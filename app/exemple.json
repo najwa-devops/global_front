@@ -1,0 +1,25 @@
+{
+    "templateName": "FACTURE_MAROCAINE_STANDARD",
+    "fields": [
+        {
+            "key": "invoiceNumber",
+            "type": "TEXT",
+            "labelPatterns": [
+                "Facture",
+                "N°",
+                "Invoice"
+            ],
+            "regexValue": "([A-Z0-9\\-]+)",
+            "required": true
+        }
+    ],
+    "invoiceNumber": {
+        "position": {
+            "x": 45.45,
+            "y": 0,
+            "width": 40,
+            "height": 4
+        },
+        "value": "202501-FA002"
+    }
+}
