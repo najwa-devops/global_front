@@ -46,7 +46,7 @@ function mapBackendDossier(raw: any): Dossier {
 }
 
 function DossiersPageContent() {
-    const { isComptable, isSuperAdmin } = useAuth()
+    const { isComptable, isAdmin } = useAuth()
     const router = useRouter()
     const [search, setSearch] = useState("")
     const [showCreateModal, setShowCreateModal] = useState(false)
@@ -113,7 +113,7 @@ function DossiersPageContent() {
                         {loading ? "Chargement..." : `${dossiers.length} dossier(s)`}
                     </h2>
                 </div>
-                {(isComptable() || isSuperAdmin()) && (
+                {(isComptable() || isAdmin()) && (
                     <Button onClick={() => setShowCreateModal(true)} className="gap-2">
                         <Plus className="h-4 w-4" />
                         Nouveau Dossier
@@ -197,7 +197,7 @@ function DossiersPageContent() {
                     <p className="text-sm text-muted-foreground mt-1">
                         {search ? "Modifiez votre recherche" : "Créez votre premier dossier"}
                     </p>
-                    {!search && (isComptable() || isSuperAdmin()) && (
+                    {!search && (isComptable() || isAdmin()) && (
                         <Button className="mt-4 gap-2" onClick={() => setShowCreateModal(true)}>
                             <Plus className="h-4 w-4" />
                             Nouveau Dossier
@@ -247,7 +247,7 @@ function DossiersPageContent() {
                                             <Button variant="ghost" size="sm" className="group-hover:text-primary" onClick={() => router.push(`/dossiers/${dossier.id}`)}>
                                                 Ouvrir <ChevronRight className="ml-1 h-4 w-4" />
                                             </Button>
-                                            {(isComptable() || isSuperAdmin()) && (
+                                            {(isComptable() || isAdmin()) && (
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
@@ -296,7 +296,7 @@ function DossiersPageContent() {
                                     <Building2 className="h-3 w-3" />
                                     {dossier.fournisseur.name}
                                 </CardDescription>
-                                {isSuperAdmin() && (
+                                {isAdmin() && (
                                     <CardDescription className="text-xs mt-0.5">
                                         Comptable : {dossier.comptableName}
                                     </CardDescription>
@@ -315,7 +315,7 @@ function DossiersPageContent() {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                        {(isComptable() || isSuperAdmin()) && (
+                                        {(isComptable() || isAdmin()) && (
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -348,7 +348,7 @@ function DossiersPageContent() {
 
 export default function DossiersPage() {
     return (
-        <AuthGuard allowedRoles={["COMPTABLE", "SUPER_ADMIN"]}>
+        <AuthGuard allowedRoles={["COMPTABLE", "ADMIN", "CLIENT"]}>
             <DossiersPageContent />
         </AuthGuard>
     )

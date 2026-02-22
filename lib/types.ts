@@ -64,6 +64,28 @@ export type DynamicInvoiceStatus =
 export type BackendInvoiceStatus = "VERIFY" | "READY_TO_TREAT" | "READY_TO_VALIDATE" | "VALIDATED" | "REJECTED" | "PENDING" | "PROCESSING" | "TREATED" | "ERROR" | "TO_VERIFY"
 
 // ============================================
+// AUTH / UTILISATEURS
+// ============================================
+
+export type UserRole = "ADMIN" | "COMPTABLE" | "CLIENT" | "SUPER_ADMIN" | "FOURNISSEUR"
+
+export interface AuthUser {
+  id: number
+  username: string
+  role: UserRole
+  displayName?: string
+  email?: string
+  active?: boolean
+}
+
+export interface CreateUserRequest {
+  username: string
+  password: string
+  role: UserRole
+  displayName?: string
+}
+
+// ============================================
 // COMPTABILITE
 // ============================================
 
@@ -160,6 +182,28 @@ export interface UpdateTierRequest {
   active?: boolean | undefined;
 }
 
+export interface AccountingEntry {
+  id: number;
+  AC?: string | number;
+  dossierId?: number;
+  invoiceId?: number;
+  invoiceNumber?: string;
+  supplier?: string;
+  journal?: string;
+  accountNumber: string;
+  entryDate?: string;
+  debit?: number;
+  credit?: number;
+  label?: string;
+  createdAt?: string;
+  createdBy?: string;
+}
+
+export interface AccountingJournalDefaults {
+  purchaseJournal?: string;
+  salesJournal?: string;
+}
+
 // ============================================
 // TYPES RELEVÉ BANCAIRE
 // ============================================
@@ -184,6 +228,18 @@ export interface LocalBankStatement {
   isProcessing?: boolean | undefined
   createdAt: Date
   updatedAt?: Date | undefined
+}
+
+export interface BankStatementStats {
+  total: number
+  pending: number
+  processing: number
+  readyToValidate: number
+  validated: number
+  error: number
+  totalRibs: number
+  invalid: number
+  averageConfidence: number
 }
 
 export interface DynamicInvoice {
@@ -223,11 +279,20 @@ export interface DynamicInvoice {
     type: string
     value: string
   } | undefined
+  clientValidated?: boolean
+  clientValidatedAt?: Date
+  clientValidatedBy?: string
+  accounted?: boolean
+  accountedAt?: Date
+  accountedBy?: string
+  isAvoir?: boolean
   createdAt: Date
   updatedAt?: Date | undefined
   validatedAt?: Date | undefined
   validatedBy?: string | undefined
 }
+
+export type LocalInvoice = DynamicInvoice
 
 // ============================================
 // TYPES TEMPLATES LOCAUX
@@ -469,6 +534,13 @@ export interface DynamicInvoiceDto {
   canCreateTemplate?: boolean
   tier?: Tier
   dossierId?: number
+  clientValidated?: boolean
+  clientValidatedAt?: string
+  clientValidatedBy?: string
+  accounted?: boolean
+  accountedAt?: string
+  accountedBy?: string
+  isAvoir?: boolean
 }
 
 export interface DynamicInvoiceCreateResponseDto {

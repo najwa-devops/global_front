@@ -66,6 +66,8 @@ function ComptableDossiersContent() {
                 dossierNom: req.name,
                 fournisseurEmail: req.fournisseurEmail,
                 comptableId,
+                fournisseurName: req.fournisseurName,
+                fournisseurPassword: req.fournisseurPassword,
             })
             toast.success(`Dossier "${req.name}" créé.`)
             setShowCreate(false)
@@ -182,7 +184,7 @@ function ComptableDossiersContent() {
 
 export default function ComptableDossiersPage() {
     return (
-        <AuthGuard allowedRoles={["SUPER_ADMIN"]}>
+        <AuthGuard allowedRoles={["ADMIN"]}>
             <ComptableDossiersContent />
         </AuthGuard>
     )

@@ -14,15 +14,15 @@ import { AdminService } from "@/src/api/services/admin.service"
 import { ComptableAdminDto } from "@/src/types"
 
 function AdminUsersPageContent() {
-    const [email, setEmail] = useState("")
+    const [username, setUsername] = useState("")
     const [password, setPassword] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [createdComptables, setCreatedComptables] = useState<ComptableAdminDto[]>([])
 
     const canSubmit = useMemo(() => {
-        return !!email.trim() && !!password.trim() && !isSubmitting
-    }, [email, password, isSubmitting])
+        return !!username.trim() && !!password.trim() && !isSubmitting
+    }, [username, password, isSubmitting])
 
     const onCreateComptable = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -31,13 +31,13 @@ function AdminUsersPageContent() {
         try {
             setIsSubmitting(true)
             const created = await AdminService.createComptable({
-                email: email.trim(),
+                username: username.trim(),
                 password: password.trim(),
             })
 
             setCreatedComptables(prev => [created, ...prev])
-            toast.success(`Comptable créé: ${created.email}`)
-            setEmail("")
+            toast.success(`Comptable créé: ${created.username}`)
+            setUsername("")
             setPassword("")
         } catch (err) {
             if (err instanceof ApiError) {
@@ -77,7 +77,7 @@ function AdminUsersPageContent() {
                         Ajouter un comptable
                     </CardTitle>
                     <CardDescription>
-                        Créez un utilisateur avec le rôle COMPTABLE (endpoint: /api/admin/comptables). La liste est chargée via /api/admin/users?role=COMPTABLE.
+                        Créez un utilisateur avec le rôle COMPTABLE (endpoint: POST /api/auth/users). La liste est récupérée du même endpoint puis filtrée par rôle.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -87,8 +87,8 @@ function AdminUsersPageContent() {
                             <Input
                                 id="comptable-email"
                                 type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
                                 placeholder="comptable@cabinet.ma"
                                 disabled={isSubmitting}
                                 required
@@ -166,7 +166,7 @@ function AdminUsersPageContent() {
 
 export default function AdminUsersPage() {
     return (
-        <AuthGuard allowedRoles={["SUPER_ADMIN"]}>
+        <AuthGuard allowedRoles={["ADMIN"]}>
             <AdminUsersPageContent />
         </AuthGuard>
     )

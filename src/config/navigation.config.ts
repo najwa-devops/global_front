@@ -11,7 +11,9 @@ import {
     Users,
     BarChart3,
     Sparkles,
-    ChevronLeft
+    ChevronLeft,
+    Clock,
+    BookOpenCheck
 } from "lucide-react";
 import { UserRole } from "@/src/types";
 
@@ -27,9 +29,34 @@ export interface NavItemConfig {
 
 // Global Nav Items (When NO dossier is active)
 export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
-    SUPER_ADMIN: [
+    ADMIN: [
         { id: "admin-dashboard", href: "/admin", label: "Administration", icon: ShieldCheck },
         { id: "all-dossiers", href: "/dossiers", label: "Tous les Dossiers", icon: FolderOpen },
+        {
+            id: "global-billing",
+            href: "/facturation",
+            label: "Facturation",
+            icon: FileText,
+            children: [
+                { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload },
+                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2 },
+                { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck },
+                { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
+            ]
+        },
+        {
+            id: "global-bank",
+            href: "/bank",
+            label: "Relevés bancaires",
+            icon: Building2,
+            children: [
+                { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload },
+                { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List },
+                { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2 },
+            ]
+        },
         {
             id: "system-parent",
             href: "/admin/gestion",
@@ -56,6 +83,31 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
         { id: "dossiers", href: "/dossiers", label: "Mes Dossiers", icon: FolderOpen },
         { id: "admin-dashboard", href: "/dossiers", label: "Tableau de bord", icon: Building2 },
         {
+            id: "global-billing",
+            href: "/facturation",
+            label: "Facturation",
+            icon: FileText,
+            children: [
+                { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload },
+                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2 },
+                { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck },
+                { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
+            ]
+        },
+        {
+            id: "global-bank",
+            href: "/bank",
+            label: "Relevés bancaires",
+            icon: Building2,
+            children: [
+                { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload },
+                { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List },
+                { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2 },
+            ]
+        },
+        {
             id: "configuration-parent",
             href: "/configuration",
             label: "Configuration",
@@ -66,26 +118,40 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             ]
         }
     ],
-    FOURNISSEUR: [
+    CLIENT: [
         { id: "my-dossier", href: "/dashboard", label: "Mon Dossier", icon: FolderOpen },
-        { id: "upload", href: "/upload", label: "Déposer Facture", icon: Upload },
+        {
+            id: "global-billing",
+            href: "/facturation",
+            label: "Facturation",
+            icon: FileText,
+            children: [
+                { id: "upload", href: "/upload", label: "Déposer Facture", icon: Upload },
+                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2 },
+            ]
+        },
     ]
 };
 
 // Contextual Nav Items (When a dossier IS active)
 export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[] => [
-    { id: "back", href: "/dossiers", label: "Indice des dossiers", icon: ChevronLeft, roles: ["COMPTABLE", "SUPER_ADMIN"] },
-    { id: "dash", href: `/dossiers/${dossierId}`, label: "Tableau de bord", icon: Building2, roles: ["COMPTABLE", "SUPER_ADMIN", "FOURNISSEUR"] },
+    { id: "back", href: "/dossiers", label: "Indice des dossiers", icon: ChevronLeft, roles: ["COMPTABLE", "ADMIN"] },
+    { id: "dash", href: `/dossiers/${dossierId}`, label: "Tableau de bord", icon: Building2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
     {
         id: "billing",
         href: "#",
         label: "Facturation",
         icon: FileText,
-        roles: ["COMPTABLE", "SUPER_ADMIN", "FOURNISSEUR"],
+        roles: ["COMPTABLE", "ADMIN", "CLIENT"],
         children: [
-            { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "SUPER_ADMIN", "FOURNISSEUR"] },
-            { id: "invoices", href: "/invoices", label: "Mes Factures", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "SUPER_ADMIN", "FOURNISSEUR"] },
-            { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "SUPER_ADMIN", "FOURNISSEUR"] },
+            { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "invoices", href: "/invoices", label: "Mes Factures", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
         ]
     },
     {
@@ -93,10 +159,11 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         href: "#",
         label: "Banque",
         icon: Building2,
-        roles: ["COMPTABLE", "SUPER_ADMIN"],
+        roles: ["COMPTABLE", "ADMIN"],
         children: [
-            { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload, roles: ["COMPTABLE", "SUPER_ADMIN"] },
-            { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List, roles: ["COMPTABLE", "SUPER_ADMIN"] },
+            { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN"] },
         ]
     },
     {
@@ -104,10 +171,10 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         href: "#",
         label: "Configuration",
         icon: Sliders,
-        roles: ["COMPTABLE", "SUPER_ADMIN"],
+        roles: ["COMPTABLE", "ADMIN"],
         children: [
-            { id: "accounting-settings", href: "/settings/accounting", label: "Plan Comptable", icon: Building2, roles: ["COMPTABLE", "SUPER_ADMIN"] },
-            { id: "patterns", href: "/settings/patterns", label: "Patterns OCR", icon: Settings, roles: ["COMPTABLE", "SUPER_ADMIN"] },
+            { id: "accounting-settings", href: "/settings/accounting", label: "Plan Comptable", icon: Building2, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "patterns", href: "/settings/patterns", label: "Patterns OCR", icon: Settings, roles: ["COMPTABLE", "ADMIN"] },
         ]
     }
 ];
@@ -119,8 +186,12 @@ export const ROUTE_METADATA: Record<string, { title: string; breadcrumb?: string
     "/upload": { title: "Nouveau dépôt", breadcrumb: "Uploader" },
     "/invoices": { title: "Factures en traitement", breadcrumb: "Factures" },
     "/validated": { title: "Factures validées", breadcrumb: "Archives" },
+    "/client-pending": { title: "Factures en attente", breadcrumb: "Attente" },
+    "/accounted": { title: "Factures comptabilisées", breadcrumb: "Comptabilisées" },
+    "/comptability": { title: "Journal comptable", breadcrumb: "Journal" },
     "/bank/list": { title: "Relevés Bancaires", breadcrumb: "Banque" },
     "/bank/upload": { title: "Importer un relevé", breadcrumb: "Import" },
+    "/bank/validated": { title: "Relevés validés", breadcrumb: "Validés" },
     "/settings/accounting": { title: "Plan Comptable & Tiers", breadcrumb: "Comptabilité" },
     "/settings/patterns": { title: "Filtres & Patterns", breadcrumb: "Patterns" },
     "/templates": { title: "Modèles OCR", breadcrumb: "Templates" },

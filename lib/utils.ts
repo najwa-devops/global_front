@@ -175,7 +175,7 @@ export function dynamicInvoiceDtoToLocal(dto: DynamicInvoiceDto): DynamicInvoice
     originalName: dto.originalName,
     filePath: dto.filePath,
     fileSize: dto.fileSize,
-    fileUrl: getFileUrl(dto.filePath || dto.filename),
+    fileUrl: getFileUrl(dto.filePath || dto.filename, dto.id),
     extractedText: dto.extractedText,
     headerText: dto.headerRawText || dto.fieldsData?.headerRawText,
     footerText: dto.footerRawText || dto.fieldsData?.footerRawText,
@@ -199,6 +199,13 @@ export function dynamicInvoiceDtoToLocal(dto: DynamicInvoiceDto): DynamicInvoice
     averageConfidence: dto.fieldsData?.averageConfidence || dto.averageConfidence,
     allFieldsFound: dto.fieldsData?.allFieldsFound || dto.allFieldsFound,
     tier: dto.tier,
+    clientValidated: dto.clientValidated ?? dto.fieldsData?.clientValidated,
+    clientValidatedAt: dto.clientValidatedAt ? new Date(dto.clientValidatedAt) : undefined,
+    clientValidatedBy: dto.clientValidatedBy,
+    accounted: dto.accounted ?? dto.fieldsData?.accounted,
+    accountedAt: dto.accountedAt ? new Date(dto.accountedAt) : undefined,
+    accountedBy: dto.accountedBy,
+    isAvoir: dto.isAvoir,
     createdAt: new Date(dto.createdAt),
     updatedAt: dto.updatedAt ? new Date(dto.updatedAt) : undefined,
   }
@@ -215,6 +222,10 @@ export function dynamicInvoiceToUpdateDto(invoice: DynamicInvoice): Record<strin
 
   return fields
 }
+
+// Alias pour compatibilité avec les pages héritées
+export const invoiceDtoToLocal = dynamicInvoiceDtoToLocal
+export const localInvoiceToUpdateDto = dynamicInvoiceToUpdateDto
 
 // ============================================
 // FORMATAGE
@@ -271,6 +282,62 @@ export function formatFileSize(bytes: number | null): string {
 }
 
 // ============================================
+// EXPORT
+// ============================================
+
+export function exportInvoicesToCsv(invoices: DynamicInvoice[], filename: string) {
+  if (typeof window === "undefined") return
+  const headers = [
+    "id",
+    "filename",
+    "invoiceNumber",
+    "supplier",
+    "invoiceDate",
+    "amountHT",
+    "tva",
+    "amountTTC",
+    "status",
+  ]
+
+  const rows = invoices.map((invoice) => {
+    const field = (key: string) =>
+      invoice.fields.find((f) => f.key === key)?.value ?? ""
+    return [
+      invoice.id,
+      invoice.filename,
+      String(field("invoiceNumber") ?? ""),
+      String(field("supplier") ?? ""),
+      String(field("invoiceDate") ?? ""),
+      String(field("amountHT") ?? ""),
+      String(field("tva") ?? ""),
+      String(field("amountTTC") ?? ""),
+      invoice.status || "",
+    ]
+  })
+
+  const escapeCsv = (value: any) => {
+    const str = String(value ?? "")
+    if (str.includes(",") || str.includes("\"") || str.includes("\n")) {
+      return `"${str.replace(/"/g, "\"\"")}"`
+    }
+    return str
+  }
+
+  const csv = [
+    headers.map(escapeCsv).join(","),
+    ...rows.map((row) => row.map(escapeCsv).join(",")),
+  ].join("\n")
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+// ============================================
 // VALIDATION
 // ============================================
 
@@ -278,6 +345,8 @@ export function isDynamicInvoiceComplete(invoice: DynamicInvoice): boolean {
   const requiredFields = invoice.fields.filter((f) => f.required)
   return requiredFields.every((f) => f.value !== null && f.value !== "")
 }
+
+export const isInvoiceComplete = isDynamicInvoiceComplete
 
 export function validateAmounts(
   ht: number,

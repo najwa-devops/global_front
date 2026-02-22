@@ -8,8 +8,8 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     authenticated: boolean;
-    login: (email: string, password?: string) => Promise<void>;
-    logout: () => void;
+    login: (username: string, password: string) => Promise<void>;
+    logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
 }
 
@@ -22,16 +22,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const fetchUser = useCallback(async () => {
         try {
-            // Dans le fournisseur, on ne met loading=true que si on n'a pas déjà de données
-            // ou si on veut forcer un reload.
-            if (AuthService.isAuthenticated()) {
-                const userData = await AuthService.me();
-                setUser(userData);
-                setAuthenticated(true);
-            } else {
-                setUser(null);
-                setAuthenticated(false);
-            }
+            const userData = await AuthService.me();
+            setUser(userData);
+            setAuthenticated(true);
         } catch (error) {
             console.error('Authentication check failed', error);
             setUser(null);
@@ -45,23 +38,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fetchUser();
     }, [fetchUser]);
 
-    const login = async (email: string, password?: string) => {
+    const login = async (username: string, password: string) => {
         setLoading(true);
         try {
-            const request: LoginRequest = { email };
-            if (password !== undefined) {
-                request.password = password;
-            }
-            const response = await AuthService.login(request);
-            setUser(response.user);
+            const request: LoginRequest = { username: username.trim(), password };
+            const userData = await AuthService.login(request);
+            setUser(userData);
             setAuthenticated(true);
         } finally {
             setLoading(false);
         }
     };
 
-    const logout = () => {
-        AuthService.logout();
+    const logout = async () => {
+        await AuthService.logout();
         setUser(null);
         setAuthenticated(false);
     };

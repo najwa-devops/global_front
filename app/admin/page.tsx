@@ -304,7 +304,7 @@ function AdminPageContent() {
 
 export default function AdminPage() {
     return (
-        <AuthGuard allowedRoles={["SUPER_ADMIN"]}>
+        <AuthGuard allowedRoles={["ADMIN"]}>
             <AdminPageContent />
         </AuthGuard>
     )

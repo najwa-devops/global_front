@@ -1,12 +1,47 @@
 import apiClient from '../api-client';
-import { LoginRequest, LoginResponse, User } from '@/src/types';
-import { USE_MOCK, MOCK_USERS } from '@/src/mock/data.mock';
+import { LoginRequest, User } from '@/src/types';
 
-interface BackendLoginData {
-    token: string;
-    userId: number;
-    email: string;
+const AUTH_USER_KEY = 'auth_user';
+
+interface BackendUserPayload {
+    id: number;
+    username: string;
     role: User['role'];
+    displayName?: string;
+    active?: boolean;
+}
+
+interface BackendLoginResponse {
+    message?: string;
+    user: BackendUserPayload;
+}
+
+interface BackendMeResponse extends BackendUserPayload {}
+
+function mapBackendUser(payload: BackendUserPayload): User {
+    const username = payload.username || '';
+    const displayName = payload.displayName || username || 'Utilisateur';
+    const name = displayName || (username.includes('@') ? username.split('@')[0] : username);
+
+    return {
+        id: Number(payload.id),
+        username,
+        displayName,
+        name,
+        email: username,
+        role: payload.role,
+        active: payload.active ?? true,
+    };
+}
+
+function storeUser(user: User) {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+}
+
+function clearStoredUser() {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(AUTH_USER_KEY);
 }
 
 /**
@@ -14,80 +49,40 @@ interface BackendLoginData {
  * Handles login, logout, and session management.
  */
 export class AuthService {
-    static async login(request: LoginRequest): Promise<LoginResponse> {
-        if (USE_MOCK) {
-            const user = MOCK_USERS[request.email];
-            if (!user || request.password !== (user.password || 'password')) {
-                throw new Error('Identifiants incorrects (Mode Mock)');
-            }
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('token', 'mock-jwt-token');
-                localStorage.setItem('mock_user_email', user.email);
-            }
-            return {
-                token: 'mock-jwt-token',
-                user,
-            };
-        }
-
-        const response = await apiClient.post<BackendLoginData>('/api/auth/login', request);
-        const { token, userId, email, role } = response.data;
-
-        const user: User = {
-            id: userId,
-            email,
-            role,
-            name: email.split('@')[0],
-            active: true,
-        };
-
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('token', token);
-            localStorage.setItem('auth_user', JSON.stringify(user));
-        }
-
-        return { token, user };
+    static async login(request: LoginRequest): Promise<User> {
+        const response = await apiClient.post<BackendLoginResponse>('/api/auth/login', request);
+        const userPayload = response.data.user;
+        const mapped = mapBackendUser(userPayload);
+        storeUser(mapped);
+        return mapped;
     }
 
     static async me(): Promise<User> {
-        if (USE_MOCK) {
-            if (typeof window !== 'undefined') {
-                const email = localStorage.getItem('mock_user_email') || 'admin@example.com';
-                return MOCK_USERS[email];
-            }
-            return MOCK_USERS['admin@example.com'];
-        }
-
         try {
-            const response = await apiClient.get<User>('/api/auth/me');
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('auth_user', JSON.stringify(response.data));
-            }
-            return response.data;
+            const response = await apiClient.get<BackendMeResponse>('/api/auth/me');
+            const mapped = mapBackendUser(response.data);
+            storeUser(mapped);
+            return mapped;
         } catch {
-            if (typeof window !== 'undefined') {
-                const stored = localStorage.getItem('auth_user');
-                if (stored) {
-                    return JSON.parse(stored) as User;
-                }
-            }
+            clearStoredUser();
             throw new Error('Unable to fetch current user');
         }
     }
 
-    static logout(): void {
+    static async logout(): Promise<void> {
+        clearStoredUser();
+        try {
+            await apiClient.post('/api/auth/logout');
+        } catch {
+            // ignore logout errors
+        }
         if (typeof window !== 'undefined') {
-            localStorage.removeItem('token');
-            localStorage.removeItem('mock_user_email');
-            localStorage.removeItem('auth_user');
             window.location.href = '/login';
         }
     }
 
     static isAuthenticated(): boolean {
-        if (typeof window !== 'undefined') {
-            return !!localStorage.getItem('token');
-        }
-        return false;
+        if (typeof window === 'undefined') return false;
+        return !!localStorage.getItem(AUTH_USER_KEY);
     }
 }

@@ -20,7 +20,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     const isLoginPage = pathname === "/login"
 
     const { currentDossier } = useDossier()
-    const displayName = (user?.name && user.name.trim()) || (user?.email ? user.email.split("@")[0] : "Utilisateur")
+    const displayName = (user?.displayName && user.displayName.trim()) || (user?.username ? user.username.split("@")[0] : "Utilisateur")
     const userInitial = displayName.charAt(0).toUpperCase() || "U"
 
     // On peut charger le compte des factures en attente ici pour le badge de la sidebar
@@ -104,8 +104,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                         {user && (
                             <div className="flex items-center gap-4">
                                 <div className="text-right hidden sm:block">
-                                    <p className="text-sm font-semibold text-foreground leading-none">{displayName}</p>
-                                    <p className="text-[10px] text-muted-foreground uppercase mt-1 tracking-wider font-bold">{user.role}</p>
+                                <p className="text-sm font-semibold text-foreground leading-none">{displayName}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase mt-1 tracking-wider font-bold">{user.role}</p>
                                 </div>
                                 <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold shadow-sm">
                                     {userInitial}

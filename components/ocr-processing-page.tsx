@@ -349,7 +349,7 @@ export function OcrProcessingPage({
 
         // CAS 2: Fichier sur serveur
         if (invoice.filePath || invoice.filename) {
-          const url = api.getFileUrl(invoice.filePath || invoice.filename)
+          const url = api.getFileUrl(invoice.filePath || invoice.filename, invoice.id)
           setDocumentUrl(url)
           setIsLoadingDocument(false)
           return
@@ -1318,6 +1318,7 @@ export function OcrProcessingPage({
                           alt="Document"
                           className="w-full"
                           draggable={false}
+                          crossOrigin="use-credentials"
                           onLoad={() => setDocumentRendered(true)}
                           onError={() => setDocumentError("Impossible de charger l'image")}
                         />
@@ -1349,7 +1350,7 @@ export function OcrProcessingPage({
                     {isPdf && (
                       <div className="relative" style={{ minHeight: '500px' }}>
                         <Document
-                          file={documentUrl}
+                          file={{ url: documentUrl, withCredentials: true }}
                           onLoadSuccess={({ numPages }) => {
                             console.log("PDF loaded successfully, pages:", numPages)
                             setNumPages(numPages)

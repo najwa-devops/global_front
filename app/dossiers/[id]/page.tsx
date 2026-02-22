@@ -27,14 +27,14 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = 
 function DossierDetailContent() {
     const params = useParams()
     const router = useRouter()
-    const { isComptable, isSuperAdmin } = useAuth()
+    const { isComptable, isAdmin } = useAuth()
     const dossierId = Number(params.id)
     const [loading, setLoading] = useState(true)
     const [dossier, setDossier] = useState<any>(null)
     const [invoices, setInvoices] = useState<any[]>([])
     const [bankStatements, setBankStatements] = useState<any[]>([])
 
-    const canEdit = isComptable() || isSuperAdmin()
+    const canEdit = isComptable() || isAdmin()
 
     const loadData = async () => {
         try {
@@ -127,7 +127,7 @@ function DossierDetailContent() {
                                 <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                                 <span className="text-sm text-muted-foreground">{dossier?.fournisseurEmail || "N/A"}</span>
                             </div>
-                            {isSuperAdmin() && (
+                            {isAdmin() && (
                                 <p className="text-xs text-muted-foreground mt-0.5">Comptable : {dossier?.comptableEmail || "N/A"}</p>
                             )}
                         </div>

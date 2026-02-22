@@ -13,7 +13,16 @@ export interface ApiResponse<T> {
     timestamp: string;
 }
 
-export type UserRole = "SUPER_ADMIN" | "COMPTABLE" | "FOURNISSEUR";
+// Role map keeps runtime values for API payloads and guards while also providing a strict union type.
+export const UserRole = {
+    SUPER_ADMIN: "SUPER_ADMIN",
+    ADMIN: "ADMIN",
+    COMPTABLE: "COMPTABLE",
+    CLIENT: "CLIENT",
+    FOURNISSEUR: "FOURNISSEUR",
+} as const;
+
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export interface User {
     id: number;
@@ -35,13 +44,16 @@ export interface LoginRequest {
 }
 
 export interface CreateComptableRequest {
-    email: string;
+    username: string;
     password: string;
+    displayName?: string;
 }
 
 export interface ComptableAdminDto {
     id: number;
+    username: string;
     email: string;
+    displayName?: string | null;
     role: "COMPTABLE";
     active: boolean;
 }

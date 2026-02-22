@@ -85,7 +85,7 @@ function ValidatedPageContent() {
 
 export default function Page() {
     return (
-        <AuthGuard allowedRoles={["COMPTABLE", "SUPER_ADMIN"]}>
+        <AuthGuard allowedRoles={["COMPTABLE", "ADMIN", "CLIENT"]}>
             <ValidatedPageContent />
         </AuthGuard>
     )

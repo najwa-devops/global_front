@@ -27,6 +27,7 @@ export class ApiError extends Error {
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout: REQUEST_TIMEOUT,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -35,13 +36,6 @@ const apiClient: AxiosInstance = axios.create({
 // Request Interceptor
 apiClient.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-        if (typeof window !== 'undefined') {
-            const token = localStorage.getItem('token');
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-            }
-        }
-
         logger.debug(`API Request: ${config.method?.toUpperCase()} ${config.url}`, {
             params: config.params,
         });
@@ -80,7 +74,7 @@ apiClient.interceptors.response.use(
         if (status === 401) {
             logger.warn('Unauthorized access detected. Redirecting to login.');
             if (typeof window !== 'undefined') {
-                localStorage.removeItem('token');
+                localStorage.removeItem('auth_session');
                 if (!window.location.pathname.startsWith('/login')) {
                     window.location.href = '/login';
                 }

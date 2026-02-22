@@ -28,7 +28,7 @@ function UploadPageContent() {
         try {
             const dossierId = resolveDossierId()
 
-            if (user?.role !== "SUPER_ADMIN" && !dossierId) {
+            if (user?.role !== "ADMIN" && !dossierId) {
                 toast.error("Dossier requis: ouvrez un dossier avant l'upload.")
                 return
             }

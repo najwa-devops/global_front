@@ -1,71 +1,151 @@
-"use client"
+﻿"use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import type { ComponentType } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { FileText, Eye, Scan, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Sparkles, Zap, CheckCircle2 } from "lucide-react"
+import { FileText, Eye, Scan, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Sparkles, Zap, CheckCircle, BookOpenCheck, RefreshCw } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { DynamicInvoice } from "@/lib/types"
-import { formatAmount, formatDate, toWorkflowStatus } from "@/lib/utils"
+import { Checkbox } from "@/components/ui/checkbox"
+import type { LocalInvoice, UserRole } from "@/lib/types"
+import { formatAmount, formatDate } from "@/lib/utils"
+
+export type BulkAction = {
+  id: string
+  label: string
+  icon?: ComponentType<{ className?: string }>
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost"
+  onAction: (selected: LocalInvoice[]) => void | Promise<void>
+  confirmMessage?: (count: number) => string
+  disabled?: (selected: LocalInvoice[]) => boolean
+}
 
 interface InvoiceTableProps {
-  invoices: DynamicInvoice[]
-  onView: (invoice: DynamicInvoice) => void
-  onProcessOcr: (invoice: DynamicInvoice) => void
-  onProcessInline: (invoice: DynamicInvoice) => void
+  invoices: LocalInvoice[]
+  onView: (invoice: LocalInvoice) => void
+  onProcessOcr: (invoice: LocalInvoice) => void
+  onProcessInline: (invoice: LocalInvoice) => void
   onDelete: (invoiceId: number) => void
-  onConfirm?: (invoice: DynamicInvoice) => void
-  onFinalValidate?: (invoice: DynamicInvoice) => void
+  onClientValidate?: (invoice: LocalInvoice) => void | Promise<void>
+  onAccount?: (invoice: LocalInvoice) => void | Promise<void>
+  onRebuildAccounting?: (invoice: LocalInvoice) => void | Promise<void>
+  userRole?: UserRole
   itemsPerPage?: number
-  userRole?: string | undefined
+  bulkActions?: BulkAction[]
+  columnPreset?: "default" | "client-pending"
 }
 
 export function InvoiceTable({
   invoices,
   onView,
+  onProcessOcr,
   onDelete,
   onProcessInline,
-  onConfirm,
-  onFinalValidate,
+  onClientValidate,
+  onAccount,
+  onRebuildAccounting,
+  userRole,
   itemsPerPage = 10,
-  userRole
+  bulkActions = [],
+  columnPreset = "default"
 }: InvoiceTableProps) {
+  const isClient = userRole === "CLIENT"
+  const isClientPendingView = columnPreset === "client-pending"
+  const showSelection = !isClientPendingView
+  const showBulkActions = !isClientPendingView && bulkActions.length > 0
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   const totalPages = Math.ceil(invoices.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedInvoices = invoices.slice(startIndex, startIndex + itemsPerPage)
 
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const validIds = new Set(invoices.map((inv) => inv.id))
+      const next = new Set<number>()
+      prev.forEach((id) => {
+        if (validIds.has(id)) {
+          next.add(id)
+        }
+      })
+      return next
+    })
+  }, [invoices])
+
+  const selectedInvoices = useMemo(
+    () => invoices.filter((inv) => selectedIds.has(inv.id)),
+    [invoices, selectedIds],
+  )
+
+  const allSelected = invoices.length > 0 && selectedIds.size === invoices.length
+  const someSelected = selectedIds.size > 0 && !allSelected
+
+  const toggleAll = () => {
+    setSelectedIds(() => {
+      if (allSelected) {
+        return new Set()
+      }
+      return new Set(invoices.map((inv) => inv.id))
+    })
+  }
+
+  const toggleRow = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleBulkAction = async (action: BulkAction) => {
+    if (selectedInvoices.length === 0) return
+    if (action.confirmMessage) {
+      const confirmed = confirm(action.confirmMessage(selectedInvoices.length))
+      if (!confirmed) return
+    }
+    await action.onAction(selectedInvoices)
+  }
+
   const getStatusBadge = (status?: string) => {
-    const s = toWorkflowStatus(status)
-    switch (s) {
-      case "READY_TO_TREAT":
+    switch (status) {
+      case "pending":
         return (
           <Badge className="bg-amber-400/10 text-amber-400 border-amber-400/30 hover:bg-amber-400/20">
             En attente
           </Badge>
         )
-      case "VERIFY":
+      case "processing":
         return (
-          <Badge className="bg-indigo-400/10 text-indigo-400 border-indigo-400/30 hover:bg-indigo-400/20">
-            À vérifier
+          <Badge className="bg-sky-400/10 text-sky-400 border-sky-400/30 hover:bg-sky-400/20">
+            En cours
           </Badge>
         )
-      case "READY_TO_VALIDATE":
+      case "treated":
+        return (
+          <Badge className="bg-purple-400/10 text-purple-400 border-purple-400/30 hover:bg-purple-400/20">
+            Scanne terminé
+          </Badge>
+        )
+      case "ready_to_validate":
         return (
           <Badge className="bg-blue-400/10 text-blue-400 border-blue-400/30 hover:bg-blue-400/20">
             Prêt à valider
           </Badge>
         )
-      case "VALIDATED":
+      case "validated":
         return (
           <Badge className="bg-emerald-400/10 text-emerald-400 border-emerald-400/30 hover:bg-emerald-400/20">
             Validé
           </Badge>
         )
-      case "REJECTED":
+      case "error":
         return (
           <Badge className="bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20">
             Erreur
@@ -80,7 +160,32 @@ export function InvoiceTable({
     }
   }
 
-  const getTemplateBadge = (invoice: DynamicInvoice) => {
+  const getStatusBadgeSingle = (invoice: LocalInvoice) => {
+    if (invoice.accounted) {
+      return (
+        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20">
+          Comptabilisee
+        </Badge>
+      )
+    }
+    if (invoice.status === "validated") {
+      return (
+        <Badge className="bg-purple-400/10 text-purple-500 border-purple-400/30 hover:bg-purple-400/20">
+          Validee comptable
+        </Badge>
+      )
+    }
+    if (invoice.clientValidated) {
+      return (
+        <Badge className="bg-emerald-400/10 text-emerald-500 border-emerald-400/30 hover:bg-emerald-400/20">
+          Validee client
+        </Badge>
+      )
+    }
+    return getStatusBadge(invoice.status)
+  }
+
+  const getTemplateBadge = (invoice: LocalInvoice) => {
     if (invoice.templateId) {
       return (
         <div className="flex flex-col gap-1">
@@ -105,50 +210,63 @@ export function InvoiceTable({
     )
   }
 
-  const getInvoiceDate = (invoice: DynamicInvoice): string => {
+  const getAvoirBadge = (invoice: LocalInvoice) => {
+    if (!invoice.isAvoir) return null
+    return (
+      <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/30 hover:bg-rose-500/20">
+        Avoir
+      </Badge>
+    )
+  }
+
+  const getInvoiceDate = (invoice: LocalInvoice): string => {
     const dateField = invoice.fields.find((f) => f.key === "invoiceDate")
-    if (dateField?.value) {
-      if (typeof dateField.value === 'string' && dateField.value.includes('/')) {
-        return dateField.value
+    if (dateField?.value !== null && dateField?.value !== undefined) {
+      const rawValue = String(dateField.value).trim()
+      if (!rawValue) return formatDate(invoice.createdAt)
+
+      // Keep OCR-friendly day/month formats as-is (e.g. 08/01/2026, 08-01-2026).
+      if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(rawValue)) {
+        return rawValue
       }
-      try {
-        const date = new Date(dateField.value)
-        if (!isNaN(date.getTime())) {
-          return formatDate(date)
-        }
-      } catch {
-        return String(dateField.value)
+
+      const parsedDate = new Date(rawValue)
+      if (!Number.isNaN(parsedDate.getTime())) {
+        return formatDate(parsedDate)
       }
+
+      // If extraction returned a non-ISO text date, show it instead of upload date.
+      return rawValue
     }
     return formatDate(invoice.createdAt)
   }
 
-  const getSupplier = (invoice: DynamicInvoice): string => {
+  const getSupplier = (invoice: LocalInvoice): string => {
     const supplierField = invoice.fields.find((f) => f.key === "supplier")
     return supplierField?.value ? String(supplierField.value) : "-"
   }
 
-  const getHT = (invoice: DynamicInvoice): string => {
+  const getHT = (invoice: LocalInvoice): string => {
     const htField = invoice.fields.find((f) => f.key === "amountHT")
     return htField?.value ? formatAmount(htField.value) : "-"
   }
 
-  const getTVA = (invoice: DynamicInvoice): string => {
+  const getTVA = (invoice: LocalInvoice): string => {
     const tvaField = invoice.fields.find((f) => f.key === "tva")
     return tvaField?.value ? formatAmount(tvaField.value) : "-"
   }
 
-  const getTTC = (invoice: DynamicInvoice): string => {
+  const getTTC = (invoice: LocalInvoice): string => {
     const ttcField = invoice.fields.find((f) => f.key === "amountTTC")
     return ttcField?.value ? formatAmount(ttcField.value) : "-"
   }
 
-  const getInvoiceNumber = (invoice: DynamicInvoice): string => {
+  const getInvoiceNumber = (invoice: LocalInvoice): string => {
     const numField = invoice.fields.find((f) => f.key === "invoiceNumber")
     return numField?.value ? String(numField.value) : "-"
   }
 
-  const getTierAccount = (invoice: DynamicInvoice): string => {
+  const getTierAccount = (invoice: LocalInvoice): string => {
     // Priorité au compte défini sur le Tier associé
     if (invoice.tier) {
       if (invoice.tier.tierNumber) {
@@ -163,19 +281,27 @@ export function InvoiceTable({
     return field?.value ? String(field.value) : "-"
   }
 
-  const getChargeAccount = (invoice: DynamicInvoice): string => {
+  const getChargeAccount = (invoice: LocalInvoice): string => {
     if (invoice.tier?.defaultChargeAccount) return invoice.tier.defaultChargeAccount
     const field = invoice.fields.find(f => f.key === "chargeAccount")
     return field?.value ? String(field.value) : "-"
   }
 
-  const getTvaAccount = (invoice: DynamicInvoice): string => {
+  const getTvaAccount = (invoice: LocalInvoice): string => {
     if (invoice.tier?.tvaAccount) return invoice.tier.tvaAccount
     const field = invoice.fields.find(f => f.key === "tvaAccount")
     return field?.value ? String(field.value) : "-"
   }
 
-  const handleDelete = (invoice: DynamicInvoice) => {
+  const isComptableScannedOrValidated = (invoice: LocalInvoice) =>
+    invoice.status === "treated" ||
+    invoice.status === "ready_to_validate" ||
+    invoice.status === "validated"
+
+  const handleDelete = (invoice: LocalInvoice) => {
+    if (isClient && (invoice.clientValidated || isComptableScannedOrValidated(invoice))) {
+      return
+    }
     if (!confirm(`Êtes-vous sûr de vouloir supprimer "${invoice.filename}" ?`)) {
       return
     }
@@ -201,6 +327,30 @@ export function InvoiceTable({
               {invoices.length} facture{invoices.length !== 1 ? "s" : ""} enregistrée{invoices.length !== 1 ? "s" : ""}
             </CardDescription>
           </div>
+          {showBulkActions && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-sm text-muted-foreground">
+                {selectedInvoices.length} sélectionnée{selectedInvoices.length !== 1 ? "s" : ""}
+              </div>
+              {bulkActions.map((action) => {
+                const Icon = action.icon
+                const disabled = action.disabled ? action.disabled(selectedInvoices) : selectedInvoices.length === 0
+                return (
+                  <Button
+                    key={action.id}
+                    variant={action.variant || "outline"}
+                    size="sm"
+                    onClick={() => handleBulkAction(action)}
+                    disabled={disabled}
+                    className="gap-2"
+                  >
+                    {Icon && <Icon className="h-4 w-4" />}
+                    {action.label}
+                  </Button>
+                )
+              })}
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -220,17 +370,36 @@ export function InvoiceTable({
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/50 hover:bg-transparent">
+                    {showSelection && (
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                          onCheckedChange={() => toggleAll()}
+                          aria-label="Sélectionner toutes les factures"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead className="w-16 text-muted-foreground">Aperçu</TableHead>
-                    <TableHead className="text-muted-foreground">Statut</TableHead>
-                    <TableHead className="text-muted-foreground">N° Facture</TableHead>
-                    <TableHead className="text-muted-foreground">Fournisseur</TableHead>
-                    <TableHead className="text-muted-foreground">Date Facture</TableHead>
-                    <TableHead className="text-muted-foreground">Montant HT</TableHead>
-                    <TableHead className="text-muted-foreground">TVA</TableHead>
-                    <TableHead className="text-muted-foreground">Montant TTC</TableHead>
-                    <TableHead className="text-muted-foreground">Compte Tier</TableHead>
-                    <TableHead className="text-muted-foreground">Cpt HT</TableHead>
-                    <TableHead className="text-muted-foreground">Cpt TVA</TableHead>
+                    {isClientPendingView ? (
+                      <>
+                        <TableHead className="text-muted-foreground">Date Facture</TableHead>
+                        <TableHead className="text-muted-foreground">Statut</TableHead>
+                      </>
+                    ) : (
+                      <>
+                        <TableHead className="text-muted-foreground">N° Facture</TableHead>
+                        <TableHead className="text-muted-foreground">Fournisseur</TableHead>
+                        <TableHead className="text-muted-foreground">Date Facture</TableHead>
+                        <TableHead className="text-muted-foreground">Montant HT</TableHead>
+                        <TableHead className="text-muted-foreground">TVA</TableHead>
+                        <TableHead className="text-muted-foreground">Montant TTC</TableHead>
+                        <TableHead className="text-muted-foreground">Compte Tier</TableHead>
+                        <TableHead className="text-muted-foreground">Cpt HT</TableHead>
+                        <TableHead className="text-muted-foreground">Cpt TVA</TableHead>
+                        <TableHead className="text-muted-foreground">Statut</TableHead>
+                      </>
+                    )}
                     <TableHead className="text-right text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -242,6 +411,15 @@ export function InvoiceTable({
                       style={{ animationDelay: `${index * 50}ms` }}
                       onClick={() => onView(invoice)}
                     >
+                      {showSelection && (
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(invoice.id)}
+                            onCheckedChange={() => toggleRow(invoice.id)}
+                            aria-label={`Sélectionner la facture ${invoice.id}`}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="h-12 w-12 rounded-lg border border-border/50 bg-muted/50 flex items-center justify-center overflow-hidden relative">
                           {invoice.isProcessing && (
@@ -260,21 +438,30 @@ export function InvoiceTable({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                      <TableCell className="font-medium text-foreground">
-                        <div className="flex flex-col gap-1">
-                          {getInvoiceNumber(invoice)}
-                          {getTemplateBadge(invoice)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-foreground">{getSupplier(invoice)}</TableCell>
-                      <TableCell className="text-muted-foreground">{getInvoiceDate(invoice)}</TableCell>
-                      <TableCell className="font-semibold text-foreground">{getHT(invoice)}</TableCell>
-                      <TableCell className="font-semibold text-muted-foreground">{getTVA(invoice)}</TableCell>
-                      <TableCell className="font-semibold text-primary">{getTTC(invoice)}</TableCell>
-                      <TableCell className="text-xs font-mono">{getTierAccount(invoice)}</TableCell>
-                      <TableCell className="text-xs font-mono">{getChargeAccount(invoice)}</TableCell>
-                      <TableCell className="text-xs font-mono">{getTvaAccount(invoice)}</TableCell>
+                      {isClientPendingView ? (
+                        <>
+                          <TableCell className="text-muted-foreground">{getInvoiceDate(invoice)}</TableCell>
+                          <TableCell>{getStatusBadgeSingle(invoice)}</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="font-medium text-foreground">
+                            <div className="flex items-center gap-2">
+                              <span>{getInvoiceNumber(invoice)}</span>
+                              {getAvoirBadge(invoice)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-foreground">{getSupplier(invoice)}</TableCell>
+                          <TableCell className="text-muted-foreground">{getInvoiceDate(invoice)}</TableCell>
+                          <TableCell className="font-semibold text-foreground">{getHT(invoice)}</TableCell>
+                          <TableCell className="font-semibold text-muted-foreground">{getTVA(invoice)}</TableCell>
+                          <TableCell className="font-semibold text-primary">{getTTC(invoice)}</TableCell>
+                          <TableCell className="text-xs font-mono">{getTierAccount(invoice)}</TableCell>
+                          <TableCell className="text-xs font-mono">{getChargeAccount(invoice)}</TableCell>
+                          <TableCell className="text-xs font-mono">{getTvaAccount(invoice)}</TableCell>
+                          <TableCell>{getStatusBadgeSingle(invoice)}</TableCell>
+                        </>
+                      )}
                       <TableCell>
                         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
@@ -292,41 +479,48 @@ export function InvoiceTable({
                                 <Eye className="h-4 w-4" />
                                 Voir détails
                               </DropdownMenuItem>
-
-                              {userRole === "FOURNISSEUR" && onConfirm && toWorkflowStatus(invoice.status) === "VERIFY" && (
-                                <DropdownMenuItem
-                                  onClick={() => onConfirm(invoice)}
-                                  className="gap-2 text-indigo-500 focus:text-indigo-600"
-                                >
-                                  <CheckCircle2 className="h-4 w-4" />
-                                  Confirmer l&apos;exactitude
-                                </DropdownMenuItem>
-                              )}
-
-                              {userRole !== "FOURNISSEUR" && (
+                              {!isClient && (
                                 <DropdownMenuItem
                                   onClick={() => onProcessInline(invoice)}
                                   className="gap-2"
-                                  disabled={invoice.isProcessing}
+                                  disabled={invoice.isProcessing || invoice.status === "processing"}
                                 >
                                   <Scan className="h-4 w-4" />
                                   {invoice.isProcessing ? "Traitement..." : "Traiter OCR"}
                                 </DropdownMenuItem>
                               )}
-
-                              {userRole !== "FOURNISSEUR" && onFinalValidate && toWorkflowStatus(invoice.status) === "READY_TO_VALIDATE" && (
+                              {isClient && onClientValidate && (
                                 <DropdownMenuItem
-                                  onClick={() => onFinalValidate(invoice)}
-                                  className="gap-2 text-emerald-600 focus:text-emerald-700 font-medium"
+                                  onClick={() => onClientValidate(invoice)}
+                                  className="gap-2"
+                                  disabled={invoice.clientValidated}
                                 >
-                                  <CheckCircle2 className="h-4 w-4" />
-                                  Validation finale
+                                  <CheckCircle className="h-4 w-4" />
+                                  {invoice.clientValidated ? "Déjà validée" : "Valider"}
                                 </DropdownMenuItem>
                               )}
-
+                              {!isClient && onAccount && invoice.status === "validated" && !invoice.accounted && (
+                                <DropdownMenuItem
+                                  onClick={() => onAccount(invoice)}
+                                  className="gap-2"
+                                >
+                                  <BookOpenCheck className="h-4 w-4" />
+                                  Comptabiliser
+                                </DropdownMenuItem>
+                              )}
+                              {!isClient && onRebuildAccounting && invoice.accounted && (
+                                <DropdownMenuItem
+                                  onClick={() => onRebuildAccounting(invoice)}
+                                  className="gap-2"
+                                >
+                                  <RefreshCw className="h-4 w-4" />
+                                  Rebuild ecritures
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => handleDelete(invoice)}
                                 className="gap-2 text-destructive focus:text-destructive"
+                                disabled={isClient && (invoice.clientValidated || isComptableScannedOrValidated(invoice))}
                               >
                                 <Trash2 className="h-4 w-4" />
                                 Supprimer

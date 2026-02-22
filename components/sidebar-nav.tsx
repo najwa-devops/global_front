@@ -161,7 +161,7 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
         {mode === 'dossier' && dossier && (isMobile || !collapsed) && (
           <div className="mb-6 mx-1">
             <Link
-              href="/dossiers"
+              href={user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" ? "/admin" : "/dossiers"}
               className="flex items-center gap-2 mb-4 px-2 text-[11px] font-medium text-muted-foreground hover:text-primary transition-colors group"
             >
               <ChevronLeft className="h-3 w-3 transition-transform group-hover:-translate-x-0.5" />
@@ -222,19 +222,19 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 shrink-0">
               <UserIcon className="h-4 w-4 text-primary" />
             </div>
-            {(isMobile || !collapsed) && user && (
-              <div className="flex flex-col items-start min-w-0">
-                <span className="text-xs font-semibold text-foreground truncate w-full">
-                  {user.name}
-                </span>
-                <span className="text-[10px] font-medium tracking-tight text-primary uppercase">
-                  {user.role}
-                </span>
-                <span className="text-[9px] text-muted-foreground truncate w-full mt-0.5" title={user.email}>
-                  {user.email}
-                </span>
-              </div>
-            )}
+                {(isMobile || !collapsed) && user && (
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="text-xs font-semibold text-foreground truncate w-full">
+                      {user.displayName || user.name}
+                    </span>
+                    <span className="text-[10px] font-medium tracking-tight text-primary uppercase">
+                      {user.role}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground truncate w-full mt-0.5" title={user.username || user.email}>
+                      {user.username || user.email}
+                    </span>
+                  </div>
+                )}
           </div>
         </div>
 

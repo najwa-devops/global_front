@@ -19,9 +19,9 @@ export const useAuth = () => {
         return roleArray.includes(user.role);
     };
 
-    const isComptable = () => hasRole(['COMPTABLE', 'SUPER_ADMIN']);
-    const isSuperAdmin = () => hasRole('SUPER_ADMIN');
-    const isFournisseur = () => hasRole('FOURNISSEUR');
+    const isComptable = () => hasRole(['COMPTABLE', 'ADMIN']);
+    const isAdmin = () => hasRole('ADMIN');
+    const isClient = () => hasRole('CLIENT');
 
     return {
         user,
@@ -31,8 +31,8 @@ export const useAuth = () => {
         logout,
         hasRole,
         isComptable,
-        isSuperAdmin,
-        isFournisseur,
+        isAdmin,
+        isClient,
         refreshUser,
     };
 };

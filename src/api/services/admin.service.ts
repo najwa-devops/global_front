@@ -1,7 +1,40 @@
 import apiClient from "../api-client";
-import { CreateComptableRequest, ComptableAdminDto } from "@/src/types";
+import { CreateComptableRequest, ComptableAdminDto, UserRole } from "@/src/types";
 
 const LOCAL_CREATED_COMPTABLES_KEY = "created_comptables_cache";
+
+export type AdminUserDto = {
+    id: number;
+    username: string;
+    displayName?: string | null;
+    role: UserRole;
+    active: boolean;
+};
+
+type BackendDossier = {
+    id: number;
+    name: string;
+    active?: boolean;
+    comptableId?: number | null;
+    clientId?: number | null;
+    createdAt?: string;
+    invoicesCount?: number;
+    pendingInvoicesCount?: number;
+    validatedInvoicesCount?: number;
+};
+
+let userCache: AdminUserDto[] | null = null;
+
+function toComptableDto(user: AdminUserDto): ComptableAdminDto {
+    return {
+        id: user.id,
+        username: user.username,
+        email: user.username,
+        displayName: user.displayName,
+        role: "COMPTABLE",
+        active: user.active,
+    };
+}
 
 export type AdminDossierDto = {
     id: number;
@@ -17,82 +50,75 @@ export type AdminDossierDto = {
     validatedInvoicesCount?: number;
 };
 
-export type AdminDashboardDto = {
-    usersCount: number;
-    comptablesCount: number;
-    dossiersCount: number;
-    users: Array<Record<string, unknown>>;
-    comptables: ComptableAdminDto[];
-    dossiers: AdminDossierDto[];
-};
-
 export class AdminService {
     static async createComptable(request: CreateComptableRequest): Promise<ComptableAdminDto> {
-        const response = await apiClient.post<ComptableAdminDto>("/api/admin/comptables", request);
+        const response = await apiClient.post<AdminUserDto>("/api/auth/users", {
+            username: request.username,
+            password: request.password,
+            displayName: request.displayName ?? request.username,
+            role: UserRole.COMPTABLE,
+        });
+
+        const created = toComptableDto(response.data);
+        userCache = null; // invalidate cached users so lists refresh
+
         if (typeof window !== "undefined") {
             const raw = localStorage.getItem(LOCAL_CREATED_COMPTABLES_KEY);
             const current = raw ? (JSON.parse(raw) as ComptableAdminDto[]) : [];
-            const deduped = [response.data, ...current.filter((c) => c.id !== response.data.id)];
+            const deduped = [created, ...current.filter((c) => c.id !== created.id)];
             localStorage.setItem(LOCAL_CREATED_COMPTABLES_KEY, JSON.stringify(deduped));
         }
-        return response.data;
+
+        return created;
+    }
+
+    static async listUsers(forceRefresh: boolean = false): Promise<AdminUserDto[]> {
+        if (!forceRefresh && userCache) {
+            return userCache;
+        }
+
+        const response = await apiClient.get<AdminUserDto[]>("/api/auth/users");
+        const users = Array.isArray(response.data) ? response.data : [];
+        userCache = users;
+        return users;
     }
 
     static async listComptables(): Promise<ComptableAdminDto[]> {
         try {
-            const response = await apiClient.get<{ count?: number; comptables?: ComptableAdminDto[] } | ComptableAdminDto[]>(
-                "/api/admin/comptables"
-            );
-
-            if (Array.isArray(response.data)) {
-                return response.data;
-            }
-
-            return response.data?.comptables ?? [];
+            const users = await this.listUsers();
+            return users.filter((user) => user.role === UserRole.COMPTABLE).map(toComptableDto);
         } catch {
-            // Backward-compatible fallback for older backend versions.
-            try {
-                const response = await apiClient.get<{ count?: number; users?: ComptableAdminDto[] } | ComptableAdminDto[]>(
-                    "/api/admin/users",
-                    { params: { role: "COMPTABLE" } }
-                );
-                if (Array.isArray(response.data)) {
-                    return response.data;
-                }
-                return response.data?.users ?? [];
-            } catch {
-                if (typeof window === "undefined") return [];
-                const raw = localStorage.getItem(LOCAL_CREATED_COMPTABLES_KEY);
-                return raw ? (JSON.parse(raw) as ComptableAdminDto[]) : [];
-            }
+            if (typeof window === "undefined") return [];
+            const raw = localStorage.getItem(LOCAL_CREATED_COMPTABLES_KEY);
+            return raw ? (JSON.parse(raw) as ComptableAdminDto[]) : [];
         }
     }
 
     static async listDossiers(): Promise<AdminDossierDto[]> {
-        const response = await apiClient.get<{ count?: number; dossiers?: AdminDossierDto[] } | AdminDossierDto[]>(
-            "/api/admin/dossiers"
-        );
-
-        if (Array.isArray(response.data)) {
-            return response.data;
-        }
-
-        return response.data?.dossiers ?? [];
-    }
-
-    static async getDashboard(): Promise<AdminDashboardDto> {
         try {
-            const response = await apiClient.get<AdminDashboardDto>("/api/admin/dashboard");
-            return response.data;
+            const [response, users] = await Promise.all([
+                apiClient.get<BackendDossier[]>("/api/dossiers"),
+                this.listUsers(),
+            ]);
+
+            const dossiers = Array.isArray(response.data) ? response.data : [];
+            const userMap = new Map(users.map((user) => [user.id, user]));
+
+            return dossiers.map((dossier) => ({
+                id: dossier.id,
+                name: dossier.name,
+                status: dossier.active ? "ACTIVE" : "INACTIVE",
+                comptableId: dossier.comptableId ?? null,
+                comptableEmail: dossier.comptableId ? userMap.get(dossier.comptableId)?.username ?? null : null,
+                fournisseurId: dossier.clientId ?? null,
+                fournisseurEmail: dossier.clientId ? userMap.get(dossier.clientId)?.username ?? null : null,
+                createdAt: dossier.createdAt,
+                invoicesCount: dossier.invoicesCount ?? 0,
+                pendingInvoicesCount: dossier.pendingInvoicesCount ?? 0,
+                validatedInvoicesCount: dossier.validatedInvoicesCount ?? 0,
+            }));
         } catch {
-            return {
-                usersCount: 0,
-                comptablesCount: 0,
-                dossiersCount: 0,
-                users: [],
-                comptables: [],
-                dossiers: [],
-            };
+            return [];
         }
     }
 
@@ -100,8 +126,19 @@ export class AdminService {
         fournisseurEmail: string;
         dossierNom: string;
         comptableId: number;
+        fournisseurName?: string;
+        fournisseurPassword?: string;
     }): Promise<Record<string, unknown>> {
-        const response = await apiClient.post<Record<string, unknown>>("/api/admin/fournisseurs", payload);
+        const displayName = payload.fournisseurName || payload.fournisseurEmail.split("@")[0] || payload.fournisseurEmail;
+        const response = await apiClient.post<Record<string, unknown>>("/api/dossiers", {
+            dossierName: payload.dossierNom,
+            clientUsername: payload.fournisseurEmail,
+            clientDisplayName: displayName,
+            clientPassword: payload.fournisseurPassword || "ChangeMe123!",
+            comptableId: payload.comptableId,
+        });
+
+        userCache = null;
         return response.data;
     }
 }
