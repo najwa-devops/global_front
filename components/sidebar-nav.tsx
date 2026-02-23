@@ -61,6 +61,16 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
     )
   }
 
+  const clearSelectedDossier = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("currentDossierId")
+      localStorage.removeItem("currentDossierName")
+    }
+    if (isMobile) {
+      setMobileOpen(false)
+    }
+  }
+
   const renderNavItem = (item: NavItemConfig, isChild = false) => {
     const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href) && !item.children)
     const isExpanded = openMenus.includes(item.id)
@@ -162,6 +172,7 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
           <div className="mb-6 mx-1">
             <Link
               href={user?.role === "ADMIN" || user?.role === "SUPER_ADMIN" ? "/admin" : "/dossiers"}
+              onClick={clearSelectedDossier}
               className="flex items-center gap-2 mb-4 px-2 text-[11px] font-medium text-muted-foreground hover:text-primary transition-colors group"
             >
               <ChevronLeft className="h-3 w-3 transition-transform group-hover:-translate-x-0.5" />
@@ -225,14 +236,12 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
                 {(isMobile || !collapsed) && user && (
                   <div className="flex flex-col items-start min-w-0">
                     <span className="text-xs font-semibold text-foreground truncate w-full">
-                      {user.displayName || user.name}
+                      {user.name?.trim() || user.email.split("@")[0]}
                     </span>
                     <span className="text-[10px] font-medium tracking-tight text-primary uppercase">
                       {user.role}
                     </span>
-                    <span className="text-[9px] text-muted-foreground truncate w-full mt-0.5" title={user.username || user.email}>
-                      {user.username || user.email}
-                    </span>
+                   
                   </div>
                 )}
           </div>

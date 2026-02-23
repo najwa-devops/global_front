@@ -30,7 +30,7 @@ function toComptableDto(user: AdminUserDto): ComptableAdminDto {
         id: user.id,
         username: user.username,
         email: user.username,
-        displayName: user.displayName,
+        ...(user.displayName !== undefined ? { displayName: user.displayName } : {}),
         role: "COMPTABLE",
         active: user.active,
     };
@@ -48,6 +48,15 @@ export type AdminDossierDto = {
     invoicesCount?: number;
     pendingInvoicesCount?: number;
     validatedInvoicesCount?: number;
+};
+
+export type AdminInvoiceStatsDto = {
+    verify?: number;
+    readyToTreat?: number;
+    readyToValidate?: number;
+    validated?: number;
+    rejected?: number;
+    total?: number;
 };
 
 export class AdminService {
@@ -88,10 +97,13 @@ export class AdminService {
             const users = await this.listUsers();
             return users.filter((user) => user.role === UserRole.COMPTABLE).map(toComptableDto);
         } catch {
-            if (typeof window === "undefined") return [];
-            const raw = localStorage.getItem(LOCAL_CREATED_COMPTABLES_KEY);
-            return raw ? (JSON.parse(raw) as ComptableAdminDto[]) : [];
+            return [];
         }
+    }
+
+    static async getGlobalInvoiceStats(): Promise<AdminInvoiceStatsDto> {
+        const response = await apiClient.get<AdminInvoiceStatsDto>("/api/dynamic-invoices/stats");
+        return response.data || {};
     }
 
     static async listDossiers(): Promise<AdminDossierDto[]> {
@@ -112,7 +124,7 @@ export class AdminService {
                 comptableEmail: dossier.comptableId ? userMap.get(dossier.comptableId)?.username ?? null : null,
                 fournisseurId: dossier.clientId ?? null,
                 fournisseurEmail: dossier.clientId ? userMap.get(dossier.clientId)?.username ?? null : null,
-                createdAt: dossier.createdAt,
+                ...(dossier.createdAt !== undefined ? { createdAt: dossier.createdAt } : {}),
                 invoicesCount: dossier.invoicesCount ?? 0,
                 pendingInvoicesCount: dossier.pendingInvoicesCount ?? 0,
                 validatedInvoicesCount: dossier.validatedInvoicesCount ?? 0,

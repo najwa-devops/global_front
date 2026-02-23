@@ -36,6 +36,13 @@ export function useNavigation() {
         return null;
     };
 
+    const detectDossierName = (): string | null => {
+        if (currentDossier?.name) return currentDossier.name;
+        if (typeof window === 'undefined') return null;
+        const stored = localStorage.getItem('currentDossierName');
+        return stored && stored.trim().length > 0 ? stored : null;
+    };
+
     const isDossierScopedPath = () => {
         const dossierPaths = [
             "/upload",
@@ -60,9 +67,10 @@ export function useNavigation() {
     // Si on est dans un dossier (id détecté), on renvoie la config contextuelle filtrée
     if (currentDossier || fallbackDossierId) {
         const dossierId = currentDossier?.id ?? fallbackDossierId!;
+        const dossierName = detectDossierName() ?? `Dossier #${dossierId}`;
         const dossierFallback: Dossier = currentDossier ?? {
             id: dossierId,
-            name: "Dossier",
+            name: dossierName,
             fournisseur: { id: 0, name: "", email: "" },
             comptableId: 0,
             comptableName: "",

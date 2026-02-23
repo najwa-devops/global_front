@@ -83,6 +83,14 @@ function StatsPageContent() {
         { label: "Fournisseurs uniques", value: supplierCount, icon: Building2, color: "text-purple-500", bg: "bg-purple-500/10" },
     ]
 
+    const openDossier = (id: number, name?: string | null) => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("currentDossierId", String(id))
+            localStorage.setItem("currentDossierName", (name || `Dossier #${id}`).trim())
+        }
+        router.push(`/dossiers/${id}`)
+    }
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -187,7 +195,7 @@ function StatsPageContent() {
                             <Card
                                 key={dossier.id}
                                 className="border-border/50 hover:border-border cursor-pointer"
-                                onClick={() => router.push(`/dossiers/${dossier.id}`)}
+                                onClick={() => openDossier(dossier.id, dossier.name)}
                             >
                                 <CardContent className="py-3 px-4">
                                     <div className="flex items-center justify-between gap-4">

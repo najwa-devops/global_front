@@ -152,6 +152,7 @@ function mapInvoice(raw: any): DynamicInvoiceDto {
 
 function mapBankStatus(status: string | undefined): LocalBankStatement["status"] {
   const s = String(status || "").toUpperCase()
+  if (s === "READY_TO_VALIDATE") return "treated"
   if (s.includes("VALID")) return "validated"
   if (s.includes("PENDING") || s.includes("ATTENTE")) return "pending"
   if (s.includes("PROCESS") || s.includes("COURS")) return "processing"
@@ -533,7 +534,10 @@ export async function activateTier(id: number): Promise<void> {
 // Journal comptable
 export async function getAccountingEntries(): Promise<AccountingEntry[]> {
   const dossierId = getCurrentDossierId()
-  return request<AccountingEntry[]>("/api/accounting/journal/entries", undefined, { dossierId })
+  const result = await request<any>("/api/accounting/journal/entries", undefined, { dossierId })
+  if (Array.isArray(result)) return result as AccountingEntry[]
+  if (Array.isArray(result?.entries)) return result.entries as AccountingEntry[]
+  return []
 }
 
 export async function rebuildAccountingEntries(invoiceId: number): Promise<{ message: string; entries: AccountingEntry[] }> {

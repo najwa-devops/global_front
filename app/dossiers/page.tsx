@@ -105,6 +105,14 @@ function DossiersPageContent() {
         }
     }
 
+    const openDossier = (id: number, name: string) => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("currentDossierId", String(id))
+            localStorage.setItem("currentDossierName", name)
+        }
+        router.push(`/dossiers/${id}`)
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -222,7 +230,7 @@ function DossiersPageContent() {
                                 <TableRow
                                     key={dossier.id}
                                     className="cursor-pointer hover:bg-accent/50 group"
-                                    onClick={() => router.push(`/dossiers/${dossier.id}`)}
+                                    onClick={() => openDossier(dossier.id, dossier.name)}
                                 >
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-2">
@@ -244,7 +252,7 @@ function DossiersPageContent() {
                                     <TableCell>{new Date(dossier.createdAt).toLocaleDateString("fr-FR")}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                                            <Button variant="ghost" size="sm" className="group-hover:text-primary" onClick={() => router.push(`/dossiers/${dossier.id}`)}>
+                                            <Button variant="ghost" size="sm" className="group-hover:text-primary" onClick={() => openDossier(dossier.id, dossier.name)}>
                                                 Ouvrir <ChevronRight className="ml-1 h-4 w-4" />
                                             </Button>
                                             {(isComptable() || isAdmin()) && (
@@ -270,7 +278,7 @@ function DossiersPageContent() {
                         <Card
                             key={dossier.id}
                             className="border-border/50 hover:border-primary/40 hover:shadow-md transition-all duration-200 cursor-pointer group"
-                            onClick={() => router.push(`/dossiers/${dossier.id}`)}
+                            onClick={() => openDossier(dossier.id, dossier.name)}
                         >
                             <CardHeader className="pb-3">
                                 <div className="flex items-start justify-between">

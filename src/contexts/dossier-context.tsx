@@ -73,6 +73,9 @@ export function DossierProvider({ children }: { children: ReactNode }) {
             if (mounted) setCurrentDossier(dossier);
             if (typeof window !== 'undefined') {
                 localStorage.setItem('currentDossierId', String(dossierId));
+                if (dossier?.name) {
+                    localStorage.setItem('currentDossierName', dossier.name);
+                }
             }
             if (mounted) setIsLoading(false);
         } else {
@@ -81,6 +84,9 @@ export function DossierProvider({ children }: { children: ReactNode }) {
                 if (Number.isFinite(storedDossierId) && storedDossierId > 0) {
                     const dossier = await fetchDossierById(storedDossierId);
                     if (mounted) setCurrentDossier(dossier);
+                    if (dossier?.name) {
+                        localStorage.setItem('currentDossierName', dossier.name);
+                    }
                     return;
                 }
             }

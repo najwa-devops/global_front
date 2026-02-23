@@ -29,6 +29,56 @@ export interface NavItemConfig {
 
 // Global Nav Items (When NO dossier is active)
 export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
+    SUPER_ADMIN: [
+        { id: "admin-dashboard", href: "/admin", label: "Administration", icon: ShieldCheck },
+        { id: "all-dossiers", href: "/dossiers", label: "Tous les Dossiers", icon: FolderOpen },
+        {
+            id: "global-billing",
+            href: "/facturation",
+            label: "Facturation",
+            icon: FileText,
+            children: [
+                { id: "upload", href: "/upload", label: "Nouveau dÃ©pÃ´t", icon: Upload },
+                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/validated", label: "Factures validÃ©es", icon: CheckCircle2 },
+                { id: "accounted", href: "/accounted", label: "Factures comptabilisÃ©es", icon: BookOpenCheck },
+                { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
+            ]
+        },
+        {
+            id: "global-bank",
+            href: "/bank",
+            label: "RelevÃ©s bancaires",
+            icon: Building2,
+            children: [
+                { id: "bank-upload", href: "/bank/upload", label: "Importer relevÃ©", icon: Upload },
+                { id: "bank-list", href: "/bank/list", label: "Liste des relevÃ©s", icon: List },
+                { id: "bank-validated", href: "/bank/validated", label: "RelevÃ©s validÃ©s", icon: CheckCircle2 },
+            ]
+        },
+        {
+            id: "system-parent",
+            href: "/admin/gestion",
+            label: "Gestion SystÃ¨me",
+            icon: Users,
+            children: [
+                { id: "admin-stats", href: "/admin/statistiques", label: "Statistiques", icon: BarChart3 },
+                { id: "admin-audit", href: "/admin/audit", label: "Journal d'audit", icon: ShieldCheck },
+                { id: "admin-users", href: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
+            ]
+        },
+        {
+            id: "config-parent",
+            href: "/configuration",
+            label: "Configuration",
+            icon: Sliders,
+            children: [
+                { id: "accounting-settings", href: "/settings/accounting", label: "Plan Comptable", icon: Building2 },
+                { id: "patterns", href: "/settings/patterns", label: "Filtres & Patterns", icon: Settings },
+            ]
+        }
+    ],
     ADMIN: [
         { id: "admin-dashboard", href: "/admin", label: "Administration", icon: ShieldCheck },
         { id: "all-dossiers", href: "/dossiers", label: "Tous les Dossiers", icon: FolderOpen },
@@ -130,6 +180,21 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
                 { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
                 { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
                 { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2 },
+            ]
+        },
+    ],
+    FOURNISSEUR: [
+        { id: "my-dossier", href: "/dashboard", label: "Mon Dossier", icon: FolderOpen },
+        {
+            id: "global-billing",
+            href: "/facturation",
+            label: "Facturation",
+            icon: FileText,
+            children: [
+                { id: "upload", href: "/upload", label: "DÃ©poser Facture", icon: Upload },
+                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/validated", label: "Factures validÃ©es", icon: CheckCircle2 },
             ]
         },
     ]

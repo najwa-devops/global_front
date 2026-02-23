@@ -14,7 +14,7 @@ export default function BankListPage() {
 
     const fetchStatements = async () => {
         try {
-            const data = await api.getAllBankStatements("pending")
+            const data = await api.getAllBankStatements("READY_TO_VALIDATE")
             setStatements(data)
         } catch (error) {
             console.error("Error fetching bank statements:", error)

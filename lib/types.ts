@@ -216,6 +216,25 @@ export interface BankStatementField {
   position?: FieldPosition | undefined
 }
 
+export interface BankTransaction {
+  id?: number
+  date?: string
+  dateOperation?: string
+  dateValeur?: string
+  libelle?: string
+  description?: string
+  debit?: number
+  credit?: number
+  balance?: number
+  confidenceScore?: number
+  flags?: string[]
+  transactionIndex?: number
+  compte?: string
+  isLinked?: boolean
+  sens?: string
+  isValid?: boolean
+}
+
 export interface LocalBankStatement {
   id: number
   filename: string
@@ -228,6 +247,34 @@ export interface LocalBankStatement {
   isProcessing?: boolean | undefined
   createdAt: Date
   updatedAt?: Date | undefined
+  statusCode?: string
+  rib?: string
+  month?: number
+  year?: number
+  bankName?: string
+  accountHolder?: string
+  openingBalance?: number | null
+  closingBalance?: number | null
+  totalCredit?: number
+  totalDebit?: number
+  balanceDifference?: number | null
+  transactionCount?: number
+  validTransactionCount?: number
+  errorTransactionCount?: number
+  overallConfidence?: number
+  continuityStatus?: string
+  isBalanceValid?: boolean | null
+  isContinuityValid?: boolean
+  isLinked?: boolean
+  canReprocess?: boolean
+  canDelete?: boolean
+  validatedAt?: string | null
+  validatedBy?: string | null
+  validationErrors?: unknown
+  rawOcrText?: string
+  cleanedOcrText?: string
+  transactionsPreview?: BankTransaction[]
+  transactions?: BankTransaction[]
 }
 
 export interface BankStatementStats {

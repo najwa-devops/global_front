@@ -85,6 +85,14 @@ function ComptableDossiersContent() {
         }
     }, [dossiers])
 
+    const openDossier = (id: number, name: string) => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("currentDossierId", String(id))
+            localStorage.setItem("currentDossierName", name)
+        }
+        router.push(`/dossiers/${id}`)
+    }
+
     if (!loading && !comptable) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -147,7 +155,7 @@ function ComptableDossiersContent() {
                     <Card
                         key={dossier.id}
                         className="border-border/50 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group"
-                        onClick={() => router.push(`/dossiers/${dossier.id}`)}
+                        onClick={() => openDossier(dossier.id, dossier.name)}
                     >
                         <CardHeader className="pb-2">
                             <div className="flex items-start justify-between">

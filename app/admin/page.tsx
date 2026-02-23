@@ -12,8 +12,7 @@ import {
     Users, FolderOpen, FileText, Search, ChevronRight, UserPlus, Building2, Clock,
     BarChart3, ShieldCheck
 } from "lucide-react"
-import { api } from "@/lib/api"
-import { AdminService, AdminDossierDto } from "@/src/api/services/admin.service"
+import { AdminService, AdminDossierDto, AdminInvoiceStatsDto } from "@/src/api/services/admin.service"
 import { ComptableAdminDto } from "@/src/types"
 
 type DossierRow = {
@@ -35,7 +34,7 @@ function AdminPageContent() {
     const router = useRouter()
     const [search, setSearch] = useState("")
     const [loading, setLoading] = useState(true)
-    const [stats, setStats] = useState<any>(null)
+    const [stats, setStats] = useState<AdminInvoiceStatsDto | null>(null)
     const [comptables, setComptables] = useState<ComptableAdminDto[]>([])
     const [dossiers, setDossiers] = useState<DossierRow[]>([])
 
@@ -43,7 +42,7 @@ function AdminPageContent() {
         const load = async () => {
             try {
                 const [statsData, dossiersData, comptablesData] = await Promise.all([
-                    api.getDynamicInvoiceStats().catch(() => null),
+                    AdminService.getGlobalInvoiceStats().catch(() => null),
                     AdminService.listDossiers().catch(() => []),
                     AdminService.listComptables().catch(() => []),
                 ])
@@ -101,6 +100,14 @@ function AdminPageContent() {
     const uniqueFournisseurs = useMemo(() => {
         return new Set(dossiers.map((d) => d.fournisseurName)).size
     }, [dossiers])
+
+    const openDossier = (id: number, name: string) => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("currentDossierId", String(id))
+            localStorage.setItem("currentDossierName", name)
+        }
+        router.push(`/dossiers/${id}`)
+    }
 
     return (
         <div className="space-y-6">
@@ -242,7 +249,7 @@ function AdminPageContent() {
                             <Card
                                 key={dossier.id}
                                 className="border-border/50 hover:border-border cursor-pointer"
-                                onClick={() => router.push(`/dossiers/${dossier.id}`)}
+                                onClick={() => openDossier(dossier.id, dossier.name)}
                             >
                                 <CardContent className="py-3 px-4">
                                     <div className="flex items-center justify-between gap-4">
