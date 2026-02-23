@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { FileText, Clock, CheckCircle, TrendingUp } from "lucide-react"
 import type { DynamicInvoice } from "@/lib/types"
+import { api } from "@/lib/api"
 import { formatAmount, toWorkflowStatus } from "@/lib/utils"
 
 interface StatsCardsProps {
@@ -10,13 +12,49 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ invoices }: StatsCardsProps) {
+  const [serverStats, setServerStats] = useState<Record<string, number> | null>(null)
+
+  const localStats = useMemo(() => {
+    return {
+      total: invoices.length,
+      pending: invoices.filter((i) =>
+        ["VERIFY", "READY_TO_TREAT", "READY_TO_VALIDATE"].includes(toWorkflowStatus(i.status))
+      ).length,
+      validated: invoices.filter((i) => toWorkflowStatus(i.status) === "VALIDATED").length,
+      errors: invoices.filter((i) => toWorkflowStatus(i.status) === "REJECTED").length,
+    }
+  }, [invoices])
+
+  useEffect(() => {
+    let mounted = true
+
+    const loadStats = async () => {
+      try {
+        const stats = await api.getInvoiceStats()
+        if (mounted) setServerStats((stats || {}) as Record<string, number>)
+      } catch {
+        if (mounted) setServerStats(null)
+      }
+    }
+
+    loadStats()
+    return () => {
+      mounted = false
+    }
+  }, [invoices])
+
+  const hasServerPending =
+    serverStats?.verify !== undefined ||
+    serverStats?.readyToTreat !== undefined ||
+    serverStats?.readyToValidate !== undefined
+
   const stats = {
-    total: invoices.length,
-    pending: invoices.filter((i) =>
-      ["VERIFY", "READY_TO_TREAT", "READY_TO_VALIDATE"].includes(toWorkflowStatus(i.status))
-    ).length,
-    validated: invoices.filter((i) => toWorkflowStatus(i.status) === "VALIDATED").length,
-    errors: invoices.filter((i) => toWorkflowStatus(i.status) === "REJECTED").length,
+    total: serverStats?.total ?? localStats.total,
+    pending: hasServerPending
+      ? (serverStats?.verify ?? 0) + (serverStats?.readyToTreat ?? 0) + (serverStats?.readyToValidate ?? 0)
+      : localStats.pending,
+    validated: serverStats?.validated ?? localStats.validated,
+    errors: serverStats?.rejected ?? localStats.errors,
   }
 
   const totalAmount = invoices.reduce((sum, inv) => {

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { api } from "@/lib/api"
 import { dynamicInvoiceDtoToLocal, toWorkflowStatus } from "@/lib/utils"
-import { type DynamicInvoice, type LocalTemplate } from "@/lib/types"
+import { type DynamicInvoice } from "@/lib/types"
 import { StatsCards } from "@/components/stats-cards"
 import { InvoiceFilters, type FilterValues } from "@/components/invoice-filters"
 import { InvoiceTable } from "@/components/invoice-table"
@@ -27,7 +27,7 @@ export default function DashboardPage() {
         const loadData = async () => {
             try {
                 setIsLoading(true)
-                const dtos = await api.getAllInvoices()
+                const dtos = await api.getAllInvoices(undefined, undefined, 1000)
                 const localInvoices = dtos.map(dynamicInvoiceDtoToLocal)
                 localInvoices.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
                 setInvoices(localInvoices)
@@ -95,7 +95,7 @@ export default function DashboardPage() {
         try {
             toast.loading("Traitement OCR en cours...", { id: `process-${invoice.id}` })
             await api.processInvoice(invoice.id)
-            const dtos = await api.getAllInvoices()
+            const dtos = await api.getAllInvoices(undefined, undefined, 1000)
             setInvoices(dtos.map(dynamicInvoiceDtoToLocal))
             toast.success(`✓ OCR terminé`, { id: `process-${invoice.id}` })
         } catch (err) {

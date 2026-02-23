@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAccounting } from "../hooks/use-accounting";
 import { Account, Tier } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,6 +52,7 @@ export function AccountingSettingsPage() {
   } = useAccounting();
 
   const [activeTab, setActiveTab] = useState("accounts");
+  const [hasSelectedDossier, setHasSelectedDossier] = useState(false);
   const [searchAccountQuery, setSearchAccountQuery] = useState("");
   const [searchTierQuery, setSearchTierQuery] = useState("");
   const [accountClassFilter, setAccountClassFilter] = useState<number | null>(
@@ -262,6 +263,13 @@ export function AccountingSettingsPage() {
     (a) => a.code.startsWith("345") || a.code.startsWith("445"),
   );
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const rawDossierId = window.localStorage.getItem("currentDossierId");
+    const dossierId = Number(rawDossierId);
+    setHasSelectedDossier(Boolean(rawDossierId) && Number.isFinite(dossierId) && dossierId > 0);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -278,9 +286,11 @@ export function AccountingSettingsPage() {
         onValueChange={setActiveTab}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+        <TabsList
+          className={`grid w-full ${hasSelectedDossier ? "grid-cols-2 lg:w-[400px]" : "grid-cols-1 lg:w-[200px]"}`}
+        >
           <TabsTrigger value="accounts">Plan Comptable</TabsTrigger>
-          <TabsTrigger value="tiers">Plan Tiers</TabsTrigger>
+          {hasSelectedDossier && <TabsTrigger value="tiers">Plan Tiers</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="accounts" className="space-y-4 pt-4">
@@ -365,85 +375,87 @@ export function AccountingSettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="tiers" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xl font-semibold">
-                Annuaire des Fournisseurs
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Rechercher..."
-                    className="pl-8 w-[250px]"
-                    value={searchTierQuery}
-                    onChange={(e) => setSearchTierQuery(e.target.value)}
-                  />
+        {hasSelectedDossier && (
+          <TabsContent value="tiers" className="space-y-4 pt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xl font-semibold">
+                  Annuaire des Fournisseurs
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher..."
+                      className="pl-8 w-[250px]"
+                      value={searchTierQuery}
+                      onChange={(e) => setSearchTierQuery(e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={openAddTier}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter
+                  </Button>
                 </div>
-                <Button onClick={openAddTier}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fournisseur</TableHead>
-                    <TableHead>Compte Tier</TableHead>
-                    <TableHead>Compte HT</TableHead>
-                    <TableHead>Compte TVA</TableHead>
-                    <TableHead className="text-center">Statut</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTiers.map((tier) => (
-                    <TableRow key={tier.id}>
-                      <TableCell className="font-medium">
-                        {tier.libelle}
-                      </TableCell>
-                      <TableCell className="font-mono">
-                        {tier.tierNumber}
-                      </TableCell>
-                      <TableCell className="font-mono text-muted-foreground">
-                        {tier.defaultChargeAccount || "-"}
-                      </TableCell>
-                      <TableCell className="font-mono text-muted-foreground">
-                        {tier.tvaAccount || "-"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {tier.active ? (
-                          <Badge variant="secondary">Actif</Badge>
-                        ) : (
-                          <Badge variant="outline">Inactif</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openEditTier(tier)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => deactivateTier(tier.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </TableCell>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fournisseur</TableHead>
+                      <TableHead>Compte Tier</TableHead>
+                      <TableHead>Compte HT</TableHead>
+                      <TableHead>Compte TVA</TableHead>
+                      <TableHead className="text-center">Statut</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTiers.map((tier) => (
+                      <TableRow key={tier.id}>
+                        <TableCell className="font-medium">
+                          {tier.libelle}
+                        </TableCell>
+                        <TableCell className="font-mono">
+                          {tier.tierNumber}
+                        </TableCell>
+                        <TableCell className="font-mono text-muted-foreground">
+                          {tier.defaultChargeAccount || "-"}
+                        </TableCell>
+                        <TableCell className="font-mono text-muted-foreground">
+                          {tier.tvaAccount || "-"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {tier.active ? (
+                            <Badge variant="secondary">Actif</Badge>
+                          ) : (
+                            <Badge variant="outline">Inactif</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openEditTier(tier)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deactivateTier(tier.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog open={isAccountDialogOpen} onOpenChange={setIsAccountDialogOpen}>
