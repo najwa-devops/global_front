@@ -1,9 +1,7 @@
 "use client"
 
-import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,13 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Progress } from "@/components/ui/progress"
 import {
   ArrowLeft,
   FileText,
   Save,
   Target,
-  X,
   Loader2,
   Plus,
   Sparkles,
@@ -30,28 +26,10 @@ import {
   ZoomIn,
   ZoomOut,
   Lightbulb,
-  Check,
-  Scan,
   Building2,
-  Settings,
   MousePointer2,
   Crosshair,
 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import type { DynamicInvoice, LocalTemplate, DynamicInvoiceField, Tier, Account } from "@/lib/types"
 import { api } from "@/lib/api"
 import { formatDate, normalizeStatus } from "@/lib/utils"
@@ -87,13 +65,6 @@ interface OcrProcessingPageProps {
   isDemoMode?: boolean
 }
 
-interface SelectionBox {
-  startX: number
-  startY: number
-  endX: number
-  endY: number
-}
-
 interface Warning {
   field: string
   message: string
@@ -108,7 +79,7 @@ export function OcrProcessingPage({
   onSave,
   isDemoMode = false,
 }: OcrProcessingPageProps) {
-  const router = useRouter()
+  void templates
   const [fields, setFields] = useState<DynamicInvoiceField[]>(invoice.fields)
   const allFields = fields
   const [extractedText, setExtractedText] = useState(invoice.rawOcrText || invoice.extractedText || "")
@@ -120,10 +91,8 @@ export function OcrProcessingPage({
   const [isSelectingPosition, setIsSelectingPosition] = useState<string | null>(null)
   const [selectionMode, setSelectionMode] = useState<'VALUE' | 'PATTERN'>("VALUE")
   const [fieldPatterns, setFieldPatterns] = useState<Record<string, string>>({})
-  const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null)
   const [pendingFields, setPendingFields] = useState<string[]>(invoice.pendingFields || [])
   const [warnings, setWarnings] = useState<Warning[]>([])
-  const [showOcrText, setShowOcrText] = useState(false)
   const [zoom, setZoom] = useState(100)
   const [status, setStatus] = useState<DynamicInvoice["status"]>(invoice.status || "pending")
   const [missingFields, setMissingFields] = useState<string[]>(invoice.missingFields || [])
@@ -136,9 +105,8 @@ export function OcrProcessingPage({
   const [pageNumber, setPageNumber] = useState(1)
   const [documentRendered, setDocumentRendered] = useState(false)
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false)
-  const [isTierLinking, setIsTierLinking] = useState(false)
   const [selectedSignature, setSelectedSignature] = useState<"ice" | "ifNumber" | null>(null)
-  const [canCreateTemplate, setCanCreateTemplate] = useState<boolean>(invoice.canCreateTemplate || false)
+  const [canCreateTemplate] = useState<boolean>(invoice.canCreateTemplate || false)
   const [tier, setTier] = useState<Tier | null>(invoice.tier || null)
   const [autoFilledFields, setAutoFilledFields] = useState<string[]>(invoice.autoFilledFields || [])
   const [hasShownTierToast, setHasShownTierToast] = useState(false)
@@ -146,7 +114,6 @@ export function OcrProcessingPage({
   const [isTierModalOpen, setIsTierModalOpen] = useState(false)
   const [isTierSelectionModalOpen, setIsTierSelectionModalOpen] = useState(false)
   const [selectedTierForUpdate, setSelectedTierForUpdate] = useState<Tier | undefined>(undefined)
-  const [isLinkingTier, setIsLinkingTier] = useState(false)
   const [isCreateTemplateModalOpen, setIsCreateTemplateModalOpen] = useState(false)
   const [isExistingSupplier, setIsExistingSupplier] = useState(false)
 
@@ -160,7 +127,6 @@ export function OcrProcessingPage({
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
 
   const imageContainerRef = useRef<HTMLDivElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   // Synchroniser extractedText si la facture change (ex: après un rechargement parent)
   useEffect(() => {
@@ -235,7 +201,6 @@ export function OcrProcessingPage({
 
   // Fonction pour lier un Tier à la facture
   const handleLinkTier = async (selectedTierId: number) => {
-    setIsTierLinking(true)
     const toastId = toast.loading("Liaison du fournisseur en cours...")
 
     try {
@@ -256,8 +221,6 @@ export function OcrProcessingPage({
     } catch (error: any) {
       console.error("Erreur liaison tier:", error)
       toast.error(error.message || "Erreur lors de la liaison du fournisseur", { id: toastId })
-    } finally {
-      setIsTierLinking(false)
     }
   }
 
@@ -435,7 +398,6 @@ export function OcrProcessingPage({
       if (isDemoMode) {
         await new Promise((resolve) => setTimeout(resolve, 1500))
 
-        const demoText = `FACTURE N FAC-2026-001...`
         setExtractedText("M. Abdelkarim Nabil\r\nargan golf\r\n...")
         setHeaderText("ARCANES\nTECHNOLOGIES\nFACTURE N° 328974-25-DHJ\n...")
         setFooterText("=== FOOTER ===\nN° ICE: 003153509000014\nN° RC: 129189\nPATENTE N°: 64004501\nIF N°: 52675350")
@@ -470,7 +432,7 @@ export function OcrProcessingPage({
       if (forcedTemplateId) {
         // Version avec template forcé
         console.log("Appel extractWithTemplate pour templateId:", forcedTemplateId)
-        const extractionResponse = await api.extractWithTemplate(invoice.id, forcedTemplateId)
+        await api.extractWithTemplate(invoice.id, forcedTemplateId)
 
         // Comme extractWithTemplate renvoie un format spécifique, on récupère le DTO complet pour la mise à jour UI
         // car le backend met à jour la facture en base lors de l'extraction
@@ -577,7 +539,6 @@ export function OcrProcessingPage({
         const ht = Number.parseFloat(
           key === "amountHT" ? String(value) : String(fields.find((f) => f.key === "amountHT")?.value || "0"),
         )
-        const tva = Number.parseFloat(key === "tva" ? String(value) : String(fields.find((f) => f.key === "tva")?.value || "0"))
 
         if (key === "amountHT" && ht > 0) {
           const newTva = ht * 0.2
@@ -737,13 +698,11 @@ export function OcrProcessingPage({
   const startSelection = (key: string, mode: 'VALUE' | 'PATTERN' = 'VALUE') => {
     setIsSelectingPosition(key)
     setSelectionMode(mode)
-    setSelectionBox(null)
     toast.info(mode === 'PATTERN' ? "Sélectionnez le pattern (label) dans le document" : "Sélectionnez la valeur dans le document")
   }
 
   const cancelPositionSelection = () => {
     setIsSelectingPosition(null)
-    setSelectionBox(null)
   }
 
   // Manual extraction features removed as they are not supported by the new backend controllers
@@ -836,35 +795,6 @@ export function OcrProcessingPage({
       toast.error(`Erreur lors de la validation: ${errorMessage}`)
     } finally {
       setIsValidating(false)
-    }
-  }
-
-  // --- NOUVEAUX HANDLERS POUR LA SÉLECTION MANUELLE ---
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // OLD MANUAL DRAWING DISABLED
-    // We now rely on native text selection in the useEffect above
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    // OLD MANUAL DRAWING DISABLED
-  }
-
-  const handleMouseUp = () => {
-    // OLD MANUAL DRAWING DISABLED
-  }
-  // --------------------------------------------------
-
-  const getSelectionBoxStyle = () => {
-    if (!selectionBox) return {}
-    const minX = Math.min(selectionBox.startX, selectionBox.endX)
-    const minY = Math.min(selectionBox.startY, selectionBox.endY)
-    const width = Math.abs(selectionBox.endX - selectionBox.startX)
-    const height = Math.abs(selectionBox.endY - selectionBox.startY)
-    return {
-      left: `${minX}%`,
-      top: `${minY}%`,
-      width: `${width}%`,
-      height: `${height}%`,
     }
   }
 
@@ -1280,7 +1210,7 @@ export function OcrProcessingPage({
             <CardContent>
               <div className="overflow-auto rounded-lg border border-border">
                 {isLoadingDocument && (
-                  <div className="flex aspect-[3/4] items-center justify-center bg-muted">
+                  <div className="flex aspect-3/4 items-center justify-center bg-muted">
                     <div className="text-center">
                       <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
                       <p className="mt-4 text-sm text-muted-foreground">Chargement du document...</p>
@@ -1289,7 +1219,7 @@ export function OcrProcessingPage({
                 )}
 
                 {!isLoadingDocument && documentError && (
-                  <div className="flex aspect-[3/4] items-center justify-center bg-muted">
+                  <div className="flex aspect-3/4 items-center justify-center bg-muted">
                     <div className="text-center">
                       <AlertTriangle className="mx-auto h-16 w-16 text-amber-500" />
                       <p className="mt-4 text-sm text-muted-foreground">{documentError}</p>
@@ -1350,7 +1280,8 @@ export function OcrProcessingPage({
                     {isPdf && (
                       <div className="relative" style={{ minHeight: '500px' }}>
                         <Document
-                          file={{ url: documentUrl, withCredentials: true }}
+                          file={documentUrl}
+                          options={{ withCredentials: true }}
                           onLoadSuccess={({ numPages }) => {
                             console.log("PDF loaded successfully, pages:", numPages)
                             setNumPages(numPages)
@@ -1361,7 +1292,7 @@ export function OcrProcessingPage({
                             setDocumentError("Impossible de charger le PDF: " + (error.message || "Erreur inconnue"))
                           }}
                           loading={
-                            <div className="flex items-center justify-center h-[600px]">
+                            <div className="flex items-center justify-center h-150">
                               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                             </div>
                           }
@@ -1426,7 +1357,7 @@ export function OcrProcessingPage({
               <Textarea
                 value={extractedText}
                 readOnly
-                className="min-h-[200px] font-mono text-xs bg-muted/50 resize-y"
+                className="min-h-50 font-mono text-xs bg-muted/50 resize-y"
                 placeholder="Le texte OCR complet apparaîtra ici..."
               />
             </CardContent>
@@ -1482,7 +1413,7 @@ export function OcrProcessingPage({
                         </p>
                       </div>
                       <Badge className="bg-green-600 text-white">
-                        {invoice.extractionMethod === "DYNAMIC_TEMPLATE" ? "Extraction Dynamique" : "Patterns"}
+                        {extractionMethod === "DYNAMIC_TEMPLATE" ? "Extraction Dynamique" : "Patterns"}
                       </Badge>
                     </div>
                   </div>
@@ -1620,7 +1551,7 @@ export function OcrProcessingPage({
                     <Textarea
                       value={headerText}
                       readOnly
-                      className="min-h-[100px] font-mono text-xs bg-muted/50 resize-y"
+                      className="min-h-25 font-mono text-xs bg-muted/50 resize-y"
                       placeholder="Aucun texte d'en-tête détecté..."
                     />
                   </CardContent>
@@ -1647,7 +1578,7 @@ export function OcrProcessingPage({
                     <Textarea
                       value={footerText}
                       readOnly
-                      className="min-h-[100px] font-mono text-xs bg-muted/50 resize-y"
+                      className="min-h-25 font-mono text-xs bg-muted/50 resize-y"
                       placeholder="Aucun texte détecté dans le pied de page..."
                     />
                   </CardContent>
