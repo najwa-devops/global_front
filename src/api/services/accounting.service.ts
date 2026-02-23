@@ -5,6 +5,13 @@ import { Account, CreateAccountRequest, UpdateAccountRequest, Tier, CreateTierRe
  * Service for Accounting (Accounts & Tiers).
  */
 export class AccountingService {
+    private static getCurrentDossierId(): number | undefined {
+        if (typeof window === 'undefined') return undefined;
+        const raw = window.localStorage.getItem('currentDossierId');
+        const id = Number(raw);
+        return Number.isFinite(id) && id > 0 ? id : undefined;
+    }
+
     // Accounts
     static async getAccounts(activeOnly = true): Promise<Account[]> {
         const response = await apiClient.get<{ accounts: Account[] }>('/api/accounting/accounts', {
@@ -38,28 +45,41 @@ export class AccountingService {
 
     // Tiers
     static async getAllTiers(activeOnly = true): Promise<Tier[]> {
+        const dossierId = this.getCurrentDossierId();
         const response = await apiClient.get<{ tiers: Tier[] }>('/api/accounting/tiers', {
-            params: { activeOnly }
+            params: { activeOnly, dossierId }
         });
         return response.data.tiers || [];
     }
 
     static async getTierById(id: number): Promise<Tier> {
-        const response = await apiClient.get<{ tier: Tier }>(`/api/accounting/tiers/${id}`);
+        const dossierId = this.getCurrentDossierId();
+        const response = await apiClient.get<{ tier: Tier }>(`/api/accounting/tiers/${id}`, {
+            params: { dossierId }
+        });
         return response.data.tier;
     }
 
     static async createTier(data: CreateTierRequest): Promise<Tier> {
-        const response = await apiClient.post<{ tier: Tier }>('/api/accounting/tiers', data);
+        const dossierId = this.getCurrentDossierId();
+        const response = await apiClient.post<{ tier: Tier }>('/api/accounting/tiers', data, {
+            params: { dossierId }
+        });
         return response.data.tier;
     }
 
     static async updateTier(id: number, data: UpdateTierRequest): Promise<Tier> {
-        const response = await apiClient.put<{ tier: Tier }>(`/api/accounting/tiers/${id}`, data);
+        const dossierId = this.getCurrentDossierId();
+        const response = await apiClient.put<{ tier: Tier }>(`/api/accounting/tiers/${id}`, data, {
+            params: { dossierId }
+        });
         return response.data.tier;
     }
 
     static async deactivateTier(id: number): Promise<void> {
-        await apiClient.delete(`/api/accounting/tiers/${id}`);
+        const dossierId = this.getCurrentDossierId();
+        await apiClient.delete(`/api/accounting/tiers/${id}`, {
+            params: { dossierId }
+        });
     }
 }

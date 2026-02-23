@@ -74,6 +74,7 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Configuration",
             icon: Sliders,
             children: [
+                { id: "general-settings", href: "/settings/general", label: "Parametres generaux", icon: Settings },
                 { id: "accounting-settings", href: "/settings/accounting", label: "Plan Comptable", icon: Building2 },
                 { id: "patterns", href: "/settings/patterns", label: "Filtres & Patterns", icon: Settings },
             ]
@@ -124,6 +125,7 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Configuration",
             icon: Sliders,
             children: [
+                { id: "general-settings", href: "/settings/general", label: "Parametres generaux", icon: Settings },
                 { id: "accounting-settings", href: "/settings/accounting", label: "Plan Comptable", icon: Building2 },
                 { id: "patterns", href: "/settings/patterns", label: "Filtres & Patterns", icon: Settings },
             ]
@@ -163,6 +165,7 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Configuration",
             icon: Sliders,
             children: [
+                { id: "general-settings", href: "/settings/general", label: "Parametres generaux", icon: Settings },
                 { id: "accounting-settings", href: "/settings/accounting", label: "Plan Comptable & Tiers", icon: Building2 },
                 { id: "templates", href: "/templates", label: "Modèles OCR", icon: Sparkles },
             ]
@@ -212,7 +215,7 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         roles: ["COMPTABLE", "ADMIN", "CLIENT"],
         children: [
             { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "invoices", href: "/invoices", label: "Mes Factures", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "invoices", href: "/invoices", label: "Factures scannées", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
@@ -238,6 +241,7 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         icon: Sliders,
         roles: ["COMPTABLE", "ADMIN"],
         children: [
+            { id: "general-settings", href: "/settings/general", label: "Parametres generaux", icon: Settings, roles: ["COMPTABLE", "ADMIN"] },
             { id: "accounting-settings", href: "/settings/accounting", label: "Plan Comptable", icon: Building2, roles: ["COMPTABLE", "ADMIN"] },
             { id: "patterns", href: "/settings/patterns", label: "Patterns OCR", icon: Settings, roles: ["COMPTABLE", "ADMIN"] },
         ]
@@ -257,6 +261,7 @@ export const ROUTE_METADATA: Record<string, { title: string; breadcrumb?: string
     "/bank/list": { title: "Relevés Bancaires", breadcrumb: "Banque" },
     "/bank/upload": { title: "Importer un relevé", breadcrumb: "Import" },
     "/bank/validated": { title: "Relevés validés", breadcrumb: "Validés" },
+    "/settings/general": { title: "Parametres generaux", breadcrumb: "General" },
     "/settings/accounting": { title: "Plan Comptable & Tiers", breadcrumb: "Comptabilité" },
     "/settings/patterns": { title: "Filtres & Patterns", breadcrumb: "Patterns" },
     "/templates": { title: "Modèles OCR", breadcrumb: "Templates" },

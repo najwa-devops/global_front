@@ -11,6 +11,7 @@ export function useAccounting() {
     const queryClient = useQueryClient();
     const { authenticated, loading } = useAuth();
     const canRunQueries = authenticated && !loading;
+    const dossierId = typeof window !== 'undefined' ? window.localStorage.getItem('currentDossierId') : null;
 
     // Queries
     const accountsQuery = useQuery({
@@ -20,7 +21,7 @@ export function useAccounting() {
     });
 
     const tiersQuery = useQuery({
-        queryKey: ['tiers'],
+        queryKey: ['tiers', dossierId],
         queryFn: () => AccountingService.getAllTiers(false),
         enabled: canRunQueries,
     });

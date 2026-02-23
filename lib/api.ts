@@ -468,23 +468,27 @@ export async function importAccounts(requests: CreateAccountRequest[]): Promise<
 }
 
 export async function getAllTiers(activeOnly: boolean = true): Promise<Tier[]> {
-  const result = await request<{ tiers?: Tier[] }>("/api/accounting/tiers", undefined, { activeOnly })
+  const dossierId = getCurrentDossierId()
+  const result = await request<{ tiers?: Tier[] }>("/api/accounting/tiers", undefined, { activeOnly, dossierId })
   return result?.tiers || []
 }
 
 export async function getTierById(id: number): Promise<Tier> {
-  const result = await request<{ tier: Tier }>(`/api/accounting/tiers/${id}`)
+  const dossierId = getCurrentDossierId()
+  const result = await request<{ tier: Tier }>(`/api/accounting/tiers/${id}`, undefined, { dossierId })
   return result.tier
 }
 
 export async function getTierByTierNumber(tierNumber: string): Promise<Tier | null> {
-  const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-tier-number/${encodeURIComponent(tierNumber)}`)
+  const dossierId = getCurrentDossierId()
+  const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-tier-number/${encodeURIComponent(tierNumber)}`, undefined, { dossierId })
   return result?.tier || null
 }
 
 export async function getTierByIce(ice: string): Promise<Tier | null> {
   try {
-    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-ice/${encodeURIComponent(ice)}`)
+    const dossierId = getCurrentDossierId()
+    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-ice/${encodeURIComponent(ice)}`, undefined, { dossierId })
     return result?.tier || null
   } catch (error: any) {
     if (error?.status === 404) return null
@@ -494,7 +498,8 @@ export async function getTierByIce(ice: string): Promise<Tier | null> {
 
 export async function getTierByIfNumber(ifNumber: string): Promise<Tier | null> {
   try {
-    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-if/${encodeURIComponent(ifNumber)}`)
+    const dossierId = getCurrentDossierId()
+    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-if/${encodeURIComponent(ifNumber)}`, undefined, { dossierId })
     return result?.tier || null
   } catch (error: any) {
     if (error?.status === 404) return null
@@ -503,32 +508,37 @@ export async function getTierByIfNumber(ifNumber: string): Promise<Tier | null> 
 }
 
 export async function searchTiers(query: string): Promise<Tier[]> {
-  const result = await request<{ tiers?: Tier[] }>("/api/accounting/tiers/search", undefined, { query })
+  const dossierId = getCurrentDossierId()
+  const result = await request<{ tiers?: Tier[] }>("/api/accounting/tiers/search", undefined, { query, dossierId })
   return result?.tiers || []
 }
 
 export async function createTier(requestPayload: CreateTierRequest): Promise<Tier> {
+  const dossierId = getCurrentDossierId()
   const result = await request<{ tier: Tier }>("/api/accounting/tiers", {
     method: "POST",
     body: JSON.stringify(requestPayload),
-  })
+  }, { dossierId })
   return result.tier
 }
 
 export async function updateTier(id: number, requestPayload: UpdateTierRequest): Promise<Tier> {
+  const dossierId = getCurrentDossierId()
   const result = await request<{ tier: Tier }>(`/api/accounting/tiers/${id}`, {
     method: "PUT",
     body: JSON.stringify(requestPayload),
-  })
+  }, { dossierId })
   return result.tier
 }
 
 export async function deactivateTier(id: number): Promise<void> {
-  await request<void>(`/api/accounting/tiers/${id}`, { method: "DELETE" })
+  const dossierId = getCurrentDossierId()
+  await request<void>(`/api/accounting/tiers/${id}`, { method: "DELETE" }, { dossierId })
 }
 
 export async function activateTier(id: number): Promise<void> {
-  await request<void>(`/api/accounting/tiers/${id}/activate`, { method: "PATCH" })
+  const dossierId = getCurrentDossierId()
+  await request<void>(`/api/accounting/tiers/${id}/activate`, { method: "PATCH" }, { dossierId })
 }
 
 // Journal comptable
