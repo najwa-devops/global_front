@@ -22,7 +22,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Variables d'environnement pour le build
-ARG NEXT_PUBLIC_API_URL=http://localhost:8089
+ARG NEXT_PUBLIC_API_URL=http://172.20.1.3:8089
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 

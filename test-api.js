@@ -2,7 +2,7 @@
 
 async function test() {
     try {
-        const url = 'http://localhost:8089/api/dynamic-invoices?limit=1';
+        const url = 'http://172.20.1.3:8089/api/dynamic-invoices?limit=1';
         console.log(`Fetching ${url}...`);
         const response = await fetch(url);
         console.log(`Status: ${response.status} ${response.statusText}`);

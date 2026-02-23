@@ -49,7 +49,7 @@ export type BackendDossierDto = {
   validatedInvoicesCount?: number
 }
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8089").replace(/\/$/, "")
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://172.20.1.3:8089").replace(/\/$/, "")
 const patternStatusOverrides = new Map<number, "PENDING" | "APPROVED" | "REJECTED">()
 export const isBankApiEnabled = process.env.NEXT_PUBLIC_ENABLE_BANK_API === "true"
 

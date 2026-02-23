@@ -7,7 +7,7 @@ import { ApiResponse } from '@/src/types';
  * Implements global error handling, interceptors, and request management.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8089';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://172.20.1.3:8089';
 const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 export class ApiError extends Error {
