@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -119,6 +119,8 @@ export function OcrProcessingPage({
 
   // Tracking for failed lookups to avoid console noise
   const lookupCache = useRef<Set<string>>(new Set())
+  const lookupInFlight = useRef<Set<string>>(new Set())
+  const pdfOptions = useMemo(() => ({ withCredentials: true }), [])
 
   // États pour les comptes comptables (dropdowns)
   const [chargeAccounts, setChargeAccounts] = useState<Account[]>([])
@@ -297,15 +299,20 @@ export function OcrProcessingPage({
 
   // Chargement du document
   useEffect(() => {
+    let objectUrl: string | null = null
+
     const loadDocumentUrl = async () => {
       setIsLoadingDocument(true)
       setDocumentError(null)
+      setDocumentRendered(false)
+      setNumPages(1)
+      setPageNumber(1)
 
       try {
         // CAS 1: Fichier local
         if (file) {
-          const url = URL.createObjectURL(file)
-          setDocumentUrl(url)
+          objectUrl = URL.createObjectURL(file)
+          setDocumentUrl(objectUrl)
           setIsLoadingDocument(false)
           return
         }
@@ -330,11 +337,11 @@ export function OcrProcessingPage({
     loadDocumentUrl()
 
     return () => {
-      if (file && documentUrl?.startsWith("blob:")) {
-        URL.revokeObjectURL(documentUrl)
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [file, invoice.filePath, isDemoMode])
+  }, [file, invoice.filePath, invoice.filename, invoice.id, isDemoMode])
 
   const getStatusBadge = () => {
     switch (status) {
@@ -607,16 +614,18 @@ export function OcrProcessingPage({
       // Use cache to avoid redundant 404s
       const lookupKey = `ice:${iceValue}|if:${ifValue}`
       if (lookupCache.current.has(lookupKey)) return
+      if (lookupInFlight.current.has(lookupKey)) return
+      lookupInFlight.current.add(lookupKey)
 
       try {
         let foundTier: Tier | null = null
         // On cherche par ICE d'abord
         if (iceValue.length >= 8) {
-          foundTier = await api.getTierByIce(iceValue)
+          foundTier = await api.getTierByIce(iceValue, invoice.dossierId)
         }
         // Sinon par IF
         if (!foundTier && ifValue.length >= 8) {
-          foundTier = await api.getTierByIfNumber(ifValue)
+          foundTier = await api.getTierByIfNumber(ifValue, invoice.dossierId)
         }
 
         if (foundTier) {
@@ -641,6 +650,8 @@ export function OcrProcessingPage({
         console.error("Erreur lors de la vérification du fournisseur existant:", error)
         // Also mark as tried on error to avoid looping on 500s or persistent issues
         lookupCache.current.add(lookupKey)
+      } finally {
+        lookupInFlight.current.delete(lookupKey)
       }
     }
 
@@ -1281,14 +1292,16 @@ export function OcrProcessingPage({
                       <div className="relative" style={{ minHeight: '500px' }}>
                         <Document
                           file={documentUrl}
-                          options={{ withCredentials: true }}
+                          options={pdfOptions}
                           onLoadSuccess={({ numPages }) => {
                             console.log("PDF loaded successfully, pages:", numPages)
                             setNumPages(numPages)
+                            setPageNumber((prev) => Math.min(Math.max(prev, 1), numPages))
                             setDocumentRendered(true)
                           }}
                           onLoadError={(error) => {
                             console.error("Erreur PDF:", error)
+                            setDocumentRendered(false)
                             setDocumentError("Impossible de charger le PDF: " + (error.message || "Erreur inconnue"))
                           }}
                           loading={

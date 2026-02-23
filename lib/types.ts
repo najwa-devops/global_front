@@ -128,6 +128,7 @@ export interface UpdateAccountRequest {
 
 export interface Tier {
   id: number;
+  dossierId?: number | undefined;
   libelle: string;
 
   // Mode Auxiliaire
@@ -291,6 +292,7 @@ export interface BankStatementStats {
 
 export interface DynamicInvoice {
   id: number
+  dossierId?: number
   filename: string
   originalName?: string | undefined
   filePath: string

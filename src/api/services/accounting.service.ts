@@ -62,7 +62,8 @@ export class AccountingService {
 
     static async createTier(data: CreateTierRequest): Promise<Tier> {
         const dossierId = this.getCurrentDossierId();
-        const response = await apiClient.post<{ tier: Tier }>('/api/accounting/tiers', data, {
+        const payload = this.normalizeTierPayload(data);
+        const response = await apiClient.post<{ tier: Tier }>('/api/accounting/tiers', payload, {
             params: { dossierId }
         });
         return response.data.tier;
@@ -70,7 +71,8 @@ export class AccountingService {
 
     static async updateTier(id: number, data: UpdateTierRequest): Promise<Tier> {
         const dossierId = this.getCurrentDossierId();
-        const response = await apiClient.put<{ tier: Tier }>(`/api/accounting/tiers/${id}`, data, {
+        const payload = this.normalizeTierPayload(data);
+        const response = await apiClient.put<{ tier: Tier }>(`/api/accounting/tiers/${id}`, payload, {
             params: { dossierId }
         });
         return response.data.tier;
@@ -81,5 +83,35 @@ export class AccountingService {
         await apiClient.delete(`/api/accounting/tiers/${id}`, {
             params: { dossierId }
         });
+    }
+
+    private static normalizeTierPayload<T extends CreateTierRequest | UpdateTierRequest>(data: T): T {
+        const normalizeCode = (value?: string) => {
+            if (value == null) return undefined;
+            const normalized = value.trim().replace(/\s+/g, '');
+            return normalized.length > 0 ? normalized.toUpperCase() : undefined;
+        };
+        const normalizeIdentifier = (value?: string) => {
+            if (value == null) return undefined;
+            const normalized = value.trim().replace(/\s+/g, '');
+            return normalized.length > 0 ? normalized : undefined;
+        };
+        const normalizeText = (value?: string) => {
+            if (value == null) return undefined;
+            const normalized = value.trim();
+            return normalized.length > 0 ? normalized : undefined;
+        };
+
+        return {
+            ...data,
+            libelle: normalizeText(data.libelle),
+            tierNumber: normalizeCode(data.tierNumber),
+            collectifAccount: normalizeCode(data.collectifAccount),
+            ifNumber: normalizeIdentifier(data.ifNumber),
+            ice: normalizeIdentifier(data.ice),
+            rcNumber: normalizeIdentifier(data.rcNumber),
+            defaultChargeAccount: normalizeCode(data.defaultChargeAccount),
+            tvaAccount: normalizeCode(data.tvaAccount),
+        } as T;
     }
 }

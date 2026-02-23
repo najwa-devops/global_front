@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AccountingService } from '@/src/api/services/accounting.service';
+import { ApiError } from '@/src/api/api-client';
 import { CreateAccountRequest, UpdateAccountRequest, CreateTierRequest, UpdateTierRequest } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { logger } from '@/src/lib/logger';
@@ -12,6 +13,11 @@ export function useAccounting() {
     const { authenticated, loading } = useAuth();
     const canRunQueries = authenticated && !loading;
     const dossierId = typeof window !== 'undefined' ? window.localStorage.getItem('currentDossierId') : null;
+    const errorMessage = (error: unknown, fallback: string) => {
+        if (error instanceof ApiError && error.message) return error.message;
+        if (error instanceof Error && error.message) return error.message;
+        return fallback;
+    };
 
     // Queries
     const accountsQuery = useQuery({
@@ -35,7 +41,7 @@ export function useAccounting() {
         },
         onError: (error) => {
             logger.error('Failed to create account', error);
-            toast.error('Failed to create account');
+            toast.error(errorMessage(error, 'Failed to create account'));
         },
     });
 
@@ -48,7 +54,7 @@ export function useAccounting() {
         },
         onError: (error) => {
             logger.error('Failed to update account', error);
-            toast.error('Failed to update account');
+            toast.error(errorMessage(error, 'Failed to update account'));
         },
     });
 
@@ -60,7 +66,7 @@ export function useAccounting() {
         },
         onError: (error) => {
             logger.error('Failed to create tier', error);
-            toast.error('Failed to create tier');
+            toast.error(errorMessage(error, 'Failed to create tier'));
         },
     });
 
@@ -72,7 +78,7 @@ export function useAccounting() {
         },
         onError: (error) => {
             logger.error('Failed to deactivate tier', error);
-            toast.error('Failed to deactivate tier');
+            toast.error(errorMessage(error, 'Failed to deactivate tier'));
         },
     });
 
@@ -85,7 +91,7 @@ export function useAccounting() {
         },
         onError: (error) => {
             logger.error('Failed to update tier', error);
-            toast.error('Failed to update tier');
+            toast.error(errorMessage(error, 'Failed to update tier'));
         },
     });
 

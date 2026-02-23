@@ -176,8 +176,8 @@ export default function ClientPendingPage() {
 
       <InvoiceTable
         invoices={applyFilters(invoices)}
-        onView={(inv) => router.push(`/ocr/${inv.id}`)}
-        onProcessOcr={(inv) => router.push(`/ocr/${inv.id}`)}
+        onView={(inv) => router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`)}
+        onProcessOcr={(inv) => router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`)}
         onProcessInline={() => {
           toast.error("Traitement OCR indisponible pour le client")
         }}

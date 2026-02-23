@@ -227,7 +227,7 @@ export function AccountingSettingsPage() {
 
   async function handleSaveTier() {
     try {
-      if (!tierForm.libelle || !tierForm.tierNumber) {
+      if (!tierForm.libelle.trim() || !tierForm.tierNumber.trim()) {
         toast.error("Nom et Compte tier sont obligatoires");
         return;
       }
@@ -241,6 +241,7 @@ export function AccountingSettingsPage() {
       setIsTierDialogOpen(false);
     } catch (error: any) {
       logger.error("Error saving tier", error);
+      toast.error(error?.message || "Erreur lors de l'enregistrement du fournisseur");
     }
   }
 

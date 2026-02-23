@@ -167,7 +167,7 @@ export default function InvoicesPage() {
 
             <InvoiceTable
                 invoices={applyFilters(invoices)}
-                onView={(inv) => router.push(`/ocr/${inv.id}`)}
+                onView={(inv) => router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`)}
                 onProcessOcr={() => { }}
                 onProcessInline={handleProcessInline}
                 onDelete={handleDeleteInvoice}

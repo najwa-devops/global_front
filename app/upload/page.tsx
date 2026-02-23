@@ -54,7 +54,7 @@ function UploadPageContent() {
     return (
         <UploadPage
             onUpload={handleUpload}
-            onViewInvoice={(inv) => router.push(`/ocr/${inv.id}`)}
+            onViewInvoice={(inv) => router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`)}
             isDemoMode={false}
         />
     )

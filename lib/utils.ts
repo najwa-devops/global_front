@@ -169,8 +169,11 @@ export function dynamicInvoiceDtoToLocal(dto: DynamicInvoiceDto): DynamicInvoice
     })
   }
 
+  const dossierRef = dto.dossierId !== undefined ? { dossierId: dto.dossierId } : {}
+
   return {
     id: dto.id,
+    ...dossierRef,
     filename: dto.filename,
     originalName: dto.originalName,
     filePath: dto.filePath,

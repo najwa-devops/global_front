@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { api } from "@/lib/api"
 import { dynamicInvoiceDtoToLocal, toWorkflowStatus } from "@/lib/utils"
 import { type DynamicInvoice, type LocalTemplate } from "@/lib/types"
@@ -12,6 +12,7 @@ import { toast } from "sonner"
 export default function Page() {
     const params = useParams()
     const router = useRouter()
+    const searchParams = useSearchParams()
     const id = params.id ? Number(params.id) : null
 
     const [invoice, setInvoice] = useState<DynamicInvoice | null>(null)
@@ -20,6 +21,23 @@ export default function Page() {
 
     useEffect(() => {
         if (!id) return
+
+        const queryDossierId = Number(searchParams.get("dossierId"))
+        const hasQueryDossierId = Number.isFinite(queryDossierId) && queryDossierId > 0
+
+        if (typeof window !== "undefined") {
+            if (hasQueryDossierId) {
+                localStorage.setItem("currentDossierId", String(queryDossierId))
+            } else {
+                const storedDossierId = Number(localStorage.getItem("currentDossierId"))
+                const hasStoredDossierId = Number.isFinite(storedDossierId) && storedDossierId > 0
+                if (!hasStoredDossierId) {
+                    toast.error("Dossier requis: ouvrez un dossier avant d'acceder a la facture.")
+                    router.push("/dossiers")
+                    return
+                }
+            }
+        }
 
         const loadData = async () => {
             try {
@@ -40,7 +58,7 @@ export default function Page() {
         }
 
         loadData()
-    }, [id])
+    }, [id, router, searchParams])
 
     const handleInvoiceSaved = (updatedInvoice: DynamicInvoice) => {
         setInvoice(updatedInvoice)

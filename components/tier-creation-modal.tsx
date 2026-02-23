@@ -98,16 +98,16 @@ export function TierCreationModal({
 
         try {
             // Validation
-            if (!formData.libelle) throw new Error("Le libellé est requis")
+            if (!formData.libelle?.trim()) throw new Error("Le libellé est requis")
 
             if (formData.auxiliaireMode) {
                 if (!formData.collectifAccount) throw new Error("Le compte collectif est requis en mode auxiliaire")
                 if (!/^(342100000|441100000)$/.test(formData.collectifAccount)) {
                     throw new Error("Compte collectif invalide (doit être 342100000 ou 441100000)")
                 }
-                if (!formData.tierNumber) throw new Error("Le compte tier est obligatoire")
+                if (!formData.tierNumber?.trim()) throw new Error("Le compte tier est obligatoire")
             } else {
-                if (!formData.tierNumber) throw new Error("Le compte tier est obligatoire")
+                if (!formData.tierNumber?.trim()) throw new Error("Le compte tier est obligatoire")
             }
 
             // Regex Validation
@@ -132,11 +132,35 @@ export function TierCreationModal({
 
             const payload: any = {
                 ...formData,
+                libelle: formData.libelle?.trim(),
+                tierNumber: formData.tierNumber?.trim().toUpperCase(),
+                collectifAccount: formData.collectifAccount?.trim() || null,
+                ifNumber: formData.ifNumber?.trim() || null,
+                ice: formData.ice?.trim() || null,
+                rcNumber: formData.rcNumber?.trim() || null,
+                defaultChargeAccount: formData.defaultChargeAccount?.trim() || null,
+                tvaAccount: formData.tvaAccount?.trim() || null,
                 auxiliaireMode: formData.auxiliaireMode,
                 // Ensure correct types
-                defaultTvaRate: formData.defaultTvaRate ? Number(formData.defaultTvaRate) : null,
+                defaultTvaRate: formData.tvaAccount ? Number(formData.defaultTvaRate) : null,
                 active: true,
                 createdBy: "user" // TODO: Get actual user via context if available
+            }
+
+            const currentDossierId = (() => {
+                if (typeof window === "undefined") return undefined
+                const id = Number(window.localStorage.getItem("currentDossierId"))
+                return Number.isFinite(id) && id > 0 ? id : undefined
+            })()
+
+            // Early business check: same ICE must not exist in the same dossier.
+            if (!isEditMode && payload.ice) {
+                const existingByIce = await api.getTierByIce(payload.ice, currentDossierId)
+                if (existingByIce) {
+                    throw new Error(
+                        `ICE déjà utilisé dans ce dossier (dossierId=${existingByIce.dossierId ?? currentDossierId}, tierId=${existingByIce.id}).`
+                    )
+                }
             }
 
             // Cleanup headers specific to mode

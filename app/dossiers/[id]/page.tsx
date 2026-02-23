@@ -278,7 +278,7 @@ function DossierDetailContent() {
                               size="icon"
                               variant="ghost"
                               className="h-7 w-7"
-                              onClick={() => router.push(`/ocr/${inv.id}`)}
+                              onClick={() => router.push(`/ocr/${inv.id}?dossierId=${dossierId}`)}
                               title="Voir"
                             >
                               <Eye className="h-3.5 w-3.5" />

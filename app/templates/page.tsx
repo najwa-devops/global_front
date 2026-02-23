@@ -68,7 +68,7 @@ export default function Page() {
         <TemplatesInvoicesPage
             invoices={invoices}
             templates={templates as any}
-            onView={(inv) => router.push(`/ocr/${inv.id}`)}
+            onView={(inv) => router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`)}
             onDelete={async (id) => {
                 await api.deleteDynamicInvoice(id)
                 await loadData()

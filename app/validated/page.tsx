@@ -76,7 +76,7 @@ function ValidatedPageContent() {
             filters={{ search: "", supplier: "", status: "VALIDATED" }}
             onFiltersChange={() => { }}
             suppliers={suppliers}
-            onView={(inv) => router.push(`/ocr/${inv.id}`)}
+            onView={(inv) => router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`)}
             onDelete={handleDeleteInvoice}
             onExport={(format) => toast.info(`Export ${format.toUpperCase()} bientôt disponible`)}
         />

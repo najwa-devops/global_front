@@ -142,7 +142,7 @@ export default function Page() {
       filters={{ search: "", supplier: "", status: "all" }}
       onFiltersChange={() => {}}
       suppliers={suppliers}
-      onView={(inv) => router.push(`/ocr/${inv.id}`)}
+      onView={(inv) => router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`)}
       onDelete={handleDeleteInvoice}
       onExport={(format) => toast.info(`${format.toUpperCase()} export coming soon`)}
       userRole={userRole || undefined}

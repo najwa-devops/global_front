@@ -55,6 +55,11 @@ export const isBankApiEnabled = process.env.NEXT_PUBLIC_ENABLE_BANK_API === "tru
 
 function getCurrentDossierId(): number | undefined {
   if (typeof window === "undefined") return undefined
+  const fromQuery = Number(new URLSearchParams(window.location.search).get("dossierId"))
+  if (Number.isFinite(fromQuery) && fromQuery > 0) {
+    window.localStorage.setItem("currentDossierId", String(fromQuery))
+    return fromQuery
+  }
   const raw = window.localStorage.getItem("currentDossierId")
   const id = Number(raw)
   return Number.isFinite(id) && id > 0 ? id : undefined
@@ -63,6 +68,36 @@ function getCurrentDossierId(): number | undefined {
 function getPathFilename(pathOrName: string): string {
   if (!pathOrName) return ""
   return pathOrName.split(/[\\/]/).filter(Boolean).pop() || pathOrName
+}
+
+function normalizeTierPayload<T extends CreateTierRequest | UpdateTierRequest>(payload: T): T {
+  const normalizeCode = (value?: string) => {
+    if (value == null) return undefined
+    const normalized = value.trim().replace(/\s+/g, "")
+    return normalized ? normalized.toUpperCase() : undefined
+  }
+  const normalizeIdentifier = (value?: string) => {
+    if (value == null) return undefined
+    const normalized = value.trim().replace(/\s+/g, "")
+    return normalized || undefined
+  }
+  const normalizeText = (value?: string) => {
+    if (value == null) return undefined
+    const normalized = value.trim()
+    return normalized || undefined
+  }
+
+  return {
+    ...payload,
+    libelle: normalizeText(payload.libelle),
+    tierNumber: normalizeCode(payload.tierNumber),
+    collectifAccount: normalizeCode(payload.collectifAccount),
+    ifNumber: normalizeIdentifier(payload.ifNumber),
+    ice: normalizeIdentifier(payload.ice),
+    rcNumber: normalizeIdentifier(payload.rcNumber),
+    defaultChargeAccount: normalizeCode(payload.defaultChargeAccount),
+    tvaAccount: normalizeCode(payload.tvaAccount),
+  } as T
 }
 
 function url(path: string, query?: Record<string, string | number | boolean | undefined | null>): string {
@@ -485,10 +520,10 @@ export async function getTierByTierNumber(tierNumber: string): Promise<Tier | nu
   return result?.tier || null
 }
 
-export async function getTierByIce(ice: string): Promise<Tier | null> {
+export async function getTierByIce(ice: string, dossierId?: number): Promise<Tier | null> {
   try {
-    const dossierId = getCurrentDossierId()
-    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-ice/${encodeURIComponent(ice)}`, undefined, { dossierId })
+    const resolvedDossierId = dossierId || getCurrentDossierId()
+    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-ice/${encodeURIComponent(ice)}`, undefined, { dossierId: resolvedDossierId })
     return result?.tier || null
   } catch (error: any) {
     if (error?.status === 404) return null
@@ -496,10 +531,10 @@ export async function getTierByIce(ice: string): Promise<Tier | null> {
   }
 }
 
-export async function getTierByIfNumber(ifNumber: string): Promise<Tier | null> {
+export async function getTierByIfNumber(ifNumber: string, dossierId?: number): Promise<Tier | null> {
   try {
-    const dossierId = getCurrentDossierId()
-    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-if/${encodeURIComponent(ifNumber)}`, undefined, { dossierId })
+    const resolvedDossierId = dossierId || getCurrentDossierId()
+    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-if/${encodeURIComponent(ifNumber)}`, undefined, { dossierId: resolvedDossierId })
     return result?.tier || null
   } catch (error: any) {
     if (error?.status === 404) return null
@@ -515,18 +550,20 @@ export async function searchTiers(query: string): Promise<Tier[]> {
 
 export async function createTier(requestPayload: CreateTierRequest): Promise<Tier> {
   const dossierId = getCurrentDossierId()
+  const payload = normalizeTierPayload(requestPayload)
   const result = await request<{ tier: Tier }>("/api/accounting/tiers", {
     method: "POST",
-    body: JSON.stringify(requestPayload),
+    body: JSON.stringify(payload),
   }, { dossierId })
   return result.tier
 }
 
 export async function updateTier(id: number, requestPayload: UpdateTierRequest): Promise<Tier> {
   const dossierId = getCurrentDossierId()
+  const payload = normalizeTierPayload(requestPayload)
   const result = await request<{ tier: Tier }>(`/api/accounting/tiers/${id}`, {
     method: "PUT",
-    body: JSON.stringify(requestPayload),
+    body: JSON.stringify(payload),
   }, { dossierId })
   return result.tier
 }
