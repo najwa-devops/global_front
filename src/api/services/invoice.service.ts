@@ -62,6 +62,10 @@ export class InvoiceService {
     }
 
     static async updateInvoiceStatus(id: number | string, status: string): Promise<any> {
-        return apiClient.put(`/api/dynamic-invoices/${id}/status`, { status })
+        const normalized = String(status || "").toUpperCase();
+        if (normalized === "READY_TO_TREAT") {
+            return apiClient.post(`/api/dynamic-invoices/${id}/client-validate`);
+        }
+        throw new Error("Backend does not expose generic invoice status update endpoint");
     }
 }

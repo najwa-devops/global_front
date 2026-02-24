@@ -157,8 +157,6 @@ function DossierDetailContent() {
 
   return (
     <div className="space-y-6">
-      
-
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           {
@@ -278,7 +276,11 @@ function DossierDetailContent() {
                               size="icon"
                               variant="ghost"
                               className="h-7 w-7"
-                              onClick={() => router.push(`/ocr/${inv.id}?dossierId=${dossierId}`)}
+                              onClick={() =>
+                                router.push(
+                                  `/ocr/${inv.id}?dossierId=${dossierId}`,
+                                )
+                              }
                               title="Voir"
                             >
                               <Eye className="h-3.5 w-3.5" />

@@ -3,16 +3,18 @@
 import { useState, useEffect } from "react";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { BreadcrumbNav } from "@/components/breadcrumb-nav";
 import { usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import { toWorkflowStatus } from "@/lib/utils";
+import { FolderOpen } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useDossier } from "@/src/contexts/dossier-context";
 import { getRouteMetadata } from "@/src/config/navigation.config";
+import { SimpleUserGuide } from "@/components/simple-user-guide";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const [pendingCount, setPendingCount] = useState(0);
-  const [dossierName, setDossierName] = useState("");
   const isMobile = useIsMobile();
   const pathname = usePathname();
   const { user, logout, authenticated, loading } = useAuth();
@@ -23,18 +25,6 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     (user?.name && user.name.trim()) ||
     (user?.email ? user.email.split("@")[0] : "Utilisateur");
   const userInitial = displayName.charAt(0).toUpperCase() || "U";
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (currentDossier?.name) {
-      localStorage.setItem("currentDossierName", currentDossier.name);
-      setDossierName(currentDossier.name);
-      return;
-    }
-
-    setDossierName(localStorage.getItem("currentDossierName") || "");
-  }, [currentDossier?.name, pathname]);
 
   // On peut charger le compte des factures en attente ici pour le badge de la sidebar
   useEffect(() => {
@@ -63,14 +53,35 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [pathname, isLoginPage, authenticated, loading]);
 
+  const getBreadcrumbItems = () => {
+    const parts = pathname.split("/").filter(Boolean);
+    const items = [{ label: "Accueil", href: "/dashboard" }];
+
+    parts.forEach((_, index) => {
+      const pathSegments = parts.slice(0, index + 1);
+      const href = "/" + pathSegments.join("/");
+      const meta = getRouteMetadata(href);
+
+      // Si on est sur une route dynamique /dossiers/[id], on utilise le nom du dossier
+      if (
+        index > 0 &&
+        parts[index - 1] === "dossiers" &&
+        currentDossier &&
+        String(currentDossier.id) === parts[index]
+      ) {
+        items.push({ label: currentDossier.name, href: undefined } as any);
+      } else {
+        items.push({
+          label: meta.breadcrumb || meta.title,
+          href: index === parts.length - 1 ? undefined : href,
+        } as any);
+      }
+    });
+
+    return items;
+  };
+
   const { title: pageTitle } = getRouteMetadata(pathname);
-  const isDossierDetailPage = /^\/dossiers\/\d+$/.test(pathname);
-  const headerTitle =
-    isDossierDetailPage && currentDossier
-      ? currentDossier.name
-      : currentDossier
-        ? `${pageTitle} de ${currentDossier.name}`
-        : pageTitle;
 
   if (isLoginPage) {
     return <>{children}</>;
@@ -84,12 +95,23 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         <div
           className={`container mx-auto px-6 py-6 ${isMobile ? "pt-20" : ""}`}
         >
+          {!isMobile && <BreadcrumbNav items={getBreadcrumbItems() as any} />}
+
           <div className="mb-8 flex items-center justify-between">
             <div className="flex flex-col gap-1">
               <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                {headerTitle}{" "}
-                <span className="text-[#00906b]"> {dossierName || ""}</span>
+                {pathname.match(/^\/dossiers\/\d+$/) && currentDossier
+                  ? currentDossier.name
+                  : pageTitle}
               </h1>
+              {pathname.includes("/dossiers/") &&
+                currentDossier &&
+                !pathname.match(/^\/dossiers\/\d+$/) && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground/60">
+                    <FolderOpen className="h-3 w-3" />
+                    <span>{currentDossier.name}</span>
+                  </div>
+                )}
             </div>
 
             {user && (
@@ -108,6 +130,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
               </div>
             )}
           </div>
+
+          <SimpleUserGuide />
 
           {children}
         </div>

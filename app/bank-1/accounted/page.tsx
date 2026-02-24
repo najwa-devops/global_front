@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { ValidatedBankStatementsPage } from "@/components/validated-bank-statements-page";
 import { BankStatsCards } from "@/components/bank-stats-cards";
+import { ValidatedBankStatementsPage } from "@/components/validated-bank-statements-page";
 import { api } from "@/lib/api";
 import { BankStatementStats, BankStatementV2 } from "@/lib/types";
 import { toast } from "sonner";
 
-export default function BankValidatedPage() {
+export default function BankAccountedPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<BankStatementStats | null>(null);
@@ -21,14 +21,14 @@ export default function BankValidatedPage() {
         api.getAllBankStatements({ limit: 1000 }),
         api.getBankStatementStats(),
       ]);
-      const validated = (
+      const accounted = (
         Array.isArray(statementsData) ? statementsData : []
-      ).filter((s) => { const status = String(s.status || "").toUpperCase(); return ["VALIDATED", "VALIDE"].includes(status); });
-      setStatements(validated);
+      ).filter((s) => { const status = String(s.status || "").toUpperCase(); return ["COMPTABILISE", "COMPTABILISÉ"].includes(status); });
+      setStatements(accounted);
       setStats(statsData);
     } catch (error) {
-      console.error("Error loading validated bank statements:", error);
-      toast.error("Impossible de charger les relevés validés");
+      console.error("Error loading accounted bank statements:", error);
+      toast.error("Impossible de charger les relevés comptabilisés");
     } finally {
       setLoading(false);
     }
@@ -57,18 +57,6 @@ export default function BankValidatedPage() {
     toast.info("Export disponible prochainement");
   };
 
-  const handleMarkAsAccounted = async (statementId: number) => {
-    try {
-      await api.updateBankStatementStatus(statementId, "COMPTABILISE");
-      setStatements((prev) =>
-        prev.filter((statement) => statement.id !== statementId),
-      );
-      toast.success("Relevé marqué comme comptabilisé");
-    } catch {
-      toast.error("Erreur lors de la comptabilisation");
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -84,8 +72,11 @@ export default function BankValidatedPage() {
         statements={statements}
         onView={handleView}
         onDelete={handleDelete}
-        onMarkAsAccounted={handleMarkAsAccounted}
         onExport={handleExport}
+        title="Relevés Bancaires Comptabilisés"
+        emptyTitle="Aucun relevé bancaire comptabilisé"
+        emptyDescription="Les relevés bancaires comptabilisés apparaîtront ici"
+        statusWord="comptabilisé"
       />
     </div>
   );

@@ -3,26 +3,31 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, Download, FileText } from "lucide-react"
-import type { LocalBankStatement } from "@/lib/types"
+import type { BankStatementV2 } from "@/lib/types"
 import { BankStatementTable } from "./bank-statement-table"
-import type { FilterValues } from "./invoice-filters"
 
 interface ValidatedBankStatementsPageProps {
-    statements: LocalBankStatement[]
-    filters: FilterValues
-    onFiltersChange: (filters: FilterValues) => void
-    onView: (statement: LocalBankStatement) => void
+    statements: BankStatementV2[]
+    onView: (statement: BankStatementV2) => void
     onDelete: (statementId: number) => void
+    onMarkAsAccounted?: (statementId: number) => void
     onExport: (format: "csv" | "excel" | "pdf") => void
+    title?: string
+    emptyTitle?: string
+    emptyDescription?: string
+    statusWord?: string
 }
 
 export function ValidatedBankStatementsPage({
     statements,
-    filters,
-    onFiltersChange,
     onView,
     onDelete,
+    onMarkAsAccounted,
     onExport,
+    title = "Relevés Bancaires Validés",
+    emptyTitle = "Aucun relevé bancaire validé",
+    emptyDescription = "Les relevés bancaires validés apparaîtront ici",
+    statusWord = "validé",
 }: ValidatedBankStatementsPageProps) {
     return (
         <div className="space-y-6">
@@ -35,9 +40,9 @@ export function ValidatedBankStatementsPage({
                                 <CheckCircle2 className="h-6 w-6 text-emerald-500" />
                             </div>
                             <div>
-                                <CardTitle className="text-2xl">Relevés Bancaires Validés</CardTitle>
+                                <CardTitle className="text-2xl">{title}</CardTitle>
                                 <CardDescription>
-                                    {statements.length} relevé{statements.length > 1 ? "s" : ""} bancaire{statements.length > 1 ? "s" : ""} validé{statements.length > 1 ? "s" : ""}
+                                    {statements.length} relevé{statements.length > 1 ? "s" : ""} bancaire{statements.length > 1 ? "s" : ""} {statusWord}{statements.length > 1 ? "s" : ""}
                                 </CardDescription>
                             </div>
                         </div>
@@ -72,6 +77,7 @@ export function ValidatedBankStatementsPage({
                     statements={statements}
                     onView={onView}
                     onDelete={onDelete}
+                    onMarkAsAccounted={onMarkAsAccounted}
                 />
             ) : (
                 <Card className="border-border/50">
@@ -81,9 +87,9 @@ export function ValidatedBankStatementsPage({
                                 <FileText className="h-8 w-8 text-muted-foreground" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-medium">Aucun relevé bancaire validé</h3>
+                                <h3 className="text-lg font-medium">{emptyTitle}</h3>
                                 <p className="text-sm text-muted-foreground mt-1">
-                                    Les relevés bancaires validés apparaîtront ici
+                                    {emptyDescription}
                                 </p>
                             </div>
                         </div>

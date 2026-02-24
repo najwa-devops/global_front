@@ -15,10 +15,7 @@ export interface AuditLogEntry {
 
 export class AuditService {
     static async list(): Promise<AuditLogEntry[]> {
-        const response = await apiClient.get<{ logs?: AuditLogEntry[] } | AuditLogEntry[]>('/api/admin/audit/logs');
-        if (Array.isArray(response.data)) {
-            return response.data;
-        }
-        return response.data?.logs ?? [];
+        // No audit endpoint is exposed by the current backend controllers.
+        return [];
     }
 }

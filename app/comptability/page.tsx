@@ -1,51 +1,60 @@
-﻿"use client"
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import { api } from "@/lib/api"
-import type { AccountingEntry, UserRole } from "@/lib/types"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"
-import { Loader2, RefreshCw, BookOpenCheck } from "lucide-react"
-import { formatAmount, formatDate, formatDateTime } from "@/lib/utils"
-import { toast } from "sonner"
+import { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
+import type { AccountingEntry, UserRole } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableFooter,
+} from "@/components/ui/table";
+import { Loader2, RefreshCw, BookOpenCheck } from "lucide-react";
+import { formatAmount, formatDate, formatDateTime } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function Page() {
-  const [ entries, setEntries] = useState<AccountingEntry[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [userRole, setUserRole] = useState<UserRole | null>(null)
+  const [entries, setEntries] = useState<AccountingEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   const loadEntries = async () => {
     try {
-      setIsLoading(true)
-      const data = await api.getAccountingEntries()
-      setEntries(data)
+      setIsLoading(true);
+      const data = await api.getAccountingEntries();
+      setEntries(data);
     } catch (err: any) {
-      toast.error(err?.message || "Erreur chargement journal")
-      setEntries([])
+      toast.error(err?.message || "Erreur chargement journal");
+      setEntries([]);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    api.getCurrentUser()
+    api
+      .getCurrentUser()
       .then((u) => setUserRole(u.role))
-      .catch(() => setUserRole(null))
-  }, [])
+      .catch(() => setUserRole(null));
+  }, []);
 
   useEffect(() => {
-    loadEntries()
-  }, [])
+    loadEntries();
+  }, []);
 
   const totals = useMemo(() => {
-    const debit = entries.reduce((sum, entry) => sum + (entry.debit || 0), 0)
-    const credit = entries.reduce((sum, entry) => sum + (entry.credit || 0), 0)
-    return { debit, credit }
-  }, [entries])
+    const debit = entries.reduce((sum, entry) => sum + (entry.debit || 0), 0);
+    const credit = entries.reduce((sum, entry) => sum + (entry.credit || 0), 0);
+    return { debit, credit };
+  }, [entries]);
 
-  const balance = totals.debit - totals.credit
-  const isBalanced = Math.abs(balance) < 0.01
+  const balance = totals.debit - totals.credit;
+  const isBalanced = Math.abs(balance) < 0.01;
 
   if (userRole === "CLIENT") {
     return (
@@ -57,7 +66,7 @@ export default function Page() {
           Cette page est reservee aux roles comptable et administrateur.
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (isLoading) {
@@ -66,7 +75,7 @@ export default function Page() {
         <Loader2 className="h-8 w-8 text-primary animate-spin" />
         <p className="mt-4 text-muted-foreground">Chargement du journal...</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -104,14 +113,23 @@ export default function Page() {
           <CardTitle className="text-base">Résumé du journal</CardTitle>
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div>
-              Debit: <span className="font-semibold text-foreground">{formatAmount(totals.debit)}</span>
+              Debit:{" "}
+              <span className="font-semibold text-foreground">
+                {formatAmount(totals.debit)}
+              </span>
             </div>
             <div>
-              Credit: <span className="font-semibold text-foreground">{formatAmount(totals.credit)}</span>
+              Credit:{" "}
+              <span className="font-semibold text-foreground">
+                {formatAmount(totals.credit)}
+              </span>
             </div>
             <div className={isBalanced ? "text-emerald-600" : "text-amber-600"}>
-              Solde: <span className="font-semibold">{formatAmount(balance)}</span>{" "}
-              <span className="text-xs">{isBalanced ? "(Equilibre)" : "(A verifier)"}</span>
+              Solde:{" "}
+              <span className="font-semibold">{formatAmount(balance)}</span>{" "}
+              <span className="text-xs">
+                {isBalanced ? "(Equilibre)" : "(A verifier)"}
+              </span>
             </div>
           </div>
         </CardHeader>
@@ -125,41 +143,85 @@ export default function Page() {
               <Table className="min-w-[900px]">
                 <TableHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
                   <TableRow className="bg-muted/40">
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">N°</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">Journal</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">Compte</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">Date</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">Piece</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">Désignation</TableHead>
-                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground">Debit</TableHead>
-                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground">Credit</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      N°
+                    </TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Journal
+                    </TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Compte
+                    </TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Date
+                    </TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Piece
+                    </TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Désignation
+                    </TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Debit
+                    </TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Credit
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {entries.map((entry, index) => (
-                    <TableRow key={entry.id} className={index % 2 === 0 ? "bg-background" : "bg-muted/30"}>
-                      <TableCell className="text-xs font-semibold text-muted-foreground">{entry.AC ?? "-"}</TableCell>
-                      <TableCell className="text-xs font-semibold text-muted-foreground">{entry.journal || "-"}</TableCell>
-                      <TableCell className="font-mono text-xs">{entry.accountNumber}</TableCell>
-                      <TableCell>{entry.entryDate ? formatDate(entry.entryDate) : "-"}</TableCell>
-                      <TableCell className="font-medium">{entry.invoiceNumber || "-"}</TableCell>
-                      <TableCell className="max-w-[340px] truncate">{entry.supplier || "-"}</TableCell>
+                    <TableRow
+                      key={entry.id}
+                      className={
+                        index % 2 === 0 ? "bg-background" : "bg-muted/30"
+                      }
+                    >
+                      <TableCell className="text-xs font-semibold text-muted-foreground">
+                        {entry.AC ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold text-muted-foreground">
+                        {entry.journal || "-"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {entry.accountNumber}
+                      </TableCell>
+                      <TableCell>
+                        {entry.entryDate ? formatDate(entry.entryDate) : "-"}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {entry.invoiceNumber || "-"}
+                      </TableCell>
+                      <TableCell className="max-w-[340px] truncate">
+                        {entry.supplier || "-"}
+                      </TableCell>
                       <TableCell className="text-right font-mono text-emerald-700">
-                        {entry.debit && entry.debit > 0 ? formatAmount(entry.debit) : "-"}
+                        {entry.debit && entry.debit > 0
+                          ? formatAmount(entry.debit)
+                          : "-"}
                       </TableCell>
                       <TableCell className="text-right font-mono text-rose-700">
-                        {entry.credit && entry.credit > 0 ? formatAmount(entry.credit) : "-"}
+                        {entry.credit && entry.credit > 0
+                          ? formatAmount(entry.credit)
+                          : "-"}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-right text-xs uppercase tracking-wide text-muted-foreground">
+                    <TableCell
+                      colSpan={5}
+                      className="text-right text-xs uppercase tracking-wide text-muted-foreground"
+                    >
                       Totaux
                     </TableCell>
-                    <TableCell className="text-right font-mono">{formatAmount(totals.debit)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatAmount(totals.credit)}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatAmount(totals.debit)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatAmount(totals.credit)}
+                    </TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -168,5 +230,5 @@ export default function Page() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

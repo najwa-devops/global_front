@@ -1,27 +1,11 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
-import { Building2, Settings2, Gauge } from "lucide-react"
+import { Building2, Settings2, ShieldCheck, Gauge } from "lucide-react"
 import { toast } from "sonner"
 
 export function GeneralSettingsPage() {
@@ -34,11 +18,6 @@ export function GeneralSettingsPage() {
         return false
     })
 
-    const [isAuxDialogOpen, setIsAuxDialogOpen] = useState(false)
-    const [auxType, setAuxType] = useState<"client" | "fournisseur">("fournisseur")
-    const [comptCollectife, setComptCollectife] = useState("")
-    const [codeTier, setCodeTier] = useState("")
-
     useEffect(() => {
         if (typeof window !== "undefined") {
             localStorage.setItem("accounting_global_aux_mode", String(globalAuxMode))
@@ -48,13 +27,11 @@ export function GeneralSettingsPage() {
     const handleToggleAuxMode = (checked: boolean) => {
         setGlobalAuxMode(checked)
         toast.success(checked ? "Mode auxiliaire activé par défaut" : "Mode auxiliaire désactivé par défaut")
-        if (checked) {
-            setIsAuxDialogOpen(true)
-        }
     }
 
     return (
         <div className="space-y-6 max-w-4xl">
+
             <div className="grid gap-6">
                 <Card className="border-border/50 bg-card/50 overflow-hidden">
                     <CardHeader className="bg-muted/30 pb-4">
@@ -138,8 +115,6 @@ export function GeneralSettingsPage() {
                     </CardContent>
                 </Card>
             </div>
-
-           
         </div>
     )
 }

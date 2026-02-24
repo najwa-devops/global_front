@@ -1,266 +1,388 @@
-"use client"
-
-import { useState } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { FileText, Save, Trash2, Eye, Loader2 } from "lucide-react"
-import type { LocalBankStatement, BankStatementField } from "@/lib/types"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+    FileText,
+    Save,
+    Trash2,
+    Eye,
+    Loader2,
+    MoreHorizontal,
+    Edit2,
+    X,
+    CheckCircle2,
+    RefreshCw
+} from "lucide-react"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import type { BankStatementV2, BankTransactionV2 } from "@/lib/types"
 import { formatFileSize, formatDate } from "@/lib/utils"
+import { BankStatementDetailModal } from "./bank-statement-detail-modal"
 
 interface BankStatementTableProps {
-    statements: LocalBankStatement[]
-    onView: (statement: LocalBankStatement) => void
+    statements: BankStatementV2[]
+    onView: (statement: BankStatementV2) => void
     onDelete: (statementId: number) => void
-    onSave?: (statement: LocalBankStatement) => void
+    onValidate?: (statementId: number) => void
+    onMarkAsAccounted?: (statementId: number) => void
+    onReprocess?: (statement: BankStatementV2) => void
+    onSave?: (statement: BankStatementV2) => void
 }
 
-export function BankStatementTable({ statements, onView, onDelete, onSave }: BankStatementTableProps) {
-    const [editingId, setEditingId] = useState<number | null>(null)
-    const [editedFields, setEditedFields] = useState<BankStatementField[]>([])
+export function BankStatementTable({ statements, onView, onDelete, onValidate, onMarkAsAccounted, onReprocess, onSave }: BankStatementTableProps) {
+    void onView
+    void onSave
+    // Initialiser les états de "Lier" à partir des données backend si disponibles
+    const initialLinked = useMemo(() => {
+        const linked: Record<number, boolean> = {};
+        statements.forEach(s => {
+            if (s.isLinked !== undefined) {
+                linked[s.id] = s.isLinked;
+            }
+        });
+        return linked;
+    }, [statements]);
 
-    const handleEdit = (statement: LocalBankStatement) => {
-        setEditingId(statement.id)
-        setEditedFields([...statement.fields])
+    const [linkedStatements, setLinkedStatements] = useState<Record<number, boolean>>(initialLinked)
+    const [selectedStatement, setSelectedStatement] = useState<BankStatementV2 | null>(null)
+    const [isModalOpen, setIsModalOpen] = useState(false)
+
+    // Mettre à jour si les statements changent
+    useEffect(() => {
+        setLinkedStatements(prev => ({ ...prev, ...initialLinked }));
+    }, [initialLinked]);
+
+    const toggleLink = (id: number, checked: boolean) => {
+        setLinkedStatements(prev => ({ ...prev, [id]: checked }))
     }
 
-    const handleFieldChange = (fieldKey: string, value: string) => {
-        setEditedFields(prev =>
-            prev.map(field =>
-                field.key === fieldKey ? { ...field, value } : field
-            )
-        )
+    const handleViewDetails = (statement: BankStatementV2) => {
+        setSelectedStatement(statement)
+        setIsModalOpen(true)
     }
 
-    const handleSave = (statement: LocalBankStatement) => {
-        if (onSave) {
-            onSave({
-                ...statement,
-                fields: editedFields,
-            })
-        }
-        setEditingId(null)
-        setEditedFields([])
-    }
+    const normalizeStatus = (status?: string) => String(status || "").toUpperCase()
 
-    const handleCancel = () => {
-        setEditingId(null)
-        setEditedFields([])
-    }
-
-    const getFieldValue = (statement: LocalBankStatement, fieldKey: string): string => {
-        if (editingId === statement.id) {
-            const field = editedFields.find(f => f.key === fieldKey)
-            return String(field?.value || "")
-        }
-        const field = statement.fields.find(f => f.key === fieldKey)
-        return String(field?.value || "")
-    }
-
-    const getStatusBadge = (status?: string) => {
-        switch (status) {
-            case "pending":
-                return <Badge className="bg-amber-400/10 text-amber-400 border-amber-400/30">En attente</Badge>
-            case "processing":
-                return <Badge className="bg-sky-400/10 text-sky-400 border-sky-400/30">En cours</Badge>
-            case "validated":
-                return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Validé</Badge>
+    const getStatusBadge = (status: string) => {
+        switch (normalizeStatus(status)) {
+            case "PENDING":
+            case "EN_ATTENTE":
+                return <Badge className="bg-sky-400/10 text-sky-500 border-sky-400/30">En attente</Badge>
+            case "PROCESSING":
+            case "EN_COURS":
+                return <Badge className="bg-blue-500/10 text-blue-600 border-blue-400/30 animate-pulse">En cours</Badge>
+            case "TREATED":
+            case "TRAITE":
+                return <Badge className="bg-blue-700/10 text-blue-800 border-blue-700/30">Traité</Badge>
+            case "READY_TO_VALIDATE":
+            case "PRET_A_VALIDER":
+                return <Badge className="bg-emerald-400/10 text-emerald-500 border-emerald-400/30">Prêt à valider</Badge>
+            case "VALIDATED":
+            case "VALIDE":
+                return <Badge className="bg-emerald-600 text-white border-emerald-700">Validé</Badge>
+            case "COMPTABILISE":
+            case "COMPTABILISÉ":
+                return <Badge className="bg-violet-600 text-white border-violet-700">Comptabilisé</Badge>
+            case "ERROR":
+            case "ERREUR":
+                return <Badge className="bg-destructive text-white border-destructive">Erreur</Badge>
+            case "PARTIAL_SUCCESS":
+                return <Badge className="bg-orange-400/10 text-orange-600 border-orange-400/30">Succès Partiel</Badge>
+            case "VIDE":
+                return <Badge variant="outline" className="text-muted-foreground border-muted">Vide</Badge>
+            case "DUPLIQUE":
+            case "DUPLICATE":
+                return <Badge variant="outline" className="text-muted-foreground border-muted">Dupliqué</Badge>
             default:
-                return <Badge className="bg-muted/10 text-muted-foreground border-muted/30">-</Badge>
+                return <Badge className="bg-muted/10 text-muted-foreground border-muted/30">{status}</Badge>
         }
+    }
+
+    const renderStatusCell = (statement: BankStatementV2) => {
+        if (normalizeStatus(statement.status) === "PROCESSING" && statement.totalPages) {
+            const progress = Math.round(((statement.processedPages || 0) / statement.totalPages) * 100);
+            return (
+                <div className="flex flex-col gap-1 w-24">
+                    {getStatusBadge(statement.status)}
+                    <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                        <div
+                            className="bg-sky-400 h-full transition-all duration-300"
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground text-center">
+                        {statement.processedPages}/{statement.totalPages} pages
+                    </span>
+                </div>
+            );
+        }
+        return getStatusBadge(statement.status);
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                        <FileText className="h-5 w-5 text-primary" />
+        <>
+            <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-xl">
+                <CardHeader className="py-4">
+                    <div className="flex items-center gap-3">
+                        <FileText className="h-6 w-6 text-emerald-600 bg-emerald-100 p-1 rounded-md" />
+                        <CardTitle className="text-xl">Relevés Bancaires</CardTitle>
                     </div>
-                    Relevés Bancaires
-                </CardTitle>
-                <CardDescription>
-                    {statements.length} relevé{statements.length > 1 ? "s" : ""} bancaire{statements.length > 1 ? "s" : ""}
+                    <CardDescription className="ml-9">
+                        {statements.length} relevé{statements.length > 1 ? "s" : ""} à gérer
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="border-border/50 hover:bg-transparent bg-muted/30">
+                                    <TableHead className="font-bold text-foreground">Nom du relevé</TableHead>
+                                    <TableHead className="font-bold text-foreground">Période</TableHead>
+                                    <TableHead className="font-bold text-foreground">Banque</TableHead>
+                                    <TableHead className="font-bold text-foreground">RIB</TableHead>
+                                    <TableHead className="font-bold text-foreground">Total Décaissement</TableHead>
+                                    <TableHead className="font-bold text-foreground">Total Encaissement</TableHead>
+                                    <TableHead className="font-bold text-foreground">Statut</TableHead>
+                                    <TableHead className="text-right font-bold text-foreground">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {Array.isArray(statements) && statements.map((statement) => {
+                                    const isLinked = linkedStatements[statement.id] || false
+                                    return (
+                                        <TableRow key={statement.id} className="border-border/50 hover:bg-muted/10 transition-colors">
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                                    <span>{statement.originalName || statement.filename}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {statement.month && statement.year ? `${String(statement.month).padStart(2, '0')}/${statement.year}` : "-"}
+                                            </TableCell>
+                                            <TableCell>{statement.bankName || "-"}</TableCell>
+                                            <TableCell className="font-mono text-xs">{statement.rib || "-"}</TableCell>
+                                            <TableCell className="text-red-500 font-medium whitespace-nowrap">
+                                                {statement.totalDebit ? `${statement.totalDebit.toLocaleString()} DH` : "0.00 DH"}
+                                            </TableCell>
+                                            <TableCell className="text-emerald-500 font-medium whitespace-nowrap">
+                                                {statement.totalCredit ? `${statement.totalCredit.toLocaleString()} DH` : "0.00 DH"}
+                                            </TableCell>
+                                            <TableCell>{renderStatusCell(statement)}</TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <div className="flex items-center gap-2 mr-2">
+                                                        {/* Checkbox 'Lier' supprimée comme demandé */}
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-primary hover:bg-primary/10"
+                                                        onClick={() => handleViewDetails(statement)}
+                                                        title="Détails"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-32">
+                                                            {(["TREATED", "READY_TO_VALIDATE", "TRAITE", "PRET_A_VALIDER"].includes(normalizeStatus(statement.status))) && onValidate && (
+                                                                <DropdownMenuItem className="text-emerald-600 gap-2" onClick={() => onValidate(statement.id)}>
+                                                                    <CheckCircle2 className="h-4 w-4" /> Valider
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {(["VALIDATED", "VALIDE"].includes(normalizeStatus(statement.status))) && onMarkAsAccounted && (
+                                                                <DropdownMenuItem className="text-violet-700 gap-2" onClick={() => onMarkAsAccounted(statement.id)}>
+                                                                    <CheckCircle2 className="h-4 w-4" /> Comptabiliser
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {(statement.canReprocess || ["ERROR", "ERREUR"].includes(normalizeStatus(statement.status))) && onReprocess && (
+                                                                <DropdownMenuItem className="text-blue-600 gap-2" onClick={() => onReprocess(statement)}>
+                                                                    <RefreshCw className="h-4 w-4" /> Reprocesser
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            <DropdownMenuItem className="text-destructive gap-2" onClick={() => onDelete(statement.id)}>
+                                                                <Trash2 className="h-4 w-4" /> Supprimer
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )
+                                })}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <BankStatementDetailModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                statement={selectedStatement}
+            />
+        </>
+    )
+}
+
+interface BankTransactionTableProps {
+    transactions: BankTransactionV2[]
+    statement?: BankStatementV2
+    onUpdate?: (transaction: BankTransactionV2) => void
+    onBulkUpdate?: (ids: number[], data: Partial<BankTransactionV2>) => void
+}
+
+export function BankTransactionTable({ transactions, statement, onUpdate }: BankTransactionTableProps) {
+    const [editingId, setEditingId] = useState<number | null>(null)
+    const [editedFields, setEditedFields] = useState<Partial<BankTransactionV2>>({})
+
+    const handleEdit = (tx: BankTransactionV2) => {
+        setEditingId(tx.id)
+        setEditedFields({ ...tx })
+    }
+
+    const handleSave = (tx: BankTransactionV2) => {
+        if (onUpdate) {
+            onUpdate({ ...tx, ...editedFields } as BankTransactionV2)
+        }
+        setEditingId(null)
+    }
+
+    return (
+        <Card className="border-border/50 bg-card/50">
+            <CardHeader className="py-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <FileText className="h-6 w-6 text-emerald-600 bg-emerald-100 p-1 rounded-md" />
+                        <CardTitle className="text-xl">Prévisualisation du Relevé</CardTitle>
+                    </div>
+                    {statement && (
+                        <div className="flex items-center gap-4">
+                            <div className="flex flex-col items-end">
+                                <span className="text-xs text-muted-foreground uppercase font-semibold">Compte</span>
+                                <Badge variant={statement.isLinked ? "default" : "outline"} className={statement.isLinked ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" : "text-orange-600 bg-orange-500/10 border-orange-500/60"}>
+                                    {statement.isLinked ? "LIÉ" : "NON LIÉ"}
+                                </Badge>
+                            </div>
+                            <div className="flex flex-col items-end border-l pl-4 border-border/50">
+                                <span className="text-xs text-muted-foreground uppercase font-semibold">Transactions</span>
+                                <span className="font-bold">{statement.transactionCount || 0}</span>
+                            </div>
+                            <div className="flex flex-col items-end border-l pl-4 border-border/50">
+                                <span className="text-xs text-muted-foreground uppercase font-semibold text-red-500">Débit Total</span>
+                                <span className="font-bold text-red-500">
+                                    {statement.totalDebit ? `${statement.totalDebit.toLocaleString()} DH` : "0.00 DH"}
+                                </span>
+                            </div>
+                            <div className="flex flex-col items-end border-l pl-4 border-border/50">
+                                <span className="text-xs text-muted-foreground uppercase font-semibold text-emerald-500">Crédit Total</span>
+                                <span className="font-bold text-emerald-500">
+                                    {statement.totalCredit ? `${statement.totalCredit.toLocaleString()} DH` : "0.00 DH"}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <CardDescription className={statement ? "mt-1 ml-9" : "ml-9"}>
+                    {transactions.length} transactions gérées
                 </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
                 <div className="overflow-x-auto">
                     <Table>
                         <TableHeader>
-                            <TableRow className="border-border/50 hover:bg-transparent">
-                                <TableHead className="w-16">Aperçu</TableHead>
-                                <TableHead>Fichier</TableHead>
+                            <TableRow className="bg-muted/30">
                                 <TableHead>Date Opération</TableHead>
                                 <TableHead>Date Valeur</TableHead>
+                                <TableHead>Compte</TableHead>
                                 <TableHead>Libellé</TableHead>
+                                <TableHead>RIB</TableHead>
                                 <TableHead>Débit</TableHead>
                                 <TableHead>Crédit</TableHead>
                                 <TableHead>Statut</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {statements.map((statement) => {
-                                const isEditing = editingId === statement.id
-                                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(statement.filename)
-
-                                return (
-                                    <TableRow key={statement.id} className="border-border/50">
-                                        <TableCell>
-                                            <div className="h-12 w-12 rounded-lg border border-border/50 bg-muted/50 flex items-center justify-center overflow-hidden">
-                                                {statement.fileUrl && isImage ? (
-                                                    <img
-                                                        src={statement.fileUrl}
-                                                        alt={statement.filename}
-                                                        className="h-full w-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <FileText className="h-5 w-5 text-muted-foreground" />
-                                                )}
+                            {Array.isArray(transactions) && transactions.map((tx) => (
+                                <TableRow key={tx.id} className="border-border/50 hover:bg-muted/10 transition-colors">
+                                    <TableCell className="whitespace-nowrap">{tx.dateOperation}</TableCell>
+                                    <TableCell className="whitespace-nowrap">{tx.dateValeur}</TableCell>
+                                    <TableCell>
+                                        <div
+                                            className={`px-3 py-1.5 rounded-lg font-mono text-sm inline-flex items-center gap-2 transition-all duration-300 ${tx.isLinked ? "text-orange-600 bg-orange-500/10 font-bold border-2 border-orange-500/60 shadow-sm shadow-orange-500/10" : "text-muted-foreground"}`}
+                                        >
+                                            {tx.isLinked && <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]" />}
+                                            {tx.compte}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="max-w-xs truncate" title={tx.libelle}>{tx.libelle}</TableCell>
+                                    <TableCell className="font-mono text-xs">{tx.rib || "-"}</TableCell>
+                                    <TableCell className="text-red-500 font-medium whitespace-nowrap">
+                                        {tx.debit > 0 ? `${tx.debit.toLocaleString()} DH` : ""}
+                                    </TableCell>
+                                    <TableCell className="text-emerald-500 font-medium whitespace-nowrap">
+                                        {tx.credit > 0 ? `${tx.credit.toLocaleString()} DH` : ""}
+                                    </TableCell>
+                                    <TableCell>
+                                        {tx.isValid ? (
+                                            <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Valide</Badge>
+                                        ) : tx.needsReview ? (
+                                            <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30">À réviser</Badge>
+                                        ) : (
+                                            <Badge variant="outline">OCR</Badge>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <div className="flex items-center gap-2 mr-2">
+                                                <Checkbox
+                                                    id={`link-${tx.id}`}
+                                                    checked={tx.isLinked}
+                                                    onCheckedChange={(checked) => {
+                                                        if (onUpdate) {
+                                                            onUpdate({
+                                                                ...tx,
+                                                                isLinked: !!checked
+                                                            })
+                                                        }
+                                                    }}
+                                                    className="h-4 w-4 border-muted-foreground data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                                                />
+                                                <label htmlFor={`link-${tx.id}`} className="text-xs font-medium cursor-pointer">Lier</label>
                                             </div>
-                                        </TableCell>
-
-                                        <TableCell className="font-medium max-w-[200px] truncate">
-                                            {statement.filename}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            {isEditing ? (
-                                                <Input
-                                                    type="date"
-                                                    value={getFieldValue(statement, "dateOperation")}
-                                                    onChange={(e) => handleFieldChange("dateOperation", e.target.value)}
-                                                    className="w-[150px]"
-                                                />
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    {getFieldValue(statement, "dateOperation") || "-"}
-                                                </span>
-                                            )}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            {isEditing ? (
-                                                <Input
-                                                    type="date"
-                                                    value={getFieldValue(statement, "dateValeur")}
-                                                    onChange={(e) => handleFieldChange("dateValeur", e.target.value)}
-                                                    className="w-[150px]"
-                                                />
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    {getFieldValue(statement, "dateValeur") || "-"}
-                                                </span>
-                                            )}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            {isEditing ? (
-                                                <Input
-                                                    type="text"
-                                                    value={getFieldValue(statement, "libelle")}
-                                                    onChange={(e) => handleFieldChange("libelle", e.target.value)}
-                                                    className="min-w-[200px]"
-                                                />
-                                            ) : (
-                                                <span className="text-muted-foreground max-w-[250px] truncate block">
-                                                    {getFieldValue(statement, "libelle") || "-"}
-                                                </span>
-                                            )}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            {isEditing ? (
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={getFieldValue(statement, "debit")}
-                                                    onChange={(e) => handleFieldChange("debit", e.target.value)}
-                                                    className="w-[120px]"
-                                                />
-                                            ) : (
-                                                <span className="text-red-500 font-medium">
-                                                    {getFieldValue(statement, "debit") ? `${getFieldValue(statement, "debit")} DH` : "-"}
-                                                </span>
-                                            )}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            {isEditing ? (
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={getFieldValue(statement, "credit")}
-                                                    onChange={(e) => handleFieldChange("credit", e.target.value)}
-                                                    className="w-[120px]"
-                                                />
-                                            ) : (
-                                                <span className="text-emerald-500 font-medium">
-                                                    {getFieldValue(statement, "credit") ? `${getFieldValue(statement, "credit")} DH` : "-"}
-                                                </span>
-                                            )}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            {getStatusBadge(statement.status)}
-                                        </TableCell>
-
-                                        <TableCell>
-                                            <div className="flex items-center justify-end gap-2">
-                                                {isEditing ? (
-                                                    <>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={handleCancel}
-                                                        >
-                                                            Annuler
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => handleSave(statement)}
-                                                            className="gap-1"
-                                                        >
-                                                            <Save className="h-4 w-4" />
-                                                            Sauvegarder
-                                                        </Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => onView(statement)}
-                                                            className="gap-1"
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                            Voir
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleEdit(statement)}
-                                                            className="gap-1"
-                                                        >
-                                                            Éditer
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => onDelete(statement.id)}
-                                                            className="gap-1 text-destructive hover:text-destructive"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                )
-                            })}
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10">
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleEdit(tx)}>
+                                                        <Edit2 className="h-4 w-4 mr-2" /> Modifier
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
                         </TableBody>
                     </Table>
                 </div>

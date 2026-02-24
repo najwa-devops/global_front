@@ -49,7 +49,8 @@ export type BackendDossierDto = {
   validatedInvoicesCount?: number
 }
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://172.20.1.3:8089").replace(/\/$/, "")
+const rawApiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "")
+const API_BASE_URL = rawApiBaseUrl === "/api" ? "" : rawApiBaseUrl
 const patternStatusOverrides = new Map<number, "PENDING" | "APPROVED" | "REJECTED">()
 export const isBankApiEnabled = process.env.NEXT_PUBLIC_ENABLE_BANK_API === "true"
 
@@ -101,15 +102,20 @@ function normalizeTierPayload<T extends CreateTierRequest | UpdateTierRequest>(p
 }
 
 function url(path: string, query?: Record<string, string | number | boolean | undefined | null>): string {
-  const u = new URL(`${API_BASE_URL}${path}`)
-  if (query) {
-    for (const [k, v] of Object.entries(query)) {
-      if (v !== undefined && v !== null && String(v) !== "") {
-        u.searchParams.set(k, String(v))
-      }
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`
+  const fullPath = `${API_BASE_URL}${normalizedPath}`
+  if (!query) return fullPath
+
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(query)) {
+    if (v !== undefined && v !== null && String(v) !== "") {
+      params.set(k, String(v))
     }
   }
-  return u.toString()
+
+  const qs = params.toString()
+  if (!qs) return fullPath
+  return `${fullPath}${fullPath.includes("?") ? "&" : "?"}${qs}`
 }
 
 async function request<T>(
@@ -609,9 +615,15 @@ export async function accountInvoiceEntries(invoiceId: number): Promise<{ messag
   )
 }
 
-export async function uploadBankStatement(file: File): Promise<LocalBankStatement> {
+export async function uploadBankStatement(file: File, bankType?: string, allowedBanks?: string[]): Promise<LocalBankStatement> {
   const formData = new FormData()
   formData.append("file", file)
+  if (bankType && bankType !== "AUTO") {
+    formData.append("bankType", bankType)
+  }
+  if (allowedBanks && allowedBanks.length > 0) {
+    allowedBanks.forEach((bank) => formData.append("allowedBanks", bank))
+  }
   const result = await request<any>("/api/v2/bank-statements/upload", {
     method: "POST",
     body: formData,
@@ -619,7 +631,17 @@ export async function uploadBankStatement(file: File): Promise<LocalBankStatemen
   return mapBankStatement(result)
 }
 
-export async function getAllBankStatements(status?: string, limit: number = 50): Promise<LocalBankStatement[]> {
+type BankStatementsQuery = {
+  status?: string
+  limit?: number
+}
+
+export async function getAllBankStatements(
+  statusOrQuery?: string | BankStatementsQuery,
+  limitArg: number = 50
+): Promise<LocalBankStatement[]> {
+  const status = typeof statusOrQuery === "string" ? statusOrQuery : statusOrQuery?.status
+  const limit = typeof statusOrQuery === "object" ? (statusOrQuery?.limit ?? 50) : limitArg
   const result = await request<{ statements?: any[] }>("/api/v2/bank-statements", undefined, { status, limit })
   return (result?.statements || []).map(mapBankStatement)
 }
@@ -629,13 +651,43 @@ export async function getBankStatementById(id: number): Promise<LocalBankStateme
   return mapBankStatement(result)
 }
 
+export async function processBankStatement(id: number, allowedBanks?: string[]): Promise<LocalBankStatement> {
+  const query = allowedBanks && allowedBanks.length > 0
+    ? { allowedBanks: allowedBanks.join(",") }
+    : undefined
+
+  await request<any>(`/api/v2/bank-statements/${id}/process`, { method: "POST" }, query)
+  const refreshed = await request<any>(`/api/v2/bank-statements/${id}`)
+  return mapBankStatement(refreshed)
+}
+
 export async function validateBankStatement(id: number, _fields: any): Promise<LocalBankStatement> {
   const result = await request<any>(`/api/v2/bank-statements/${id}/validate`, { method: "POST" })
   return mapBankStatement(result?.statement || result)
 }
 
+export async function updateBankStatementStatus(
+  id: number,
+  status: string,
+  updatedBy?: string
+): Promise<LocalBankStatement> {
+  const result = await request<any>(`/api/v2/bank-statements/${id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status, updatedBy }),
+  })
+  return mapBankStatement(result?.statement || result)
+}
+
 export async function deleteBankStatement(id: number): Promise<void> {
   await request<void>(`/api/v2/bank-statements/${id}`, { method: "DELETE" })
+}
+
+export async function deleteAllBankStatements(): Promise<void> {
+  await request<void>("/api/v2/bank-statements/all", { method: "DELETE" })
+}
+
+export async function getBankStatementStats(): Promise<any> {
+  return request<any>("/api/v2/bank-statements/stats", undefined, { _t: Date.now() })
 }
 
 // ============================================
@@ -719,7 +771,7 @@ export async function createDossier(payload: { nom: string; fournisseurEmail: st
 }
 
 export async function deleteDossier(id: number): Promise<void> {
-  await request<void>(`/api/dossiers/${id}`, { method: "DELETE" })
+  throw new Error("Suppression de dossier non supportee par le backend actuel")
 }
 
 export async function getAllPatterns(): Promise<DetectedFieldPattern[]> {
@@ -837,8 +889,12 @@ export const api = {
   uploadBankStatement,
   getAllBankStatements,
   getBankStatementById,
+  processBankStatement,
   validateBankStatement,
+  updateBankStatementStatus,
   deleteBankStatement,
+  deleteAllBankStatements,
+  getBankStatementStats,
   getAllPatterns,
   getPatternStatistics,
   approvePattern,

@@ -23,7 +23,8 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!name.trim() || !fournisseurName.trim() || !fournisseurEmail.trim()) return
+        if (!name.trim() || !fournisseurName.trim() || !fournisseurEmail.trim() || !fournisseurPassword.trim()) return
+        if (fournisseurPassword.trim().length < 6) return
         setIsLoading(true)
         // Simulate API delay
         await new Promise(r => setTimeout(r, 800))
@@ -31,7 +32,7 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
             name: name.trim(),
             fournisseurName: fournisseurName.trim(),
             fournisseurEmail: fournisseurEmail.trim(),
-            fournisseurPassword: fournisseurPassword.trim() || undefined
+            fournisseurPassword: fournisseurPassword.trim()
         })
         setIsLoading(false)
         setName("")
@@ -100,7 +101,10 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
                                         placeholder="••••••••"
                                         value={fournisseurPassword}
                                         onChange={e => setFournisseurPassword(e.target.value)}
+                                        minLength={6}
+                                        required
                                     />
+                                    <p className="text-[11px] text-muted-foreground">Minimum 6 caractères.</p>
                                 </div>
                             </div>
                         </div>
@@ -117,7 +121,7 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
                         <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                             Annuler
                         </Button>
-                        <Button type="submit" disabled={isLoading || !name || !fournisseurName || !fournisseurEmail}>
+                        <Button type="submit" disabled={isLoading || !name || !fournisseurName || !fournisseurEmail || fournisseurPassword.trim().length < 6}>
                             {isLoading ? "Création en cours..." : "Créer le dossier"}
                         </Button>
                     </DialogFooter>

@@ -2,10 +2,11 @@
 
 import { useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle2 } from "lucide-react"
+import { CheckCircle2, Upload } from "lucide-react"
 import { InvoiceTable } from "@/components/invoice-table"
 import { InvoiceFilters, type FilterValues } from "@/components/invoice-filters"
 import { StatsCards } from "@/components/stats-cards"
+import { Button } from "@/components/ui/button"
 import type { DynamicInvoice } from "@/lib/types"
 
 interface ValidatedInvoicesPageProps {
@@ -15,7 +16,6 @@ interface ValidatedInvoicesPageProps {
   suppliers: string[]
   onView: (invoice: DynamicInvoice) => void
   onDelete: (invoiceId: number) => void
-  onAccount: (invoice: DynamicInvoice) => void | Promise<void>
   onExport: (format: "csv" | "excel" | "pdf") => void
 }
 
@@ -26,7 +26,6 @@ export function ValidatedInvoicesPage({
   suppliers,
   onView,
   onDelete,
-  onAccount,
   onExport,
 }: ValidatedInvoicesPageProps) {
   //Appliquer les filtres de recherche
@@ -100,7 +99,6 @@ export function ValidatedInvoicesPage({
           onProcessOcr={() => { }} // Pas de traitement OCR pour les validées
           onProcessInline={() => { }} // Pas de traitement inline
           onDelete={onDelete}
-          onAccount={onAccount}
           itemsPerPage={10}
         />
       ) : (
