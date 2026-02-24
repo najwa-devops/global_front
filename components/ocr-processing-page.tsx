@@ -182,14 +182,16 @@ export function OcrProcessingPage({
     const fetchAccounts = async () => {
       setIsLoadingAccounts(true)
       try {
-        const [charges, tva, fournisseurs] = await Promise.all([
-          api.getChargeAccounts(),
-          api.getTvaAccounts(),
-          api.getFournisseurAccounts()
-        ])
-        setChargeAccounts(charges)
-        setTvaAccounts(tva)
-        setFournisseurAccounts(fournisseurs)
+        const allAccounts = await api.getAccounts(false)
+        setChargeAccounts(
+          allAccounts.filter((account) => account.isChargeAccount || account.classe === 6 || account.code.startsWith("6"))
+        )
+        setTvaAccounts(
+          allAccounts.filter((account) => account.isTvaAccount || account.code.startsWith("345") || account.code.startsWith("445"))
+        )
+        setFournisseurAccounts(
+          allAccounts.filter((account) => account.isFournisseurAccount || account.code.startsWith("4411") || account.code.startsWith("3421"))
+        )
       } catch (error) {
         console.error("Erreur lors du chargement des comptes:", error)
         toast.error("Impossible de charger le plan comptable")

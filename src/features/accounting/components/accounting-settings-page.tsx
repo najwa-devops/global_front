@@ -136,10 +136,10 @@ export function AccountingSettingsPage() {
 
   async function handleSaveAccount() {
     try {
-      if (!/^\d{9}$/.test(accountForm.code)) {
-        toast.error("Le code compte doit contenir exactement 9 chiffres");
-        return;
-      }
+      // if (!/^\d{9}$/.test(accountForm.code)) {
+      //   toast.error("Le code compte doit contenir exactement 9 chiffres");
+      //   return;
+      // }
       if (editingAccount) {
         await updateAccount({ id: editingAccount.id, data: accountForm });
         toast.success("Compte mis a jour");

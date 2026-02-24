@@ -61,6 +61,30 @@ function ValidatedPageContent() {
         }
     }
 
+    const handleAccountInvoice = async (invoice: DynamicInvoice) => {
+        try {
+            const result = await api.accountInvoiceEntries(invoice.id)
+            setInvoices((prev) =>
+                prev.map((inv) =>
+                    inv.id === invoice.id
+                        ? {
+                            ...inv,
+                            accounted: true,
+                            accountedAt: new Date(),
+                        }
+                        : inv
+                )
+            )
+            toast.success(result?.message || "Facture comptabilisée")
+        } catch (err: any) {
+            const message =
+                err?.message === "missing_accounting_data"
+                    ? "Données comptables manquantes pour cette facture."
+                    : err?.message || "Erreur lors de la comptabilisation"
+            toast.error(message)
+        }
+    }
+
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
@@ -78,6 +102,7 @@ function ValidatedPageContent() {
             suppliers={suppliers}
             onView={(inv) => router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`)}
             onDelete={handleDeleteInvoice}
+            onAccount={handleAccountInvoice}
             onExport={(format) => toast.info(`Export ${format.toUpperCase()} bientôt disponible`)}
         />
     )

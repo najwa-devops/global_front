@@ -457,17 +457,20 @@ export async function getAccountsByClasse(classe: number): Promise<Account[]> {
 }
 
 export async function getChargeAccounts(): Promise<Account[]> {
-  const result = await request<{ accounts?: Account[] }>("/api/accounting/accounts/charges")
+  const dossierId = getCurrentDossierId()
+  const result = await request<{ accounts?: Account[] }>("/api/accounting/accounts/charges", undefined, { dossierId })
   return result?.accounts || []
 }
 
 export async function getTvaAccounts(): Promise<Account[]> {
-  const result = await request<{ accounts?: Account[] }>("/api/accounting/accounts/tva")
+  const dossierId = getCurrentDossierId()
+  const result = await request<{ accounts?: Account[] }>("/api/accounting/accounts/tva", undefined, { dossierId })
   return result?.accounts || []
 }
 
 export async function getFournisseurAccounts(): Promise<Account[]> {
-  const result = await request<{ accounts?: Account[] }>("/api/accounting/accounts/fournisseurs")
+  const dossierId = getCurrentDossierId()
+  const result = await request<{ accounts?: Account[] }>("/api/accounting/accounts/fournisseurs", undefined, { dossierId })
   return result?.accounts || []
 }
 
@@ -523,7 +526,8 @@ export async function getTierByTierNumber(tierNumber: string): Promise<Tier | nu
 export async function getTierByIce(ice: string, dossierId?: number): Promise<Tier | null> {
   try {
     const resolvedDossierId = dossierId || getCurrentDossierId()
-    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-ice/${encodeURIComponent(ice)}`, undefined, { dossierId: resolvedDossierId })
+    const normalizedIce = ice?.trim().replace(/\s+/g, "")
+    const result = await request<{ tier?: Tier }>(`/api/accounting/tiers/by-ice/${encodeURIComponent(normalizedIce)}`, undefined, { dossierId: resolvedDossierId })
     return result?.tier || null
   } catch (error: any) {
     if (error?.status === 404) return null
@@ -591,6 +595,15 @@ export async function rebuildAccountingEntries(invoiceId: number): Promise<{ mes
   const dossierId = getCurrentDossierId()
   return request<{ message: string; entries: AccountingEntry[] }>(
     `/api/accounting/journal/entries/rebuild/${invoiceId}`,
+    { method: "POST" },
+    { dossierId }
+  )
+}
+
+export async function accountInvoiceEntries(invoiceId: number): Promise<{ message: string; entries: AccountingEntry[] }> {
+  const dossierId = getCurrentDossierId()
+  return request<{ message: string; entries: AccountingEntry[] }>(
+    `/api/accounting/journal/entries/from-invoice/${invoiceId}`,
     { method: "POST" },
     { dossierId }
   )
@@ -819,6 +832,7 @@ export const api = {
   deactivateTier,
   activateTier,
   getAccountingEntries,
+  accountInvoiceEntries,
   rebuildAccountingEntries,
   uploadBankStatement,
   getAllBankStatements,
