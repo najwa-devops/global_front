@@ -3,23 +3,18 @@
 import { UploadBankPage } from "@/components/upload-bank-page"
 import { api } from "@/lib/api"
 import { useRouter } from "next/navigation"
-import { getConfiguredBankCodes } from "@/lib/accounting-config-banks"
 
 export default function BankUploadPage() {
     const router = useRouter()
 
-    const handleUpload = async (files: File[], bankType?: string) => {
-        const configuredBanks = await getConfiguredBankCodes()
-        const effectiveBankType = bankType || configuredBanks[0] || "AUTO"
-        const allowedBanks = configuredBanks
-
+    const handleUpload = async (files: File[]) => {
         for (const file of files) {
-            await api.uploadBankStatement(file, effectiveBankType, allowedBanks)
+            await api.uploadBankStatement(file)
         }
         router.push("/bank/list")
     }
 
-    const handleViewBankStatement = (_statement: any) => {
+    const handleViewBankStatement = () => {
         // This is handled via the list or after upload
     }
 
