@@ -29,6 +29,18 @@
       }
     ],
     "paths": {
+      "@/app/*": [
+        "./src/app/*"
+      ],
+      "@/components/*": [
+        "./src/shared/components/*"
+      ],
+      "@/hooks/*": [
+        "./src/shared/hooks/*"
+      ],
+      "@/lib/*": [
+        "./src/core/lib/*"
+      ],
       "@/*": [
         "./*"
       ]
