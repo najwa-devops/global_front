@@ -28,6 +28,8 @@ export interface User {
     id: number;
     email: string;
     name: string;
+    username?: string;
+    displayName?: string;
     role: UserRole;
     active: boolean;
     password?: string; // Optional for mock authentication
@@ -39,7 +41,8 @@ export interface LoginResponse {
 }
 
 export interface LoginRequest {
-    email: string;
+    email?: string;
+    username?: string;
     password?: string;
 }
 
@@ -153,6 +156,8 @@ export interface Tier {
     defaultTvaRate?: number;
     active: boolean;
     hasAccountingConfig?: boolean;
+    hasTvaConfiguration?: boolean;
+    tvaDisplayFormat?: string;
     createdAt?: string;
     updatedAt?: string;
 }

@@ -225,6 +225,8 @@ export interface Tier {
 
   active: boolean;
   hasAccountingConfig?: boolean | undefined;
+  hasTvaConfiguration?: boolean | undefined;
+  tvaDisplayFormat?: string | undefined;
 
   createdAt?: string | undefined;
   updatedAt?: string | undefined;
@@ -343,10 +345,29 @@ export interface LocalBankStatement {
   fileSize: number;
   fileUrl?: string | undefined;
   fields: BankStatementField[];
-  status: "pending" | "processing" | "treated" | "validated" | "error";
+  status:
+    | "pending"
+    | "processing"
+    | "treated"
+    | "validated"
+    | "error"
+    | "PENDING"
+    | "PROCESSING"
+    | "TREATED"
+    | "READY_TO_VALIDATE"
+    | "VALIDATED"
+    | "ERROR"
+    | "PARTIAL_SUCCESS"
+    | "EN_ATTENTE"
+    | "EN_COURS"
+    | "VALIDE"
+    | "TRAITE"
+    | "PRET_A_VALIDER"
+    | "COMPTABILISE"
+    | "COMPTABILISÉ";
   isProcessing?: boolean | undefined;
-  createdAt: Date;
-  updatedAt?: Date | undefined;
+  createdAt: Date | string;
+  updatedAt?: Date | string | undefined;
   statusCode?: string;
   rib?: string;
   month?: number;
@@ -370,11 +391,28 @@ export interface LocalBankStatement {
   canDelete?: boolean;
   validatedAt?: string | null;
   validatedBy?: string | null;
-  validationErrors?: unknown;
   rawOcrText?: string;
   cleanedOcrText?: string;
-  transactionsPreview?: BankTransaction[];
-  transactions?: BankTransaction[];
+  processedPages?: number;
+  totalPages?: number;
+  accountedAt?: string | Date | null;
+  accountedBy?: string | null;
+  extractionErrors?: string[] | null;
+  metadata?: Record<string, any>;
+  readyForValidation?: boolean;
+  validationErrors?: string[] | string | null;
+  transactionsPreview?: BankTransactionV2[];
+  transactions?: BankTransactionV2[];
+}
+
+export type BankStatementV2 = LocalBankStatement;
+
+export interface BankOption {
+  code: string;
+  label: string;
+  name?: string | undefined;
+  enabled?: boolean | undefined;
+  mappedTo?: string | undefined;
 }
 
 export interface BankStatementStats {
@@ -383,6 +421,7 @@ export interface BankStatementStats {
   processing: number;
   readyToValidate: number;
   validated: number;
+  accounted?: number;
   error: number;
   totalRibs: number;
   invalid: number;

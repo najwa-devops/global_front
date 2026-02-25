@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import {
   Card,
   CardContent,
@@ -40,7 +40,17 @@ import {
 import type { DynamicInvoice } from "@/lib/types";
 import { formatAmount, formatDate, toWorkflowStatus } from "@/lib/utils";
 
-interface InvoiceTableProps {
+export interface BulkAction {
+  id: string;
+  label: string;
+  icon?: ComponentType<{ className?: string }>;
+  variant?: "default" | "destructive";
+  confirmMessage?: (count: number) => string;
+  disabled?: (selected: DynamicInvoice[]) => boolean;
+  onAction: (selected: DynamicInvoice[]) => void | Promise<void>;
+}
+
+export interface InvoiceTableProps {
   invoices: DynamicInvoice[];
   onView: (invoice: DynamicInvoice) => void;
   onProcessOcr: (invoice: DynamicInvoice) => void;
@@ -49,6 +59,9 @@ interface InvoiceTableProps {
   onConfirm?: (invoice: DynamicInvoice) => void;
   onFinalValidate?: (invoice: DynamicInvoice) => void;
   onAccount?: (invoice: DynamicInvoice) => void;
+  onClientValidate?: (invoice: DynamicInvoice) => void;
+  columnPreset?: string;
+  bulkActions?: BulkAction[];
   itemsPerPage?: number;
   userRole?: string | undefined;
 }

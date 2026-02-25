@@ -503,6 +503,7 @@ export function BankStatementDetailModal({
   }, [editableTransactions, transactions]);
 
   const handleSaveAll = async () => {
+    if (!localStatement) return;
     const toPersist = sortByIndex(editableTransactions);
 
     // Propagation locale avant sauvegarde: même libellé -> même code choisi.

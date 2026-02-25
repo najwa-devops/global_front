@@ -16,6 +16,7 @@ interface AccountedInvoicesPageProps {
   suppliers: string[]
   onView: (invoice: LocalInvoice) => void
   onDelete: (invoiceId: number) => void
+  onRebuildAccounting?: (invoice: LocalInvoice) => Promise<void>
   onExport: (format: "csv" | "excel" | "pdf") => void
   bulkActions?: ComponentProps<typeof InvoiceTable>["bulkActions"]
   userRole?: UserRole

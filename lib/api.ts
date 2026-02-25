@@ -1043,7 +1043,7 @@ export async function processBankStatement(
 
 export async function validateBankStatement(
   id: number,
-  _fields: any,
+  _fields?: any,
 ): Promise<LocalBankStatement> {
   const result = await request<any>(`/api/v2/bank-statements/${id}/validate`, {
     method: "POST",
@@ -1106,13 +1106,13 @@ export async function getTransactionsByStatementId(
 
 export async function updateBankTransaction(
   id: number,
-  updates: Partial<BankTransaction>,
-): Promise<BankTransaction> {
+  updates: Partial<BankTransactionV2>,
+): Promise<BankTransactionV2> {
   const result = await request<any>(`/api/v2/bank-transactions/${id}`, {
     method: "PUT",
     body: JSON.stringify(updates),
   });
-  return (result?.transaction || result) as BankTransaction;
+  return (result?.transaction || result) as BankTransactionV2;
 }
 
 export async function createBankTransaction(payload: {
