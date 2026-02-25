@@ -80,6 +80,7 @@ const EMPTY_NEW_TRANSACTION: NewTransactionForm = {
   credit: 0,
 };
 
+const DEFAULT_COMPTE_CODE = "349700000";
 function normalizeBankStatus(status?: string): string {
   return String(status || "")
     .normalize("NFD")
@@ -117,8 +118,16 @@ function normalizeLibelle(value?: string | null): string {
 }
 
 function isSelectedCompte(value?: string | null): boolean {
+  return resolveDisplayCompte(value) !== DEFAULT_COMPTE_CODE;
+}
+
+function isDefaultCompte(value?: string | null): boolean {
+  return resolveDisplayCompte(value) === DEFAULT_COMPTE_CODE;
+}
+
+function resolveDisplayCompte(value?: string | null): string {
   const compte = (value || "").trim();
-  return compte !== "" && compte !== "349700000";
+  return compte === "" ? DEFAULT_COMPTE_CODE : compte;
 }
 
 export function BankStatementDetailModal({
@@ -369,22 +378,24 @@ export function BankStatementDetailModal({
     },
   ) => {
     const readOnly =
-      !!localStatement && (isAccountedStatus(localStatement.statusCode || localStatement.status) || Boolean(localStatement.accountedAt));
+      !!localStatement && isAccountedStatus(localStatement.status);
     const isEditing = isEditingCell(tx.id, field);
     const rawValue = (tx[field] ?? "") as string | number;
     const value =
-      field === "compte" &&
-      typeof rawValue === "string" &&
-      !isSelectedCompte(rawValue)
-        ? ""
+      field === "compte" && typeof rawValue === "string"
+        ? resolveDisplayCompte(rawValue)
         : rawValue;
+    const displayValue =
+      field === "compte"
+        ? String(value)
+        : value === "" || value === null
+          ? options?.emptyLabel || "—"
+          : String(value);
 
     if (readOnly) {
       return (
         <div className={cn("rounded px-2 py-1", options?.className)}>
-          {value === "" || value === null
-            ? options?.emptyLabel || "Choisissez le code"
-            : String(value)}
+          {displayValue}
         </div>
       );
     }
@@ -422,9 +433,7 @@ export function BankStatementDetailModal({
         )}
         title="Cliquer pour modifier"
       >
-        {value === "" || value === null
-          ? options?.emptyLabel || "Choisissez le code"
-          : String(value)}
+        {displayValue}
       </div>
     );
   };
@@ -923,188 +932,225 @@ export function BankStatementDetailModal({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortByIndex(editableTransactions).map((tx) => (
-                      <TableRow key={tx.id} className="hover:bg-muted/20">
-                        <TableCell className="text-center">
-                          {isEditingCell(tx.id, "transactionIndex") ? (
-                            renderEditableCell(tx, "transactionIndex", {
-                              type: "number",
-                            })
-                          ) : (
-                            <Badge
-                              variant="secondary"
-                              className={cn(
-                                "font-normal text-xs bg-muted text-muted-foreground",
-                                !isAccounted && "cursor-pointer",
-                              )}
-                              onClick={() => {
-                                if (!isAccounted)
-                                  setEditingCell({
-                                    id: tx.id,
-                                    field: "transactionIndex",
-                                  });
-                              }}
-                            >
-                              {tx.transactionIndex || tx.id}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {renderEditableCell(tx, "dateOperation", {
-                            type: "date",
-                            emptyLabel: "Cliquer pour date",
-                          })}
-                        </TableCell>
-                        <TableCell>
-                          {renderEditableCell(tx, "dateValeur", {
-                            type: "date",
-                            emptyLabel: "Cliquer pour date",
-                          })}
-                        </TableCell>
-                        <TableCell>
-                          {isEditingCell(tx.id, "compte") ? (
-                            renderEditableCell(tx, "compte", {
-                              className: "font-mono",
-                              emptyLabel: "Choisissez le code",
-                            })
-                          ) : (
-                            <Popover
-                              open={
-                                !isAccounted && openComptePopoverTxId === tx.id
-                              }
-                              onOpenChange={(nextOpen) => {
-                                if (isAccounted) return;
-                                setOpenComptePopoverTxId(
-                                  nextOpen ? tx.id : null,
-                                );
-                              }}
-                            >
-                              <PopoverTrigger asChild>
-                                <div
-                                  className={cn(
-                                    "group flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm font-medium transition-colors w-fit",
-                                    !isAccounted && "cursor-pointer",
-                                    tx.isLinked
-                                      ? "border-orange-500 bg-transparent text-foreground hover:bg-orange-50/50"
-                                      : isSelectedCompte(tx.compte)
-                                        ? "border-orange-500 bg-orange-100 text-orange-900 hover:bg-orange-200"
-                                        : "border-transparent hover:bg-muted text-muted-foreground",
-                                  )}
-                                >
+                    {sortByIndex(editableTransactions).map((tx) => {
+                      const displayCompte = resolveDisplayCompte(tx.compte);
+                      const hasCompteLibelle =
+                        (tx.compteLibelle || "").trim() !== "";
+                      const compteIsDefault = isDefaultCompte(displayCompte);
+                      return (
+                        <TableRow key={tx.id} className="hover:bg-muted/20">
+                          <TableCell className="text-center">
+                            {isEditingCell(tx.id, "transactionIndex") ? (
+                              renderEditableCell(tx, "transactionIndex", {
+                                type: "number",
+                              })
+                            ) : (
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  "font-normal text-xs bg-muted text-muted-foreground",
+                                  !isAccounted && "cursor-pointer",
+                                )}
+                                onClick={() => {
+                                  if (!isAccounted)
+                                    setEditingCell({
+                                      id: tx.id,
+                                      field: "transactionIndex",
+                                    });
+                                }}
+                              >
+                                {tx.transactionIndex || tx.id}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {renderEditableCell(tx, "dateOperation", {
+                              type: "date",
+                              emptyLabel: "Cliquer pour date",
+                            })}
+                          </TableCell>
+                          <TableCell>
+                            {renderEditableCell(tx, "dateValeur", {
+                              type: "date",
+                              emptyLabel: "Cliquer pour date",
+                            })}
+                          </TableCell>
+                          <TableCell>
+                            {isEditingCell(tx.id, "compte") ? (
+                              renderEditableCell(tx, "compte", {
+                                className: "font-mono",
+                                emptyLabel: DEFAULT_COMPTE_CODE,
+                              })
+                            ) : (
+                              <Popover
+                                open={
+                                  !isAccounted &&
+                                  openComptePopoverTxId === tx.id
+                                }
+                                onOpenChange={(nextOpen) => {
+                                  if (isAccounted) return;
+                                  setOpenComptePopoverTxId(
+                                    nextOpen ? tx.id : null,
+                                  );
+                                }}
+                              >
+                                <PopoverTrigger asChild>
                                   <div
                                     className={cn(
-                                      "h-6 w-6 rounded flex items-center justify-center transition-colors",
-                                      tx.isLinked
-                                        ? "bg-orange-100 text-orange-700"
-                                        : isSelectedCompte(tx.compte)
-                                          ? "bg-white text-orange-700"
-                                          : "bg-muted text-muted-foreground group-hover:bg-muted-foreground/20",
+                                      "group inline-flex min-w-[145px] max-w-[250px] flex-col rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+                                      !isAccounted && "cursor-pointer",
+                                      compteIsDefault
+                                        ? "border-orange-500 bg-orange-100 text-orange-900 hover:bg-orange-200"
+                                        : tx.isLinked
+                                          ? "border-orange-500 bg-transparent text-foreground hover:bg-orange-50/50"
+                                          : isSelectedCompte(tx.compte)
+                                            ? "border-orange-500 bg-orange-100 text-orange-900 hover:bg-orange-200"
+                                            : "border-transparent hover:bg-muted text-muted-foreground",
                                     )}
                                   >
-                                    <LinkIcon className="h-3.5 w-3.5" />
+                                    <div className="flex items-center gap-2">
+                                      <div
+                                        className={cn(
+                                          "h-6 w-6 rounded flex items-center justify-center transition-colors",
+                                          compteIsDefault
+                                            ? "bg-white text-orange-700"
+                                            : tx.isLinked
+                                              ? "bg-orange-100 text-orange-700"
+                                              : isSelectedCompte(tx.compte)
+                                                ? "bg-white text-orange-700"
+                                                : "bg-muted text-muted-foreground group-hover:bg-muted-foreground/20",
+                                        )}
+                                      >
+                                        <LinkIcon className="h-3.5 w-3.5" />
+                                      </div>
+                                      <span
+                                        className={cn(
+                                          "font-mono",
+                                          compteIsDefault
+                                            ? "font-semibold text-[13px]"
+                                            : "text-[13px]",
+                                        )}
+                                      >
+                                        {displayCompte}
+                                      </span>
+                                    </div>
+                                    {hasCompteLibelle ? (
+                                      <span
+                                        className={cn(
+                                          "mt-0.5 text-[10px] leading-tight",
+                                          compteIsDefault
+                                            ? "text-orange-900/90"
+                                            : "text-muted-foreground",
+                                        )}
+                                      >
+                                        {tx.compteLibelle}
+                                      </span>
+                                    ) : null}
                                   </div>
-                                  <span className="font-mono">
-                                    {isSelectedCompte(tx.compte)
-                                      ? tx.compte
-                                      : "Choisissez le code"}
-                                  </span>
-                                </div>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                className="w-[300px] p-0"
-                                align="start"
-                              >
-                                <Command>
-                                  <CommandInput placeholder="Chercher un compte..." />
-                                  <CommandList className="max-h-[260px] overflow-y-auto overscroll-contain touch-pan-y">
-                                    <CommandEmpty>
-                                      Aucun compte trouvé.
-                                    </CommandEmpty>
-                                    <CommandGroup className="pr-1">
-                                      {loadingAccounts ? (
-                                        <div className="flex items-center justify-center p-4">
-                                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                          Chargement...
-                                        </div>
-                                      ) : (
-                                        accounts.map((account) => {
-                                          return (
-                                            <CommandItem
-                                              key={account.id}
-                                              value={`${account.code} ${account.libelle}`}
-                                              onSelect={() => {
-                                                const targetLibelle =
-                                                  normalizeLibelle(tx.libelle);
-                                                setEditableTransactions(
-                                                  (prev) =>
-                                                    prev.map((row) =>
-                                                      row.id === tx.id ||
-                                                      (targetLibelle !== "" &&
-                                                        normalizeLibelle(
-                                                          row.libelle,
-                                                        ) === targetLibelle &&
-                                                        !isSelectedCompte(
-                                                          row.compte,
-                                                        ))
-                                                        ? {
-                                                            ...row,
-                                                            compte:
-                                                              account.code,
-                                                            isLinked: true,
-                                                          }
-                                                        : row,
-                                                    ),
-                                                );
-                                                setOpenComptePopoverTxId(null);
-                                              }}
-                                              className="flex flex-col items-start gap-1 py-2 cursor-pointer"
-                                            >
-                                              <div className="flex items-center w-full justify-between">
-                                                <span className="font-medium text-sm">
-                                                  {account.libelle}
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  className="w-[300px] p-0"
+                                  align="start"
+                                >
+                                  <Command>
+                                    <CommandInput placeholder="Chercher un compte..." />
+                                    <CommandList className="max-h-[260px] overflow-y-auto overscroll-contain touch-pan-y">
+                                      <CommandEmpty>
+                                        Aucun compte trouvé.
+                                      </CommandEmpty>
+                                      <CommandGroup className="pr-1">
+                                        {loadingAccounts ? (
+                                          <div className="flex items-center justify-center p-4">
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                            Chargement...
+                                          </div>
+                                        ) : (
+                                          accounts.map((account) => {
+                                            return (
+                                              <CommandItem
+                                                key={account.id}
+                                                value={`${account.code} ${account.libelle}`}
+                                                onSelect={() => {
+                                                  const targetLibelle =
+                                                    normalizeLibelle(
+                                                      tx.libelle,
+                                                    );
+                                                  setEditableTransactions(
+                                                    (prev) =>
+                                                      prev.map((row) =>
+                                                        row.id === tx.id ||
+                                                        (targetLibelle !== "" &&
+                                                          normalizeLibelle(
+                                                            row.libelle,
+                                                          ) === targetLibelle &&
+                                                          !isSelectedCompte(
+                                                            row.compte,
+                                                          ))
+                                                          ? {
+                                                              ...row,
+                                                              compte:
+                                                                account.code,
+                                                              compteLibelle:
+                                                                account.libelle,
+                                                              isLinked: true,
+                                                            }
+                                                          : row,
+                                                      ),
+                                                  );
+                                                  setOpenComptePopoverTxId(
+                                                    null,
+                                                  );
+                                                }}
+                                                className="flex flex-col items-start gap-1 py-2 cursor-pointer"
+                                              >
+                                                <div className="flex items-center w-full justify-between">
+                                                  <span className="font-medium text-sm">
+                                                    {account.libelle}
+                                                  </span>
+                                                  {tx.compte ===
+                                                    account.code && (
+                                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                                  )}
+                                                </div>
+                                                <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+                                                  {account.code}
                                                 </span>
-                                                {tx.compte === account.code && (
-                                                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                                                )}
-                                              </div>
-                                              <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
-                                                {account.code}
-                                              </span>
-                                            </CommandItem>
-                                          );
-                                        })
-                                      )}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {renderEditableCell(tx, "libelle", {
-                            className: "max-w-[400px] truncate",
-                            emptyLabel: "Cliquer pour libellé",
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right font-medium text-red-600 bg-red-50/30">
-                          {renderEditableCell(tx, "debit", {
-                            type: "number",
-                            step: "0.01",
-                            className: "text-right",
-                            emptyLabel: "0",
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right font-medium text-emerald-600 bg-emerald-50/30">
-                          {renderEditableCell(tx, "credit", {
-                            type: "number",
-                            step: "0.01",
-                            className: "text-right",
-                            emptyLabel: "0",
-                          })}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                                              </CommandItem>
+                                            );
+                                          })
+                                        )}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {renderEditableCell(tx, "libelle", {
+                              className: "max-w-[400px] truncate",
+                              emptyLabel: "Cliquer pour libellé",
+                            })}
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-red-600 bg-red-50/30">
+                            {renderEditableCell(tx, "debit", {
+                              type: "number",
+                              step: "0.01",
+                              className: "text-right",
+                              emptyLabel: "0",
+                            })}
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-emerald-600 bg-emerald-50/30">
+                            {renderEditableCell(tx, "credit", {
+                              type: "number",
+                              step: "0.01",
+                              className: "text-right",
+                              emptyLabel: "0",
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {editableTransactions.length === 0 && (
                       <TableRow>
                         <TableCell
@@ -1154,6 +1200,3 @@ export function BankStatementDetailModal({
     </Dialog>
   );
 }
-
-
-

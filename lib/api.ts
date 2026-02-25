@@ -12,6 +12,7 @@ import {
   UpdateTierRequest,
   LocalBankStatement,
   BankTransaction,
+  BankTransactionV2,
   DetectedFieldPattern,
   PatternStatistics,
   UserRole,
@@ -64,6 +65,7 @@ export type AccountingConfigDto = {
   rib: string;
   ttcEnabled?: boolean;
 };
+export type UpsertAccountingConfigRequest = Omit<AccountingConfigDto, "id">;
 
 const rawApiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || "").replace(
   /\/$/,
@@ -208,6 +210,28 @@ export function normalizeStatus(status: any): string {
   if (s === "VALIDATED") return "validated";
   if (s === "REJECTED" || s === "ERROR") return "error";
   return "pending";
+}
+
+export async function parseApiError(response: Response): Promise<string> {
+  const contentType = response.headers.get("content-type");
+  try {
+    if (contentType && contentType.includes("application/json")) {
+      const errorData = (await response.json()) as any;
+      const code = errorData?.code || errorData?.errorCode;
+      const message =
+        errorData?.error || errorData?.message || response.statusText;
+      return code ? `${message} (${code})` : message;
+    }
+
+    const text = await response.text();
+    if (text.includes("<html>")) {
+      const match = text.match(/<title>(.*?)<\/title>/i);
+      return match ? `Server Error: ${match[1]}` : "Server Error (HTML response)";
+    }
+    return text || response.statusText;
+  } catch {
+    return response.statusText;
+  }
 }
 
 export function getFileUrl(filePath: string, invoiceId?: number): string {
@@ -880,6 +904,41 @@ export async function activateTier(id: number): Promise<void> {
   );
 }
 
+export async function getAccountingConfigs(): Promise<AccountingConfigDto[]> {
+  const result = await request<any>("/api/v2/accounting-configs");
+  return result?.configs || result || [];
+}
+
+export async function createAccountingConfig(
+  requestPayload: UpsertAccountingConfigRequest,
+): Promise<AccountingConfigDto> {
+  return request<AccountingConfigDto>("/api/v2/accounting-configs", {
+    method: "POST",
+    body: JSON.stringify(requestPayload),
+  });
+}
+
+export async function updateAccountingConfig(
+  id: number,
+  requestPayload: UpsertAccountingConfigRequest,
+): Promise<AccountingConfigDto> {
+  return request<AccountingConfigDto>(`/api/v2/accounting-configs/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(requestPayload),
+  });
+}
+
+export async function deleteAccountingConfig(id: number): Promise<void> {
+  await request<void>(`/api/v2/accounting-configs/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getAccountingConfigBanks(): Promise<string[]> {
+  const result = await request<any>("/api/v2/accounting-configs/banks");
+  return result?.banks || [];
+}
+
 // Journal comptable
 export async function getAccountingEntries(): Promise<AccountingEntry[]> {
   const dossierId = getCurrentDossierId();
@@ -1018,6 +1077,33 @@ export async function getBankStatementStats(): Promise<any> {
   });
 }
 
+export async function retryFailedBankStatementPages(id: number): Promise<any> {
+  return request<any>(`/api/v2/bank-statements/${id}/retry-failed`, {
+    method: "POST",
+  });
+}
+
+export async function getBankOptions(): Promise<{
+  count: number;
+  options: any[];
+}> {
+  const result = await request<any>("/api/v2/bank-statements/bank-options");
+  return {
+    count: Number(result?.count || 0),
+    options: Array.isArray(result?.options) ? result.options : [],
+  };
+}
+
+export async function getTransactionsByStatementId(
+  statementId: number,
+): Promise<BankTransactionV2[]> {
+  const result = await request<any>(
+    `/api/v2/bank-transactions/statement/${statementId}`,
+  );
+  if (Array.isArray(result)) return result as BankTransactionV2[];
+  return (result?.transactions || result || []) as BankTransactionV2[];
+}
+
 export async function updateBankTransaction(
   id: number,
   updates: Partial<BankTransaction>,
@@ -1027,6 +1113,26 @@ export async function updateBankTransaction(
     body: JSON.stringify(updates),
   });
   return (result?.transaction || result) as BankTransaction;
+}
+
+export async function createBankTransaction(payload: {
+  statementId: number;
+  transactionIndex?: number | undefined;
+  dateOperation: string;
+  dateValeur?: string | undefined;
+  libelle: string;
+  compte?: string | undefined;
+  categorie?: string | undefined;
+  sens?: "DEBIT" | "CREDIT" | undefined;
+  debit?: number | undefined;
+  credit?: number | undefined;
+  isLinked?: boolean | undefined;
+}): Promise<BankTransactionV2> {
+  const result = await request<any>("/api/v2/bank-transactions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return (result?.transaction || result) as BankTransactionV2;
 }
 
 // ============================================
@@ -1232,6 +1338,7 @@ export const api = {
   getTvaAccounts,
   getFournisseurAccounts,
   getTiers: getAllTiers,
+  getAllTiers,
   getTierById,
   getTierByTierNumber,
   getTierByIfNumber,
@@ -1241,6 +1348,11 @@ export const api = {
   updateTier,
   deactivateTier,
   activateTier,
+  getAccountingConfigs,
+  createAccountingConfig,
+  updateAccountingConfig,
+  deleteAccountingConfig,
+  getAccountingConfigBanks,
   getAccountingEntries,
   accountInvoiceEntries,
   rebuildAccountingEntries,
@@ -1253,7 +1365,11 @@ export const api = {
   deleteBankStatement,
   deleteAllBankStatements,
   getBankStatementStats,
+  retryFailedBankStatementPages,
+  getBankOptions,
+  getTransactionsByStatementId,
   updateBankTransaction,
+  createBankTransaction,
   getAllPatterns,
   getPatternStatistics,
   approvePattern,
