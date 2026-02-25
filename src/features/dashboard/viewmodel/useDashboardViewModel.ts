@@ -56,7 +56,7 @@ export function useDashboardViewModel() {
   );
 
   const openInvoiceOcr = (inv: DynamicInvoice) =>
-    router.push(inv.dossierId ? `/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/ocr/${inv.id}`);
+    router.push(inv.dossierId ? `/achat/ocr/${inv.id}?dossierId=${inv.dossierId}` : `/achat/ocr/${inv.id}`);
 
   const handleProcessInline = async (invoice: DynamicInvoice) => {
     try {
@@ -91,6 +91,6 @@ export function useDashboardViewModel() {
     openInvoiceOcr,
     handleProcessInline,
     handleDeleteInvoice,
-    goInvoices: () => router.push("/invoices"),
+    goInvoices: () => router.push("/achat/invoices"),
   };
 }

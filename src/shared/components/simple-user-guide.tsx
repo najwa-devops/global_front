@@ -41,13 +41,13 @@ export function SimpleUserGuide() {
 
             <div className="mt-3 flex flex-wrap gap-2">
                 <Button asChild size="sm">
-                    <Link href="/upload">1. Ajouter une facture</Link>
+                    <Link href="/achat/upload">1. Ajouter une facture</Link>
                 </Button>
                 <Button asChild size="sm" variant="secondary">
-                    <Link href="/invoices">2. Verifier</Link>
+                    <Link href="/achat/invoices">2. Verifier</Link>
                 </Button>
                 <Button asChild size="sm" variant="outline">
-                    <Link href="/validated">3. Factures validees</Link>
+                    <Link href="/achat/validated">3. Factures validees</Link>
                 </Button>
             </div>
         </div>

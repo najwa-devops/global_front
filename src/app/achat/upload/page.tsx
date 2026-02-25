@@ -40,7 +40,7 @@ function UploadPageContent() {
       }
 
       toast.success(`${files.length} fichier(s) uploadé(s) avec succès`);
-      router.push("/invoices");
+      router.push("/achat/invoices");
     } catch (err: any) {
       const message = err?.message || "Erreur lors de l'upload";
       if (message.includes("BUSINESS_EMPTY_FILE")) {
@@ -59,8 +59,8 @@ function UploadPageContent() {
       onViewInvoice={(inv) =>
         router.push(
           inv.dossierId
-            ? `/ocr/${inv.id}?dossierId=${inv.dossierId}`
-            : `/ocr/${inv.id}`,
+            ? `/achat/ocr/${inv.id}?dossierId=${inv.dossierId}`
+            : `/achat/ocr/${inv.id}`,
         )
       }
       isDemoMode={false}

@@ -1,9 +1,9 @@
 const DOSSIER_SCOPED_PATHS = [
-  "/upload",
-  "/invoices",
-  "/validated",
-  "/client-pending",
-  "/accounted",
+  "/achat/upload",
+  "/achat/invoices",
+  "/achat/validated",
+  "/achat/client-pending",
+  "/achat/accounted",
   "/comptability",
   "/bank",
   "/bank/upload",
@@ -11,7 +11,7 @@ const DOSSIER_SCOPED_PATHS = [
   "/bank/validated",
   "/settings/accounting",
   "/settings/patterns",
-  "/templates",
+  "/achat/templates",
 ];
 
 export function detectDossierIdFromPath(pathname: string): number | null {

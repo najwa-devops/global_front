@@ -54,7 +54,7 @@ export function useOcrPageViewModel(invoiceId: number | null) {
       } catch (error) {
         console.error("Error loading OCR data:", error);
         toast.error("Impossible de charger la facture");
-        router.push("/invoices");
+        router.push("/achat/invoices");
       } finally {
         setIsLoading(false);
       }
@@ -68,7 +68,7 @@ export function useOcrPageViewModel(invoiceId: number | null) {
 
     if (toWorkflowStatus(updatedInvoice.status) === "VALIDATED") {
       toast.success("Facture validee");
-      router.push("/validated");
+      router.push("/achat/validated");
       return;
     }
 

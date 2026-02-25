@@ -216,15 +216,15 @@ export default function ClientPendingPage() {
         onView={(inv) =>
           router.push(
             inv.dossierId
-              ? `/ocr/${inv.id}?dossierId=${inv.dossierId}`
-              : `/ocr/${inv.id}`,
+              ? `/achat/ocr/${inv.id}?dossierId=${inv.dossierId}`
+              : `/achat/ocr/${inv.id}`,
           )
         }
         onProcessOcr={(inv) =>
           router.push(
             inv.dossierId
-              ? `/ocr/${inv.id}?dossierId=${inv.dossierId}`
-              : `/ocr/${inv.id}`,
+              ? `/achat/ocr/${inv.id}?dossierId=${inv.dossierId}`
+              : `/achat/ocr/${inv.id}`,
           )
         }
         onProcessInline={() => {
@@ -256,7 +256,7 @@ export default function ClientPendingPage() {
             </h3>
             <Button
               className="mt-6 gap-2"
-              onClick={() => router.push("/upload")}
+              onClick={() => router.push("/achat/upload")}
             >
               <Upload className="h-4 w-4" />
               Uploader

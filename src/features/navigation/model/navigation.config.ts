@@ -38,11 +38,11 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Facturation",
             icon: FileText,
             children: [
-                { id: "upload", href: "/upload", label: "Nouveau dÃ©pÃ´t", icon: Upload },
-                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
-                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
-                { id: "validated", href: "/validated", label: "Factures validÃ©es", icon: CheckCircle2 },
-                { id: "accounted", href: "/accounted", label: "Factures comptabilisÃ©es", icon: BookOpenCheck },
+                { id: "upload", href: "/achat/upload", label: "Nouveau dÃ©pÃ´t", icon: Upload },
+                { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/achat/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/achat/validated", label: "Factures validÃ©es", icon: CheckCircle2 },
+                { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisÃ©es", icon: BookOpenCheck },
                 { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
             ]
         },
@@ -89,11 +89,11 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Facturation",
             icon: FileText,
             children: [
-                { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload },
-                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
-                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
-                { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2 },
-                { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck },
+                { id: "upload", href: "/achat/upload", label: "Nouveau dépôt", icon: Upload },
+                { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/achat/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2 },
+                { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck },
                 { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
             ]
         },
@@ -140,11 +140,11 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Facturation",
             icon: FileText,
             children: [
-                { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload },
-                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
-                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
-                { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2 },
-                { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck },
+                { id: "upload", href: "/achat/upload", label: "Nouveau dépôt", icon: Upload },
+                { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/achat/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2 },
+                { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck },
                 { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
             ]
         },
@@ -167,7 +167,7 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             children: [
                 { id: "general-settings", href: "/settings/general", label: "Parametres generaux", icon: Settings },
                 { id: "accounting-settings", href: "/settings/accounting", label: "Plan Comptable & Tiers", icon: Building2 },
-                { id: "templates", href: "/templates", label: "Modèles OCR", icon: Sparkles },
+                { id: "templates", href: "/achat/templates", label: "Modèles OCR", icon: Sparkles },
             ]
         }
     ],
@@ -179,10 +179,10 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Facturation",
             icon: FileText,
             children: [
-                { id: "upload", href: "/upload", label: "Déposer Facture", icon: Upload },
-                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
-                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
-                { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2 },
+                { id: "upload", href: "/achat/upload", label: "Déposer Facture", icon: Upload },
+                { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/achat/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2 },
             ]
         },
     ],
@@ -194,10 +194,10 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Facturation",
             icon: FileText,
             children: [
-                { id: "upload", href: "/upload", label: "DÃ©poser Facture", icon: Upload },
-                { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
-                { id: "invoices", href: "/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
-                { id: "validated", href: "/validated", label: "Factures validÃ©es", icon: CheckCircle2 },
+                { id: "upload", href: "/achat/upload", label: "DÃ©poser Facture", icon: Upload },
+                { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
+                { id: "invoices", href: "/achat/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
+                { id: "validated", href: "/achat/validated", label: "Factures validÃ©es", icon: CheckCircle2 },
             ]
         },
     ]
@@ -214,11 +214,11 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         icon: FileText,
         roles: ["COMPTABLE", "ADMIN", "CLIENT"],
         children: [
-            { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "invoices", href: "/invoices", label: "Factures scannées", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "upload", href: "/achat/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "invoices", href: "/achat/invoices", label: "Factures scannées", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
             { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
         ]
     },
@@ -229,11 +229,11 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         icon: FileText,
         roles: ["COMPTABLE", "ADMIN", "CLIENT"],
         children: [
-            { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "invoices", href: "/invoices", label: "Factures scannées", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "upload", href: "/achat/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "invoices", href: "/achat/invoices", label: "Factures scannées", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
             { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
         ]
     },
@@ -268,11 +268,11 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
 export const ROUTE_METADATA: Record<string, { title: string; breadcrumb?: string }> = {
     "/admin": { title: "Administration", breadcrumb: "Admin" },
     "/dossiers": { title: "Mes Dossiers", breadcrumb: "Dossiers" },
-    "/upload": { title: "Nouveau dépôt", breadcrumb: "Uploader" },
-    "/invoices": { title: "Factures en traitement", breadcrumb: "Factures" },
-    "/validated": { title: "Factures validées", breadcrumb: "Archives" },
-    "/client-pending": { title: "Factures en attente", breadcrumb: "Attente" },
-    "/accounted": { title: "Factures comptabilisées", breadcrumb: "Comptabilisées" },
+    "/achat/upload": { title: "Nouveau dépôt", breadcrumb: "Uploader" },
+    "/achat/invoices": { title: "Factures en traitement", breadcrumb: "Factures" },
+    "/achat/validated": { title: "Factures validées", breadcrumb: "Archives" },
+    "/achat/client-pending": { title: "Factures en attente", breadcrumb: "Attente" },
+    "/achat/accounted": { title: "Factures comptabilisées", breadcrumb: "Comptabilisées" },
     "/comptability": { title: "Journal comptable", breadcrumb: "Journal" },
     "/bank/list": { title: "Relevés Bancaires", breadcrumb: "Banque" },
     "/bank/upload": { title: "Importer un relevé", breadcrumb: "Import" },
@@ -280,7 +280,7 @@ export const ROUTE_METADATA: Record<string, { title: string; breadcrumb?: string
     "/settings/general": { title: "Parametres generaux", breadcrumb: "General" },
     "/settings/accounting": { title: "Plan Comptable & Tiers", breadcrumb: "Comptabilité" },
     "/settings/patterns": { title: "Filtres & Patterns", breadcrumb: "Patterns" },
-    "/templates": { title: "Modèles OCR", breadcrumb: "Templates" },
+    "/achat/templates": { title: "Modèles OCR", breadcrumb: "Templates" },
     "/dashboard": { title: "Tableau de bord", breadcrumb: "Dashboard" },
 };
 

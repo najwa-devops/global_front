@@ -152,7 +152,7 @@ function DossierDetailContent() {
   };
 
   const handleUpload = () => {
-    router.push(`/upload?dossierId=${dossierId}`);
+    router.push(`/achat/upload?dossierId=${dossierId}`);
   };
 
   return (
@@ -278,7 +278,7 @@ function DossierDetailContent() {
                               className="h-7 w-7"
                               onClick={() =>
                                 router.push(
-                                  `/ocr/${inv.id}?dossierId=${dossierId}`,
+                                  `/achat/ocr/${inv.id}?dossierId=${dossierId}`,
                                 )
                               }
                               title="Voir"

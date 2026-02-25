@@ -214,8 +214,8 @@ export default function InvoicesPage() {
         onView={(inv) =>
           router.push(
             inv.dossierId
-              ? `/ocr/${inv.id}?dossierId=${inv.dossierId}`
-              : `/ocr/${inv.id}`,
+              ? `/achat/ocr/${inv.id}?dossierId=${inv.dossierId}`
+              : `/achat/ocr/${inv.id}`,
           )
         }
         onProcessOcr={() => {}}
@@ -235,7 +235,7 @@ export default function InvoicesPage() {
             </h3>
             <Button
               className="mt-6 gap-2"
-              onClick={() => router.push("/upload")}
+              onClick={() => router.push("/achat/upload")}
             >
               <Upload className="h-4 w-4" />
               Uploader

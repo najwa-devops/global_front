@@ -49,13 +49,13 @@ export function DossierProvider({ children }: { children: ReactNode }) {
 
     const isDossierScopedPath = (path: string) => {
         return (
-            path === "/upload" ||
-            path === "/invoices" ||
-            path === "/validated" ||
-            path.startsWith("/ocr/") ||
+            path === "/achat/upload" ||
+            path === "/achat/invoices" ||
+            path === "/achat/validated" ||
+            path.startsWith("/achat/ocr/") ||
             path.startsWith("/bank/") ||
             path.startsWith("/settings/") ||
-            path === "/templates" ||
+            path === "/achat/templates" ||
             path === "/patterns"
         );
     };

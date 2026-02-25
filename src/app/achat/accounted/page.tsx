@@ -148,8 +148,8 @@ export default function Page() {
       onView={(inv) =>
         router.push(
           inv.dossierId
-            ? `/ocr/${inv.id}?dossierId=${inv.dossierId}`
-            : `/ocr/${inv.id}`,
+            ? `/achat/ocr/${inv.id}?dossierId=${inv.dossierId}`
+            : `/achat/ocr/${inv.id}`,
         )
       }
       onDelete={handleDeleteInvoice}
