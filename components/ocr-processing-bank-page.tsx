@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,22 @@ export function OcrProcessingBankPage({
 
   const isPdf = statement.filename.match(/\.pdf$/i);
   const isImage = statement.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+  const pdfFile = useMemo(() => {
+    if (!documentUrl) return null;
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const isRemoteHttp = /^https?:\/\//i.test(documentUrl);
+    if (isRemoteHttp) {
+      return {
+        url: documentUrl,
+        withCredentials: true,
+        ...(token
+          ? { httpHeaders: { Authorization: `Bearer ${token}` } }
+          : {}),
+      };
+    }
+    return documentUrl;
+  }, [documentUrl]);
 
   // Configuration PDF.js Worker
   useEffect(() => {
@@ -285,7 +301,7 @@ export function OcrProcessingBankPage({
               )}
               {documentUrl && isPdf && (
                 <Document
-                  file={documentUrl}
+                  file={pdfFile}
                   onLoadSuccess={({ numPages }) => {
                     setNumPages(numPages);
                     setDocumentRendered(true);

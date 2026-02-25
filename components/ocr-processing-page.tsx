@@ -220,10 +220,11 @@ export function OcrProcessingPage({
     const token =
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const isRemoteHttp = /^https?:\/\//i.test(documentUrl);
-    if (token && isRemoteHttp) {
+    if (isRemoteHttp) {
       return {
         url: documentUrl,
-        httpHeaders: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
+        ...(token ? { httpHeaders: { Authorization: `Bearer ${token}` } } : {}),
       };
     }
     return documentUrl;
@@ -448,7 +449,10 @@ export function OcrProcessingPage({
 
         // CAS 2: Fichier sur serveur
         if (invoice.filePath || invoice.filename) {
-          const url = api.getFileUrl(invoice.filePath || invoice.filename);
+          const url = api.getFileUrl(
+            invoice.filePath || invoice.filename,
+            invoice.id,
+          );
           setDocumentUrl(url);
           setIsLoadingDocument(false);
           return;
@@ -1675,26 +1679,6 @@ export function OcrProcessingPage({
               )}
             </CardContent>
           </Card>
-
-          {/* Full OCR Text Display (Below Image) */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-base">
-                  Texte OCR Complet (Raw)
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                value={extractedText}
-                readOnly
-                className="min-h-[200px] font-mono text-xs bg-muted/50 resize-y"
-                placeholder="Le texte OCR complet apparaîtra ici..."
-              />
-            </CardContent>
-          </Card>
         </div>
 
         {/* Extraction Form */}
@@ -1916,77 +1900,6 @@ export function OcrProcessingPage({
               </div>
             </CardContent>
           </Card>
-
-          {/* OCR Text - Zoned Display */}
-          <div className="space-y-2">
-            {/* Header Zone */}
-            <Collapsible>
-              <Card>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3 py-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className="bg-blue-50 text-blue-700 border-blue-200"
-                        >
-                          HEADER
-                        </Badge>
-                        <CardTitle className="text-sm">
-                          Texte OCR extrait
-                        </CardTitle>
-                      </div>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    <Textarea
-                      value={headerText}
-                      readOnly
-                      className="min-h-[100px] font-mono text-xs bg-muted/50 resize-y"
-                      placeholder="Aucun texte d'en-tête détecté..."
-                    />
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-
-            {/* Footer Zone */}
-            <Collapsible>
-              <Card>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3 py-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className="bg-purple-50 text-purple-700 border-purple-200"
-                        >
-                          FOOTER
-                        </Badge>
-                        <CardTitle className="text-sm">
-                          Texte OCR extrait
-                        </CardTitle>
-                      </div>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    <Textarea
-                      value={footerText}
-                      readOnly
-                      className="min-h-[100px] font-mono text-xs bg-muted/50 resize-y"
-                      placeholder="Aucun texte détecté dans le pied de page..."
-                    />
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-          </div>
 
           {/* Nouveau: Selection de Signature pour Template Automatique */}
           {canCreateTemplate && !templateDetected && (

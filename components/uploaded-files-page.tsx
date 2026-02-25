@@ -97,20 +97,54 @@ export function UploadedFilesPage({
   }
 
   const getTierAccount = (invoice: DynamicInvoice): string => {
-    if (invoice.tier?.displayAccount) return invoice.tier.displayAccount
-    if (invoice.tier?.tierNumber) return invoice.tier.tierNumber
-    if (invoice.tier?.collectifAccount) return invoice.tier.collectifAccount
-    const field = invoice.fields.find((f) =>
-      [
+      const pick = (...values: Array<unknown>): string | null => {
+        for (const value of values) {
+          if (value === null || value === undefined) continue
+          const normalized = String(value).trim()
+          if (normalized) return normalized
+        }
+        return null
+      }
+      const readDataValue = (obj: Record<string, unknown> | undefined, key: string): string | null => {
+        if (!obj || !(key in obj)) return null
+        const raw = obj[key] as any
+        const value = raw && typeof raw === "object" && "value" in raw ? raw.value : raw
+        return pick(value)
+      }
+
+      const tier = invoice.tier as (typeof invoice.tier & { nTier?: string; accountNumber?: string }) | undefined
+      const fromTier = pick(
+        invoice.tier?.displayAccount,
+        invoice.tier?.tierNumber,
+        tier?.nTier,
+        tier?.accountNumber,
+        invoice.tier?.collectifAccount,
+      )
+      if (fromTier) return fromTier
+
+      const tierFieldKeys = new Set([
         "tierNumber",
+        "tier_number",
         "collectifAccount",
+        "collectif_account",
         "tierAccount",
+        "tier_account",
         "compteTier",
         "compteTiers",
-      ].includes(f.key),
-    )
-    return field?.value ? String(field.value) : "-"
-  }
+        "nTier",
+      ])
+      const field = invoice.fields.find((f) => tierFieldKeys.has(f.key))
+      const fromFields = pick(field?.value)
+      if (fromFields) return fromFields
+
+      const data = invoice.fieldsData as Record<string, unknown> | undefined
+      for (const key of tierFieldKeys) {
+        const fromData = readDataValue(data, key)
+        if (fromData) return fromData
+      }
+
+      return "-"
+    }
 
   const getChargeAccount = (invoice: DynamicInvoice): string => {
     if (invoice.tier?.defaultChargeAccount) return invoice.tier.defaultChargeAccount
