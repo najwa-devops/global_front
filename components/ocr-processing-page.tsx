@@ -1328,7 +1328,7 @@ export function OcrProcessingPage({
             }
             className="bg-white"
             placeholder={hasValue ? "" : "Ex: 401000"}
-            disabled={status === "validated" || isAutoFilled}
+            //disabled={status === "validated" || isAutoFilled}
             onFocus={() => setFocusedFieldKey(`tier_${key}`)}
             onBlur={() => setTimeout(() => setFocusedFieldKey(null), 200)}
           />
