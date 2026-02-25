@@ -275,11 +275,39 @@ export function OcrProcessingPage({
           api.getFournisseurAccounts(),
         ]);
         setChargeAccounts(charges);
-        setTvaAccounts(tva);
+        if (tva.length > 0) {
+          setTvaAccounts(tva);
+        } else {
+          const accounts = await api.getAccounts(true);
+          setTvaAccounts(
+            accounts.filter(
+              (a) => a.code.startsWith("345") || a.code.startsWith("445"),
+            ),
+          );
+        }
         setFournisseurAccounts(fournisseurs);
       } catch (error) {
-        console.error("Erreur lors du chargement des comptes:", error);
-        toast.error("Impossible de charger le plan comptable");
+        try {
+          const [charges, fournisseurs, accounts] = await Promise.all([
+            api.getChargeAccounts(),
+            api.getFournisseurAccounts(),
+            api.getAccounts(true),
+          ]);
+          setChargeAccounts(charges);
+          setFournisseurAccounts(fournisseurs);
+          setTvaAccounts(
+            accounts.filter(
+              (a) => a.code.startsWith("345") || a.code.startsWith("445"),
+            ),
+          );
+        } catch (fallbackError) {
+          console.error(
+            "Erreur lors du chargement des comptes:",
+            error,
+            fallbackError,
+          );
+          toast.error("Impossible de charger le plan comptable");
+        }
       } finally {
         setIsLoadingAccounts(false);
       }

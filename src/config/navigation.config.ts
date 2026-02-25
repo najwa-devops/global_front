@@ -216,8 +216,8 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         children: [
             { id: "upload", href: "/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "invoices", href: "/invoices", label: "Factures scannées", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "client-pending", href: "/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "validated", href: "/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "accounted", href: "/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
             { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
         ]

@@ -97,11 +97,18 @@ export function UploadedFilesPage({
   }
 
   const getTierAccount = (invoice: DynamicInvoice): string => {
-    if (invoice.tier) {
-      if (invoice.tier.tierNumber) return invoice.tier.tierNumber
-      if (invoice.tier.collectifAccount) return invoice.tier.collectifAccount
-    }
-    const field = invoice.fields.find(f => f.key === "tierNumber" || f.key === "collectifAccount")
+    if (invoice.tier?.displayAccount) return invoice.tier.displayAccount
+    if (invoice.tier?.tierNumber) return invoice.tier.tierNumber
+    if (invoice.tier?.collectifAccount) return invoice.tier.collectifAccount
+    const field = invoice.fields.find((f) =>
+      [
+        "tierNumber",
+        "collectifAccount",
+        "tierAccount",
+        "compteTier",
+        "compteTiers",
+      ].includes(f.key),
+    )
     return field?.value ? String(field.value) : "-"
   }
 

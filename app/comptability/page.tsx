@@ -6,6 +6,13 @@ import type { AccountingEntry, UserRole } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -18,10 +25,19 @@ import { Loader2, RefreshCw, BookOpenCheck } from "lucide-react";
 import { formatAmount, formatDate, formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
 
+const getEntryYear = (entry: AccountingEntry): number | null => {
+  const rawDate = entry.entryDate || entry.createdAt;
+  if (!rawDate) return null;
+  const parsed = new Date(rawDate);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.getFullYear();
+};
+
 export default function Page() {
   const [entries, setEntries] = useState<AccountingEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [selectedYear, setSelectedYear] = useState<string>("");
 
   const loadEntries = async () => {
     try {
@@ -47,11 +63,48 @@ export default function Page() {
     loadEntries();
   }, []);
 
-  const totals = useMemo(() => {
-    const debit = entries.reduce((sum, entry) => sum + (entry.debit || 0), 0);
-    const credit = entries.reduce((sum, entry) => sum + (entry.credit || 0), 0);
-    return { debit, credit };
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    for (const entry of entries) {
+      const year = getEntryYear(entry);
+      if (year !== null) years.add(year);
+    }
+    return Array.from(years).sort((a, b) => b - a);
   }, [entries]);
+
+  useEffect(() => {
+    if (availableYears.length === 0) {
+      setSelectedYear("");
+      return;
+    }
+
+    const hasSelectedYear = selectedYear
+      ? availableYears.includes(Number(selectedYear))
+      : false;
+
+    if (!hasSelectedYear) {
+      setSelectedYear(String(availableYears[0]));
+    }
+  }, [availableYears, selectedYear]);
+
+  const filteredEntries = useMemo(() => {
+    if (!selectedYear) return entries;
+    return entries.filter(
+      (entry) => String(getEntryYear(entry) ?? "") === selectedYear
+    );
+  }, [entries, selectedYear]);
+
+  const totals = useMemo(() => {
+    const debit = filteredEntries.reduce(
+      (sum, entry) => sum + (entry.debit || 0),
+      0
+    );
+    const credit = filteredEntries.reduce(
+      (sum, entry) => sum + (entry.credit || 0),
+      0
+    );
+    return { debit, credit };
+  }, [filteredEntries]);
 
   const balance = totals.debit - totals.credit;
   const isBalanced = Math.abs(balance) < 0.01;
@@ -89,13 +142,14 @@ export default function Page() {
             <div>
               <CardTitle className="text-2xl">Journal Comptable</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {entries.length} ecriture{entries.length !== 1 ? "s" : ""}
+                {filteredEntries.length} ecriture
+                {filteredEntries.length !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-700">
-              Exercice en cours
+              Exercice {selectedYear || "N/A"}
             </div>
             <div>Imprime le {formatDateTime(new Date())}</div>
           </div>
@@ -110,7 +164,25 @@ export default function Page() {
 
       <Card className="border-border/50 bg-gradient-to-b from-background via-background to-muted/30">
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="text-base">Résumé du journal</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-base">Résumé du journal</CardTitle>
+            <Select
+              value={selectedYear}
+              onValueChange={setSelectedYear}
+              disabled={availableYears.length === 0}
+            >
+              <SelectTrigger className="h-8 w-[130px]">
+                <SelectValue placeholder="Année" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map((year) => (
+                  <SelectItem key={year} value={String(year)}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div>
               Debit:{" "}
@@ -134,9 +206,9 @@ export default function Page() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {entries.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              Aucune ecriture comptable pour ce dossier.
+              Aucune ecriture comptable pour {selectedYear || "cet exercice"}.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -170,7 +242,7 @@ export default function Page() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry, index) => (
+                  {filteredEntries.map((entry, index) => (
                     <TableRow
                       key={entry.id}
                       className={

@@ -32,7 +32,9 @@ export default function Page() {
       setIsLoading(true);
       const dtos = await api.getAllInvoices();
       const localInvoices = dtos.map(invoiceDtoToLocal);
-      setInvoices(localInvoices.filter((inv) => inv.accounted));
+      setInvoices(
+        localInvoices.filter((inv) => Boolean(inv.accounted || inv.accountedAt)),
+      );
     } catch (err) {
       console.error("Error loading accounted invoices:", err);
     } finally {

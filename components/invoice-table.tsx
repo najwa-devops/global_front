@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { FileText, Eye, Scan, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Sparkles, Zap, CheckCircle2 } from "lucide-react"
+import { FileText, Eye, Scan, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, Sparkles, Zap, CheckCircle2, BookOpenCheck } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { DynamicInvoice } from "@/lib/types"
 import { formatAmount, formatDate, toWorkflowStatus } from "@/lib/utils"
@@ -18,6 +18,7 @@ interface InvoiceTableProps {
   onDelete: (invoiceId: number) => void
   onConfirm?: (invoice: DynamicInvoice) => void
   onFinalValidate?: (invoice: DynamicInvoice) => void
+  onAccount?: (invoice: DynamicInvoice) => void
   itemsPerPage?: number
   userRole?: string | undefined
 }
@@ -29,6 +30,7 @@ export function InvoiceTable({
   onProcessInline,
   onConfirm,
   onFinalValidate,
+  onAccount,
   itemsPerPage = 10,
   userRole
 }: InvoiceTableProps) {
@@ -38,8 +40,16 @@ export function InvoiceTable({
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedInvoices = invoices.slice(startIndex, startIndex + itemsPerPage)
 
-  const getStatusBadge = (status?: string) => {
-    const s = toWorkflowStatus(status)
+  const getStatusBadge = (invoice: DynamicInvoice) => {
+    if (invoice.accounted || invoice.accountedAt) {
+      return (
+        <Badge className="bg-teal-500/10 text-teal-600 border-teal-500/30 hover:bg-teal-500/20">
+          Comptabilisee
+        </Badge>
+      )
+    }
+
+    const s = toWorkflowStatus(invoice.status)
     switch (s) {
       case "READY_TO_TREAT":
         return (
@@ -149,17 +159,19 @@ export function InvoiceTable({
   }
 
   const getTierAccount = (invoice: DynamicInvoice): string => {
-    // Priorité au compte défini sur le Tier associé
-    if (invoice.tier) {
-      if (invoice.tier.tierNumber) {
-        return invoice.tier.tierNumber
-      }
-      if (invoice.tier.collectifAccount) {
-        return invoice.tier.collectifAccount
-      }
-    }
-    // Sinon on cherche dans les champs extraits
-    const field = invoice.fields.find(f => f.key === "tierNumber" || f.key === "collectifAccount")
+    if (invoice.tier?.displayAccount) return invoice.tier.displayAccount
+    if (invoice.tier?.tierNumber) return invoice.tier.tierNumber
+    if (invoice.tier?.collectifAccount) return invoice.tier.collectifAccount
+
+    const field = invoice.fields.find((f) =>
+      [
+        "tierNumber",
+        "collectifAccount",
+        "tierAccount",
+        "compteTier",
+        "compteTiers",
+      ].includes(f.key),
+    )
     return field?.value ? String(field.value) : "-"
   }
 
@@ -260,7 +272,7 @@ export function InvoiceTable({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                      <TableCell>{getStatusBadge(invoice)}</TableCell>
                       <TableCell className="font-medium text-foreground">
                         <div className="flex flex-col gap-1">
                           {getInvoiceNumber(invoice)}
@@ -323,6 +335,20 @@ export function InvoiceTable({
                                   Validation finale
                                 </DropdownMenuItem>
                               )}
+
+                              {userRole !== "FOURNISSEUR" &&
+                                onAccount &&
+                                toWorkflowStatus(invoice.status) === "VALIDATED" &&
+                                !invoice.accounted &&
+                                !invoice.accountedAt && (
+                                  <DropdownMenuItem
+                                    onClick={() => onAccount(invoice)}
+                                    className="gap-2 text-emerald-600 focus:text-emerald-700 font-medium"
+                                  >
+                                    <BookOpenCheck className="h-4 w-4" />
+                                    Comptabiliser
+                                  </DropdownMenuItem>
+                                )}
 
                               <DropdownMenuItem
                                 onClick={() => handleDelete(invoice)}
@@ -389,3 +415,4 @@ export function InvoiceTable({
     </Card>
   )
 }
+
