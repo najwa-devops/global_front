@@ -61,6 +61,12 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
     )
   }
 
+  const clearSelectedDossier = () => {
+    if (typeof window === "undefined") return
+    localStorage.removeItem("currentDossierId")
+    localStorage.removeItem("currentDossierName")
+  }
+
   const renderNavItem = (item: NavItemConfig, isChild = false) => {
     const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href) && !item.children)
     const isExpanded = openMenus.includes(item.id)
@@ -163,6 +169,10 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
             <Link
               href="/dossiers"
               className="flex items-center gap-2 mb-4 px-2 text-[11px] font-medium text-muted-foreground hover:text-primary transition-colors group"
+              onClick={() => {
+                clearSelectedDossier()
+                if (isMobile) setMobileOpen(false)
+              }}
             >
               <ChevronLeft className="h-3 w-3 transition-transform group-hover:-translate-x-0.5" />
               Retour aux dossiers

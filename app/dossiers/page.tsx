@@ -63,7 +63,7 @@ function mapBackendDossier(raw: any): Dossier {
 }
 
 function DossiersPageContent() {
-  const { isComptable, isAdmin } = useAuth();
+  const { user, isComptable, isAdmin } = useAuth();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -97,9 +97,19 @@ function DossiersPageContent() {
 
   const handleCreateDossier = async (req: CreateDossierRequest) => {
     try {
+      const storedDossierId =
+        typeof window !== "undefined"
+          ? Number(localStorage.getItem("currentDossierId"))
+          : NaN;
+      const hasSelectedDossier =
+        Number.isFinite(storedDossierId) && storedDossierId > 0;
+      const adminComptableId =
+        isAdmin() && !hasSelectedDossier && user?.id ? user.id : undefined;
+
       await api.createDossier({
         nom: req.name,
         fournisseurEmail: req.fournisseurEmail,
+        comptableId: adminComptableId,
       });
       toast.success(`Dossier "${req.name}" créé.`);
       setShowCreateModal(false);

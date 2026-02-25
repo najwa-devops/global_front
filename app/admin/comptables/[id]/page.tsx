@@ -111,11 +111,11 @@ function ComptableDossiersContent() {
                 <div className="flex-1">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
-                            {(comptable?.email || "U").slice(0, 2).toUpperCase()}
+                            {(comptable?.username || "U").slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold">{comptable?.email.split("@")[0] || "Comptable"}</h2>
-                            <p className="text-sm text-muted-foreground">{comptable?.email || ""}</p>
+                            <h2 className="text-xl font-bold">{comptable?.username || "Comptable"}</h2>
+                            <p className="text-sm text-muted-foreground">{comptable?.username || ""}</p>
                         </div>
                         <Badge variant={comptable?.active ? "default" : "secondary"} className="ml-2">
                             {comptable?.active ? "Actif" : "Inactif"}

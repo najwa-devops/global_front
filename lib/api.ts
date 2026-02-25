@@ -11,6 +11,7 @@ import {
   CreateTierRequest,
   UpdateTierRequest,
   LocalBankStatement,
+  BankTransaction,
   DetectedFieldPattern,
   PatternStatistics,
   UserRole,
@@ -690,6 +691,17 @@ export async function getBankStatementStats(): Promise<any> {
   return request<any>("/api/v2/bank-statements/stats", undefined, { _t: Date.now() })
 }
 
+export async function updateBankTransaction(
+  id: number,
+  updates: Partial<BankTransaction>
+): Promise<BankTransaction> {
+  const result = await request<any>(`/api/v2/bank-transactions/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  })
+  return (result?.transaction || result) as BankTransaction
+}
+
 // ============================================
 // AUTH / UTILISATEURS
 // ============================================
@@ -727,6 +739,7 @@ export async function updateUserActive(id: number, active: boolean): Promise<Aut
   })
 }
 
+
 export async function getDossiers(): Promise<BackendDossierDto[]> {
   const dossiers = await request<any[]>("/api/dossiers")
   return (dossiers || []).map((d) => ({
@@ -745,7 +758,7 @@ export async function getDossiers(): Promise<BackendDossierDto[]> {
   }))
 }
 
-export async function createDossier(payload: { nom: string; fournisseurEmail: string }): Promise<any> {
+export async function createDossier(payload: { nom: string; fournisseurEmail: string; comptableId?: number }): Promise<any> {
   const username = payload.fournisseurEmail.trim()
   const displayName = username.split("@")[0] || username
   const result = await request<any>("/api/dossiers", {
@@ -755,6 +768,7 @@ export async function createDossier(payload: { nom: string; fournisseurEmail: st
       clientUsername: username,
       clientPassword: "ChangeMe123!",
       clientDisplayName: displayName,
+      ...(payload.comptableId ? { comptableId: payload.comptableId } : {}),
     }),
   })
 
@@ -895,6 +909,7 @@ export const api = {
   deleteBankStatement,
   deleteAllBankStatements,
   getBankStatementStats,
+  updateBankTransaction,
   getAllPatterns,
   getPatternStatistics,
   approvePattern,

@@ -83,11 +83,11 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="fournisseur-email">Email</Label>
+                                    <Label htmlFor="fournisseur-username">Username</Label>
                                     <Input
-                                        id="fournisseur-email"
-                                        type="email"
-                                        placeholder="contact@fournisseur.ma"
+                                        id="fournisseur-username"
+                                        type="text"
+                                        placeholder="fournisseur.username"
                                         value={fournisseurEmail}
                                         onChange={e => setFournisseurEmail(e.target.value)}
                                         required
@@ -113,7 +113,7 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
                     <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
                         <Info className="h-4 w-4 mt-0.5 shrink-0" />
                         <p className="text-xs">
-                            Un compte fournisseur sera créé avec cet email et mot de passe.
+                            Un compte fournisseur sera créé avec ce username et mot de passe.
                         </p>
                     </div>
 

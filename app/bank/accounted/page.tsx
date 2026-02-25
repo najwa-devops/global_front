@@ -15,6 +15,16 @@ export default function BankAccountedPage() {
   const [stats, setStats] = useState<BankStatementStats | null>(null);
   const [statements, setStatements] = useState<BankStatementV2[]>([]);
 
+  const isAccountedStatement = (statement: BankStatementV2): boolean => {
+    const rawStatus = String(
+      statement.statusCode || statement.status || "",
+    ).toUpperCase();
+    const normalized = rawStatus
+      .normalize("NFD")
+      .replace(/\p{M}+/gu, "");
+    return normalized.includes("COMPTABILIS") || Boolean(statement.accountedAt);
+  };
+
   const loadData = async () => {
     try {
       const [statementsData, statsData] = await Promise.all([
@@ -23,15 +33,12 @@ export default function BankAccountedPage() {
       ]);
       const accounted = (
         Array.isArray(statementsData) ? statementsData : []
-      ).filter((s) => {
-        const status = String(s.status || "").toUpperCase();
-        return ["COMPTABILISE", "COMPTABILISÉ"].includes(status);
-      });
+      ).filter(isAccountedStatement);
       setStatements(accounted);
       setStats(statsData);
     } catch (error) {
       console.error("Error loading accounted bank statements:", error);
-      toast.error("Impossible de charger les relevés comptabilisés");
+      toast.error("Impossible de charger les releves comptabilises");
     } finally {
       setLoading(false);
     }
@@ -46,11 +53,11 @@ export default function BankAccountedPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce relevé ?")) return;
+    if (!confirm("Etes-vous sur de vouloir supprimer ce releve ?")) return;
     try {
       await api.deleteBankStatement(id);
       setStatements((prev) => prev.filter((s) => s.id !== id));
-      toast.success("Relevé supprimé");
+      toast.success("Releve supprime");
     } catch {
       toast.error("Erreur lors de la suppression");
     }
@@ -76,10 +83,10 @@ export default function BankAccountedPage() {
         onView={handleView}
         onDelete={handleDelete}
         onExport={handleExport}
-        title="Relevés Bancaires Comptabilisés"
-        emptyTitle="Aucun relevé bancaire comptabilisé"
-        emptyDescription="Les relevés bancaires comptabilisés apparaîtront ici"
-        statusWord="comptabilisé"
+        title="Releves Bancaires Comptabilises"
+        emptyTitle="Aucun releve bancaire comptabilise"
+        emptyDescription="Les releves bancaires comptabilises apparaitront ici"
+        statusWord="comptabilise"
       />
     </div>
   );

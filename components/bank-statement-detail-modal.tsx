@@ -80,12 +80,22 @@ const EMPTY_NEW_TRANSACTION: NewTransactionForm = {
   credit: 0,
 };
 
-function isValidatedStatus(status: string): boolean {
-  return ["VALIDATED", "VALIDE"].includes(status);
+function normalizeBankStatus(status?: string): string {
+  return String(status || "")
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toUpperCase()
+    .trim();
 }
 
-function isAccountedStatus(status: string): boolean {
-  return ["COMPTABILISE", "COMPTABILISÉ"].includes(status);
+function isValidatedStatus(status?: string): boolean {
+  const normalized = normalizeBankStatus(status);
+  return normalized === "VALIDATED" || normalized === "VALIDE";
+}
+
+function isAccountedStatus(status?: string): boolean {
+  const normalized = normalizeBankStatus(status);
+  return normalized.includes("COMPTABILIS");
 }
 
 function sortByIndex(items: BankTransactionV2[]): BankTransactionV2[] {
@@ -359,7 +369,7 @@ export function BankStatementDetailModal({
     },
   ) => {
     const readOnly =
-      !!localStatement && isAccountedStatus(localStatement.status);
+      !!localStatement && (isAccountedStatus(localStatement.statusCode || localStatement.status) || Boolean(localStatement.accountedAt));
     const isEditing = isEditingCell(tx.id, field);
     const rawValue = (tx[field] ?? "") as string | number;
     const value =
@@ -560,7 +570,7 @@ export function BankStatementDetailModal({
   };
 
   if (!localStatement) return null;
-  const isAccounted = isAccountedStatus(localStatement.status);
+  const isAccounted = isAccountedStatus(localStatement.statusCode || localStatement.status) || Boolean(localStatement.accountedAt);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -595,8 +605,7 @@ export function BankStatementDetailModal({
                   Statut
                 </span>
                 {getStatusBadge(localStatement.status)}
-                {isAccountedStatus(localStatement.status) &&
-                  localStatement.accountedAt && (
+                {isAccounted && localStatement.accountedAt && (
                     <p className="text-[11px] text-muted-foreground mt-1">
                       {new Date(localStatement.accountedAt).toLocaleString()}{" "}
                       {localStatement.accountedBy
@@ -864,11 +873,10 @@ export function BankStatementDetailModal({
             </div>
           ) : (
             <div className="relative rounded-md border bg-card shadow-sm overflow-hidden">
-              {(isValidatedStatus(localStatement.status) ||
-                isAccountedStatus(localStatement.status)) && (
+              {(isValidatedStatus(localStatement.statusCode || localStatement.status) || isAccounted) && (
                 <div className="pointer-events-none absolute inset-x-0 top-14 bottom-0 z-20 flex items-center justify-center">
                   <div className="flex flex-col items-center gap-8">
-                    {isValidatedStatus(localStatement.status) && (
+                    {isValidatedStatus(localStatement.statusCode || localStatement.status) && (
                       <div
                         className="select-none border-[6px] border-emerald-600 text-emerald-600 rounded-xl px-12 py-3 text-6xl font-extrabold tracking-wider uppercase rotate-[-8deg] opacity-90 bg-white/10"
                         style={{
@@ -879,7 +887,7 @@ export function BankStatementDetailModal({
                         Validé
                       </div>
                     )}
-                    {isAccountedStatus(localStatement.status) && (
+                    {isAccounted && (
                       <div
                         className="select-none border-[6px] border-violet-600 text-violet-600 rounded-xl px-12 py-3 text-6xl font-extrabold tracking-wider uppercase rotate-[-8deg] opacity-90 bg-white/10"
                         style={{
@@ -1146,3 +1154,6 @@ export function BankStatementDetailModal({
     </Dialog>
   );
 }
+
+
+

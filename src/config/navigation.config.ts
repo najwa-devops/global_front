@@ -232,6 +232,7 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
             { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload, roles: ["COMPTABLE", "ADMIN"] },
             { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List, roles: ["COMPTABLE", "ADMIN"] },
             { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN"] },
+             { id: "bank-accounted", href: "/bank/accounted", label: "Relevés comptabilisés", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN"] },
         ]
     },
     {

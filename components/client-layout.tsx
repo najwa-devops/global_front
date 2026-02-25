@@ -95,7 +95,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         <div
           className={`container mx-auto px-6 py-6 ${isMobile ? "pt-20" : ""}`}
         >
-          {!isMobile && <BreadcrumbNav items={getBreadcrumbItems() as any} />}
+          
 
           <div className="mb-8 flex items-center justify-between">
             <div className="flex flex-col gap-1">

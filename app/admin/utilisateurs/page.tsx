@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { AuthGuard } from "@/components/auth-guard"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Users, Loader2 } from "lucide-react"
+import { UserPlus, Users, Loader2, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/src/api/api-client"
 import { AdminService } from "@/src/api/services/admin.service"
@@ -24,6 +24,10 @@ function AdminUsersPageContent() {
         return !!username.trim() && !!password.trim() && !isSubmitting
     }, [username, password, isSubmitting])
 
+    const activeCount = useMemo(() => {
+        return createdComptables.filter((c) => c.active).length
+    }, [createdComptables])
+
     const onCreateComptable = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!canSubmit) return
@@ -35,21 +39,21 @@ function AdminUsersPageContent() {
                 password: password.trim(),
             })
 
-            setCreatedComptables(prev => [created, ...prev])
-            toast.success(`Comptable créé: ${created.username}`)
+            setCreatedComptables((prev) => [created, ...prev])
+            toast.success(`Comptable cree: ${created.username}`)
             setUsername("")
             setPassword("")
         } catch (err) {
             if (err instanceof ApiError) {
                 if (err.code === "BUSINESS_ALREADY_EXISTS") {
-                    toast.error("Cet email est déjà utilisé.")
+                    toast.error("Cet username est deja utilise.")
                 } else if (err.code === "BUSINESS_BAD_REQUEST") {
-                    toast.error("Email ou mot de passe invalide.")
+                    toast.error("username ou mot de passe invalide.")
                 } else {
-                    toast.error(err.message || "Erreur lors de la création du comptable.")
+                    toast.error(err.message || "Erreur lors de la creation du comptable.")
                 }
             } else {
-                toast.error("Erreur inattendue lors de la création du comptable.")
+                toast.error("Erreur inattendue lors de la creation du comptable.")
             }
         } finally {
             setIsSubmitting(false)
@@ -70,26 +74,56 @@ function AdminUsersPageContent() {
 
     return (
         <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                    {
+                        label: "Comptables",
+                        value: isLoading ? "..." : createdComptables.length,
+                        icon: Users,
+                        color: "text-blue-500",
+                        bg: "bg-blue-500/10",
+                    },
+                    {
+                        label: "Actifs",
+                        value: isLoading ? "..." : activeCount,
+                        icon: CheckCircle2,
+                        color: "text-green-500",
+                        bg: "bg-green-500/10",
+                    },
+                ].map((stat) => (
+                    <Card key={stat.label} className="border-border/50">
+                        <CardContent className="pt-4 pb-3">
+                            <div className="flex items-center gap-2">
+                                <div className={`p-2 rounded-lg ${stat.bg}`}>
+                                    <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">{stat.value}</p>
+                                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
             <Card className="border-border/50">
-                <CardHeader>
+                <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2">
                         <UserPlus className="h-5 w-5 text-primary" />
                         Ajouter un comptable
                     </CardTitle>
-                    <CardDescription>
-                        Créez un utilisateur avec le rôle COMPTABLE (endpoint: POST /api/auth/users). La liste est récupérée du même endpoint puis filtrée par rôle.
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={onCreateComptable} className="space-y-4 max-w-md">
+                    <form onSubmit={onCreateComptable} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                         <div className="space-y-2">
-                            <Label htmlFor="comptable-email">Email</Label>
+                            <Label htmlFor="comptable-username">Username</Label>
                             <Input
-                                id="comptable-email"
-                                type="email"
+                                id="comptable-username"
+                                type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                placeholder="comptable@cabinet.ma"
+                                placeholder="comptable.username"
                                 disabled={isSubmitting}
                                 required
                             />
@@ -108,16 +142,16 @@ function AdminUsersPageContent() {
                             />
                         </div>
 
-                        <Button type="submit" className="gap-2" disabled={!canSubmit}>
+                        <Button type="submit" className="gap-2 w-full md:w-auto" disabled={!canSubmit}>
                             {isSubmitting ? (
                                 <>
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    Création...
+                                    Creation...
                                 </>
                             ) : (
                                 <>
                                     <UserPlus className="h-4 w-4" />
-                                    Créer le comptable
+                                    Creer le comptable
                                 </>
                             )}
                         </Button>
@@ -126,33 +160,32 @@ function AdminUsersPageContent() {
             </Card>
 
             <Card className="border-border/50">
-                <CardHeader>
+                <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5 text-primary" />
-                        Comptables créés (session)
+                        Comptables
                     </CardTitle>
-                    <CardDescription>
-                        Liste locale des créations effectuées depuis cette page.
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
                         <p className="text-sm text-muted-foreground">Chargement...</p>
                     ) : createdComptables.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Aucun comptable créé pour le moment.</p>
+                        <p className="text-sm text-muted-foreground">Aucun comptable cree pour le moment.</p>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {createdComptables.map((u) => (
-                                <div key={u.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium truncate">{u.email}</p>
-                                        <p className="text-xs text-muted-foreground">ID: {u.id}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant="outline">{u.role}</Badge>
+                                <div key={u.id} className="rounded-lg border border-border/60 p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium truncate">{u.username}</p>
+                                            <p className="text-xs text-muted-foreground">ID: {u.id}</p>
+                                        </div>
                                         <Badge variant={u.active ? "default" : "secondary"}>
                                             {u.active ? "Actif" : "Inactif"}
                                         </Badge>
+                                    </div>
+                                    <div className="mt-2">
+                                        <Badge variant="outline">{u.role}</Badge>
                                     </div>
                                 </div>
                             ))}
