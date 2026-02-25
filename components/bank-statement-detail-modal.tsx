@@ -381,16 +381,13 @@ export function BankStatementDetailModal({
       !!localStatement && isAccountedStatus(localStatement.status);
     const isEditing = isEditingCell(tx.id, field);
     const rawValue = (tx[field] ?? "") as string | number;
-    const value =
-      field === "compte" && typeof rawValue === "string"
-        ? resolveDisplayCompte(rawValue)
-        : rawValue;
+    const inputValue = rawValue;
     const displayValue =
       field === "compte"
-        ? String(value)
-        : value === "" || value === null
+        ? resolveDisplayCompte(String(rawValue))
+        : rawValue === "" || rawValue === null
           ? options?.emptyLabel || "—"
-          : String(value);
+          : String(rawValue);
 
     if (readOnly) {
       return (
@@ -407,7 +404,7 @@ export function BankStatementDetailModal({
           type={options?.type || "text"}
           step={options?.step}
           min={options?.type === "number" ? 0 : undefined}
-          value={value}
+          value={inputValue}
           onChange={(e) => handleCellChange(tx.id, field, e.target.value)}
           onBlur={() => setEditingCell(null)}
           onKeyDown={(e) => {
