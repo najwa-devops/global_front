@@ -2,6 +2,7 @@
 const backendBaseUrl = (process.env.BACKEND_INTERNAL_URL || 'http://localhost:8089').replace(/\/$/, '')
 
 const nextConfig = {
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: true,
   },
