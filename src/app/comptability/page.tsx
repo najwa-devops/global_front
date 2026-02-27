@@ -25,12 +25,83 @@ import { Loader2, RefreshCw, BookOpenCheck } from "lucide-react";
 import { formatAmount, formatDate, formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
 
+type JournalEntryKind = "HT" | "TVA" | "TTC" | "OTHER";
+type DisplayAccountingEntry = AccountingEntry & { displayDesignation: string };
+
 const getEntryYear = (entry: AccountingEntry): number | null => {
   const rawDate = entry.entryDate || entry.createdAt;
   if (!rawDate) return null;
   const parsed = new Date(rawDate);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.getFullYear();
+};
+
+const getEntryKind = (entry: AccountingEntry): JournalEntryKind => {
+  const label = String(entry.label || "").toLowerCase();
+
+  if (label.includes("tva")) return "TVA";
+  if (label.includes("ht") || label.includes("charge")) return "HT";
+  if (label.includes("ttc") || label.includes("fournisseur")) return "TTC";
+
+  return "OTHER";
+};
+
+const buildDisplayEntries = (
+  entries: AccountingEntry[],
+): DisplayAccountingEntry[] => {
+  const grouped = new Map<string, AccountingEntry[]>();
+  const groupOrder: string[] = [];
+
+  entries.forEach((entry, index) => {
+    const key = entry.invoiceId != null ? `invoice:${entry.invoiceId}` : `row:${index}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+      groupOrder.push(key);
+    }
+    grouped.get(key)!.push(entry);
+  });
+
+  return groupOrder.flatMap((key) => {
+    const group = grouped.get(key) || [];
+    const tvaCount = group.filter((entry) => getEntryKind(entry) === "TVA").length;
+    const hasTwoTva = tvaCount >= 2;
+
+    const orderedGroup = hasTwoTva
+      ? [...group].sort((a, b) => {
+          const rank = (entry: AccountingEntry): number => {
+            const kind = getEntryKind(entry);
+            if (kind === "HT") return 1;
+            if (kind === "TVA") return 2;
+            if (kind === "TTC") return 3;
+            return 4;
+          };
+          return rank(a) - rank(b);
+        })
+      : group;
+
+    let htIndex = 0;
+    let tvaIndex = 0;
+
+    return orderedGroup.map((entry) => {
+      const kind = getEntryKind(entry);
+      let displayDesignation = entry.label || entry.supplier || "-";
+
+      if (kind === "HT") {
+        htIndex += 1;
+        displayDesignation = hasTwoTva ? `HT ${htIndex}` : "HT";
+      } else if (kind === "TVA") {
+        tvaIndex += 1;
+        displayDesignation = hasTwoTva ? `TVA ${tvaIndex}` : "TVA";
+      } else if (kind === "TTC") {
+        displayDesignation = "TTC";
+      }
+
+      return {
+        ...entry,
+        displayDesignation,
+      };
+    });
+  });
 };
 
 export default function Page() {
@@ -93,6 +164,11 @@ export default function Page() {
       (entry) => String(getEntryYear(entry) ?? "") === selectedYear
     );
   }, [entries, selectedYear]);
+
+  const displayEntries = useMemo(
+    () => buildDisplayEntries(filteredEntries),
+    [filteredEntries],
+  );
 
   const totals = useMemo(() => {
     const debit = filteredEntries.reduce(
@@ -242,7 +318,7 @@ export default function Page() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEntries.map((entry, index) => (
+                  {displayEntries.map((entry, index) => (
                     <TableRow
                       key={entry.id}
                       className={
@@ -265,7 +341,7 @@ export default function Page() {
                         {entry.invoiceNumber || "-"}
                       </TableCell>
                       <TableCell className="max-w-[340px] truncate">
-                        {entry.supplier || "-"}
+                        {entry.displayDesignation}
                       </TableCell>
                       <TableCell className="text-right font-mono text-emerald-700">
                         {entry.debit && entry.debit > 0
