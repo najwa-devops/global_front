@@ -117,8 +117,56 @@ export function OcrProcessingPage({
   onSave,
   isDemoMode = false,
 }: OcrProcessingPageProps) {
+  const parseTvaValues = (raw: unknown): string[] => {
+    if (Array.isArray(raw)) {
+      return raw.map((v: unknown) => String(v).trim()).filter(Boolean);
+    }
+    return String(raw || "")
+      .split("|")
+      .map((v) => v.trim())
+      .filter(Boolean);
+  };
+
+  const upsertSecondaryTvaField = (
+    currentFields: DynamicInvoiceField[],
+    secondTvaValue?: string,
+  ): DynamicInvoiceField[] => {
+    const index = currentFields.findIndex((f) => f.key === "tva2");
+    const hasSecond = !!secondTvaValue && secondTvaValue.trim() !== "";
+
+    if (!hasSecond) {
+      if (index === -1) return currentFields;
+      return currentFields.filter((f) => f.key !== "tva2");
+    }
+
+    const value = secondTvaValue.trim();
+    if (index !== -1) {
+      return currentFields.map((f) =>
+        f.key === "tva2" ? { ...f, value, detected: true } : f,
+      );
+    }
+
+    return [
+      ...currentFields,
+      {
+        key: "tva2",
+        label: "TVA 2",
+        value,
+        type: "number",
+        required: false,
+        detected: true,
+      },
+    ];
+  };
+
   const router = useRouter();
-  const [fields, setFields] = useState<DynamicInvoiceField[]>(invoice.fields);
+  const initialTvaValues = parseTvaValues(invoice.fieldsData?.tvaValues);
+  const [fields, setFields] = useState<DynamicInvoiceField[]>(
+    upsertSecondaryTvaField(
+      invoice.fields,
+      initialTvaValues.length > 1 ? initialTvaValues[1] : undefined,
+    ),
+  );
   const allFields = fields;
   const [extractedText, setExtractedText] = useState(
     invoice.rawOcrText || invoice.extractedText || "",
@@ -142,6 +190,11 @@ export function OcrProcessingPage({
     invoice.pendingFields || [],
   );
   const [warnings, setWarnings] = useState<Warning[]>([]);
+  const [tvaPlaceholder, setTvaPlaceholder] = useState<string>(
+    initialTvaValues.length > 0
+      ? `TVA detectees: ${initialTvaValues.join(" | ")}`
+      : "",
+  );
   const [showOcrText, setShowOcrText] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [status, setStatus] = useState<DynamicInvoice["status"]>(
@@ -501,40 +554,21 @@ export function OcrProcessingPage({
   };
 
   const checkWarnings = () => {
-    const newWarnings: Warning[] = [];
-
-    const ht = Number.parseFloat(
-      String(fields.find((f) => f.key === "amountHT")?.value || "0"),
-    );
-    const tva = Number.parseFloat(
-      String(fields.find((f) => f.key === "tva")?.value || "0"),
-    );
-    const ttc = Number.parseFloat(
-      String(fields.find((f) => f.key === "amountTTC")?.value || "0"),
-    );
-
-    if (ht > 0 && ttc > 0) {
-      const expectedTva = ht * 0.2;
-      if (tva > 0 && Math.abs(tva - expectedTva) > 1) {
-        newWarnings.push({
-          field: "tva",
-          message: `La TVA detectee (${tva} DH) semble incorrecte.`,
-          suggestion: `${expectedTva.toFixed(2)}`,
-        });
-      }
-
-      const expectedTtc = ht + (tva || expectedTva);
-      if (Math.abs(ttc - expectedTtc) > 1) {
-        newWarnings.push({
-          field: "amountTTC",
-          message: `Le TTC detecte (${ttc} DH) semble incorrect.`,
-          suggestion: `${expectedTtc.toFixed(2)}`,
-        });
-      }
-    }
-
-    setWarnings(newWarnings);
+    setWarnings([]);
   };
+
+  useEffect(() => {
+    const tvaValues = parseTvaValues(invoice.fieldsData?.tvaValues);
+    setTvaPlaceholder(
+      tvaValues.length > 0 ? `TVA detectees: ${tvaValues.join(" | ")}` : "",
+    );
+    setFields(
+      upsertSecondaryTvaField(
+        invoice.fields,
+        tvaValues.length > 1 ? tvaValues[1] : undefined,
+      ),
+    );
+  }, [invoice.id, invoice.fieldsData?.tvaValues]);
 
   const handleOcrExtract = async (forcedTemplateId?: number) => {
     setIsProcessingOcr(true);
@@ -656,13 +690,27 @@ export function OcrProcessingPage({
       const extractionFields = result.fieldsData;
 
       if (extractionFields) {
+        const tvaValuesRaw = extractionFields.tvaValues;
+        const tvaValues = parseTvaValues(tvaValuesRaw);
+        if (tvaValues.length > 1) {
+          setTvaPlaceholder(`TVA detectees: ${tvaValues.join(" | ")}`);
+        } else if (tvaValues.length === 1) {
+          setTvaPlaceholder(`TVA detectee: ${tvaValues[0]}`);
+        } else {
+          setTvaPlaceholder("");
+        }
+
         const updatedFields = ParseBackendFieldsData(
           extractionFields,
           fields,
           result,
           newText,
         );
-        setFields(updatedFields);
+        const updatedFieldsWithSecondTva = upsertSecondaryTvaField(
+          updatedFields,
+          tvaValues.length > 1 ? tvaValues[1] : undefined,
+        );
+        setFields(updatedFieldsWithSecondTva);
         setAutoFilledFields(result.autoFilledFields || []);
       }
 
@@ -728,34 +776,6 @@ export function OcrProcessingPage({
     );
     setPendingFields((prev) => prev.filter((f) => f !== key));
     setWarnings((prev) => prev.filter((w) => w.field !== key));
-
-    if (key === "amountHT" || key === "tva" || key === "amountTTC") {
-      setTimeout(() => {
-        const ht = Number.parseFloat(
-          key === "amountHT"
-            ? String(value)
-            : String(fields.find((f) => f.key === "amountHT")?.value || "0"),
-        );
-        const tva = Number.parseFloat(
-          key === "tva"
-            ? String(value)
-            : String(fields.find((f) => f.key === "tva")?.value || "0"),
-        );
-
-        if (key === "amountHT" && ht > 0) {
-          const newTva = ht * 0.2;
-          const newTtc = ht + newTva;
-          setFields((prev) =>
-            prev.map((f) => {
-              if (f.key === "tva") return { ...f, value: newTva.toFixed(2) };
-              if (f.key === "amountTTC")
-                return { ...f, value: newTtc.toFixed(2) };
-              return f;
-            }),
-          );
-        }
-      }, 500);
-    }
   };
 
   const updateTierField = (key: keyof Tier, value: string) => {
@@ -1265,7 +1285,11 @@ export function OcrProcessingPage({
                 setFocusedFieldKey(null);
               }, 200);
             }}
+            placeholder={field.key === "tva" ? tvaPlaceholder : ""}
           />
+          {field.key === "tva" && tvaPlaceholder ? (
+            <p className="text-[11px] text-muted-foreground">{tvaPlaceholder}</p>
+          ) : null}
         </CardContent>
       </Card>
     );
@@ -1881,6 +1905,12 @@ export function OcrProcessingPage({
                   "Compte TVA",
                   "tvaAccount",
                 )}
+                {fields.find((f) => f.key === "tva2")
+                  ? renderFieldCard(
+                      fields.find((f) => f.key === "tva2"),
+                      true,
+                    )
+                  : null}
 
                 {/* Ligne 5: Montant TTC | ICE */}
                 {renderFieldCard(

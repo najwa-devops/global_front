@@ -190,6 +190,7 @@ export function dynamicInvoiceDtoToLocal(
     "averageConfidence",
     "allFieldsFound",
     "templateDetected",
+    "tvaValues",
   ];
 
   // Champs dynamiques
@@ -244,6 +245,7 @@ export function dynamicInvoiceDtoToLocal(
     fileSize: dto.fileSize,
     fileUrl: getFileUrl(dto.filePath || dto.filename, dto.id),
     extractedText: dto.extractedText,
+    fieldsData: dto.fieldsData,
     headerText: dto.headerRawText || dto.fieldsData?.headerRawText,
     footerText: dto.footerRawText || dto.fieldsData?.footerRawText,
     fields,
