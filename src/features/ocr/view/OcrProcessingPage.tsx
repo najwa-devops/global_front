@@ -159,13 +159,31 @@ export function OcrProcessingPage({
     ];
   };
 
+  const syncDetectedTvaFields = (
+    currentFields: DynamicInvoiceField[],
+    tvaValues: string[],
+  ): DynamicInvoiceField[] => {
+    let nextFields = currentFields;
+
+    if (tvaValues.length > 1) {
+      const primaryTva = tvaValues[0]?.trim();
+      if (primaryTva) {
+        nextFields = nextFields.map((f) =>
+          f.key === "tva" ? { ...f, value: primaryTva, detected: true } : f,
+        );
+      }
+    }
+
+    return upsertSecondaryTvaField(
+      nextFields,
+      tvaValues.length > 1 ? tvaValues[1] : undefined,
+    );
+  };
+
   const router = useRouter();
   const initialTvaValues = parseTvaValues(invoice.fieldsData?.tvaValues);
   const [fields, setFields] = useState<DynamicInvoiceField[]>(
-    upsertSecondaryTvaField(
-      invoice.fields,
-      initialTvaValues.length > 1 ? initialTvaValues[1] : undefined,
-    ),
+    syncDetectedTvaFields(invoice.fields, initialTvaValues),
   );
   const allFields = fields;
   const [extractedText, setExtractedText] = useState(
@@ -562,12 +580,7 @@ export function OcrProcessingPage({
     setTvaPlaceholder(
       tvaValues.length > 0 ? `TVA detectees: ${tvaValues.join(" | ")}` : "",
     );
-    setFields(
-      upsertSecondaryTvaField(
-        invoice.fields,
-        tvaValues.length > 1 ? tvaValues[1] : undefined,
-      ),
-    );
+    setFields(syncDetectedTvaFields(invoice.fields, tvaValues));
   }, [invoice.id, invoice.fieldsData?.tvaValues]);
 
   const handleOcrExtract = async (forcedTemplateId?: number) => {
@@ -706,9 +719,9 @@ export function OcrProcessingPage({
           result,
           newText,
         );
-        const updatedFieldsWithSecondTva = upsertSecondaryTvaField(
+        const updatedFieldsWithSecondTva = syncDetectedTvaFields(
           updatedFields,
-          tvaValues.length > 1 ? tvaValues[1] : undefined,
+          tvaValues,
         );
         setFields(updatedFieldsWithSecondTva);
         setAutoFilledFields(result.autoFilledFields || []);
