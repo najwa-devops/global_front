@@ -67,6 +67,28 @@ export type AccountingConfigDto = {
 };
 export type UpsertAccountingConfigRequest = Omit<AccountingConfigDto, "id">;
 
+export type DossierGeneralParamsDto = {
+  dossierId?: number;
+  companyName?: string;
+  address?: string;
+  legalForm?: string;
+  rcNumber?: string;
+  ifNumber?: string;
+  tsc?: string;
+  activity?: string;
+  category?: string;
+  professionalTax?: string;
+  cmRate?: number | null;
+  isRate?: number | null;
+  ice?: string;
+  cniOrResidenceCard?: string;
+  legalRepresentative?: string;
+  capital?: number | null;
+  subjectToRas?: boolean;
+  individualPerson?: boolean;
+  hasFiscalRegularityCertificate?: boolean;
+};
+
 const rawApiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || "").replace(
   /\/$/,
   "",
@@ -941,6 +963,31 @@ export async function getAccountingConfigBanks(): Promise<string[]> {
   return result?.banks || [];
 }
 
+export async function getGeneralParams(): Promise<DossierGeneralParamsDto> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<{ params?: DossierGeneralParamsDto }>(
+    "/api/settings/general-params",
+    undefined,
+    { dossierId },
+  );
+  return result?.params || {};
+}
+
+export async function saveGeneralParams(
+  requestPayload: DossierGeneralParamsDto,
+): Promise<DossierGeneralParamsDto> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<{ params?: DossierGeneralParamsDto }>(
+    "/api/settings/general-params",
+    {
+      method: "PUT",
+      body: JSON.stringify(requestPayload),
+    },
+    { dossierId },
+  );
+  return result?.params || {};
+}
+
 // Journal comptable
 export async function getAccountingEntries(): Promise<AccountingEntry[]> {
   const dossierId = getCurrentDossierId();
@@ -1356,6 +1403,8 @@ export const api = {
   updateAccountingConfig,
   deleteAccountingConfig,
   getAccountingConfigBanks,
+  getGeneralParams,
+  saveGeneralParams,
   getAccountingEntries,
   accountInvoiceEntries,
   rebuildAccountingEntries,

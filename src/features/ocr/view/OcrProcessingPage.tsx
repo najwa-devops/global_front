@@ -1393,6 +1393,15 @@ export function OcrProcessingPage({
                     invoice.filename,
                 )}
               </h1>
+              <Badge
+                className={
+                  invoice.isAvoir
+                    ? "bg-rose-500 text-white"
+                    : "bg-slate-600 text-white"
+                }
+              >
+                {invoice.isAvoir ? "Avoir" : "Facture"}
+              </Badge>
               {getStatusBadge()}
               {templateDetected ? (
                 <Badge

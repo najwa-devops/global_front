@@ -96,7 +96,12 @@ function ValidatedPageContent() {
   return (
     <ValidatedInvoicesPage
       invoices={invoices}
-      filters={{ search: "", supplier: "", status: "VALIDATED" }}
+      filters={{
+        search: "",
+        supplier: "",
+        status: "VALIDATED",
+        invoiceType: "all",
+      }}
       onFiltersChange={() => {}}
       suppliers={suppliers}
       onView={(inv) =>

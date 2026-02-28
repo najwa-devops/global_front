@@ -17,13 +17,14 @@ interface CreateDossierModalProps {
 export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierModalProps) {
     const [name, setName] = useState("")
     const [fournisseurName, setFournisseurName] = useState("")
+    const [ice, setIce] = useState("")
     const [fournisseurEmail, setFournisseurEmail] = useState("")
     const [fournisseurPassword, setFournisseurPassword] = useState("")
     const [isLoading, setIsLoading] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!name.trim() || !fournisseurName.trim() || !fournisseurEmail.trim() || !fournisseurPassword.trim()) return
+        if (!name.trim() || !fournisseurName.trim() || !ice.trim() || !fournisseurEmail.trim() || !fournisseurPassword.trim()) return
         if (fournisseurPassword.trim().length < 6) return
         setIsLoading(true)
         // Simulate API delay
@@ -31,12 +32,14 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
         onSubmit({
             name: name.trim(),
             fournisseurName: fournisseurName.trim(),
+            ice: ice.trim(),
             fournisseurEmail: fournisseurEmail.trim(),
             fournisseurPassword: fournisseurPassword.trim()
         })
         setIsLoading(false)
         setName("")
         setFournisseurName("")
+        setIce("")
         setFournisseurEmail("")
         setFournisseurPassword("")
     }
@@ -83,6 +86,17 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
+                                    <Label htmlFor="fournisseur-ice">ICE</Label>
+                                    <Input
+                                        id="fournisseur-ice"
+                                        type="text"
+                                        placeholder="Ex: 001234567890123"
+                                        value={ice}
+                                        onChange={e => setIce(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
                                     <Label htmlFor="fournisseur-username">Username</Label>
                                     <Input
                                         id="fournisseur-username"
@@ -121,7 +135,7 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
                         <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                             Annuler
                         </Button>
-                        <Button type="submit" disabled={isLoading || !name || !fournisseurName || !fournisseurEmail || fournisseurPassword.trim().length < 6}>
+                        <Button type="submit" disabled={isLoading || !name || !fournisseurName || !ice || !fournisseurEmail || fournisseurPassword.trim().length < 6}>
                             {isLoading ? "Création en cours..." : "Créer le dossier"}
                         </Button>
                     </DialogFooter>

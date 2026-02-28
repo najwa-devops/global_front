@@ -24,6 +24,7 @@ export interface CreateDossierRequest {
     name: string
     fournisseurEmail: string
     fournisseurName: string
+    ice: string
     fournisseurPassword?: string | undefined
 }
 

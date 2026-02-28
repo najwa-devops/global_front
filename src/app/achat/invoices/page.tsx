@@ -29,6 +29,7 @@ export default function InvoicesPage() {
     search: "",
     supplier: "",
     status: "",
+    invoiceType: "",
   });
   const router = useRouter();
 
@@ -96,6 +97,14 @@ export default function InvoicesPage() {
           String(filters.status).toUpperCase()
         )
           return false;
+      }
+
+      if (filters.invoiceType && filters.invoiceType !== "all") {
+        const isAvoir = Boolean(invoice.isAvoir);
+        const matchesType =
+          (filters.invoiceType === "AVOIR" && isAvoir) ||
+          (filters.invoiceType === "FACTURE" && !isAvoir);
+        if (!matchesType) return false;
       }
 
       if (filters.dateFrom && invoice.createdAt < filters.dateFrom)

@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/table";
 import { CreateDossierModal } from "@/components/create-dossier-modal";
 import { toast } from "sonner";
+import { GeneralParamsService } from "@/src/api/services/general-params.service";
 
 function mapBackendDossier(raw: any): Dossier {
   return {
@@ -106,12 +107,22 @@ function DossiersPageContent() {
       const adminComptableId =
         isAdmin() && !hasSelectedDossier && user?.id ? user.id : undefined;
 
-      await api.createDossier({
+      const created = await api.createDossier({
         nom: req.name,
         fournisseurEmail: req.fournisseurEmail,
         comptableId: adminComptableId,
         password: req.fournisseurPassword,
       });
+      const createdDossierId = Number(created?.dossier?.id);
+      if (Number.isFinite(createdDossierId) && createdDossierId > 0) {
+        await GeneralParamsService.saveParams(
+          {
+            companyName: req.fournisseurName,
+            ice: req.ice,
+          },
+          createdDossierId,
+        );
+      }
       toast.success(`Dossier "${req.name}" créé.`);
       setShowCreateModal(false);
       await loadDossiers();

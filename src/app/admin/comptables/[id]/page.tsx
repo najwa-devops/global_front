@@ -12,6 +12,7 @@ import { CreateDossierRequest } from "@/src/types/dossier"
 import { toast } from "sonner"
 import { AdminService, AdminDossierDto } from "@/src/api/services/admin.service"
 import { ComptableAdminDto } from "@/src/types"
+import { GeneralParamsService } from "@/src/api/services/general-params.service"
 
 type DossierRow = {
     id: number
@@ -62,13 +63,24 @@ function ComptableDossiersContent() {
 
     const handleCreate = async (req: CreateDossierRequest) => {
         try {
-            await AdminService.createFournisseurForComptable({
+            const created = await AdminService.createFournisseurForComptable({
                 dossierNom: req.name,
                 fournisseurEmail: req.fournisseurEmail,
                 comptableId,
                 fournisseurName: req.fournisseurName,
                 fournisseurPassword: req.fournisseurPassword,
             })
+            const createdData = created as { id?: unknown; dossier?: { id?: unknown } }
+            const createdDossierId = Number(createdData?.id ?? createdData?.dossier?.id)
+            if (Number.isFinite(createdDossierId) && createdDossierId > 0) {
+                await GeneralParamsService.saveParams(
+                    {
+                        companyName: req.fournisseurName,
+                        ice: req.ice,
+                    },
+                    createdDossierId,
+                )
+            }
             toast.success(`Dossier "${req.name}" créé.`)
             setShowCreate(false)
             await loadData()

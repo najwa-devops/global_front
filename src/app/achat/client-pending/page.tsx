@@ -29,6 +29,7 @@ export default function ClientPendingPage() {
     search: "",
     supplier: "",
     status: "",
+    invoiceType: "",
     dateFrom: undefined,
     dateTo: undefined,
     amountMin: undefined,
@@ -102,6 +103,14 @@ export default function ClientPendingPage() {
 
       if (filters.status && filters.status !== "all") {
         if (invoice.status !== filters.status) return false;
+      }
+
+      if (filters.invoiceType && filters.invoiceType !== "all") {
+        const isAvoir = Boolean(invoice.isAvoir);
+        const matchesType =
+          (filters.invoiceType === "AVOIR" && isAvoir) ||
+          (filters.invoiceType === "FACTURE" && !isAvoir);
+        if (!matchesType) return false;
       }
 
       if (filters.dateFrom && invoice.createdAt < filters.dateFrom)

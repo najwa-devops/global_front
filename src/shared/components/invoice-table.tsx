@@ -161,6 +161,22 @@ export function InvoiceTable({
     );
   };
 
+  const getTypeBadge = (invoice: DynamicInvoice) => {
+    if (invoice.isAvoir) {
+      return (
+        <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/30 hover:bg-rose-500/20 w-fit">
+          Avoir
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="outline" className="w-fit">
+        Facture
+      </Badge>
+    );
+  };
+
   const getInvoiceDate = (invoice: DynamicInvoice): string => {
     const dateField = invoice.fields.find((f) => f.key === "invoiceDate");
     if (dateField?.value) {
@@ -346,6 +362,7 @@ export function InvoiceTable({
                       <TableCell className="font-medium text-foreground">
                         <div className="flex flex-col gap-1">
                           {getInvoiceNumber(invoice)}
+                          {getTypeBadge(invoice)}
                           {getTemplateBadge(invoice)}
                         </div>
                       </TableCell>

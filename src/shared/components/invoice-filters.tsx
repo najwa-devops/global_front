@@ -17,6 +17,7 @@ export interface FilterValues {
   search: string
   supplier: string
   status: string
+  invoiceType: string
   dateFrom?: Date
   dateTo?: Date
   amountMin?: number
@@ -45,6 +46,7 @@ export function InvoiceFilters({ filters, onFiltersChange, suppliers, onExport }
       search: "",
       supplier: "",
       status: "",
+      invoiceType: "",
       dateFrom: undefined,
       dateTo: undefined,
       amountMin: undefined,
@@ -56,6 +58,7 @@ export function InvoiceFilters({ filters, onFiltersChange, suppliers, onExport }
     filters.search ||
     filters.supplier ||
     filters.status ||
+    filters.invoiceType ||
     filters.dateFrom ||
     filters.dateTo ||
     filters.amountMin ||
@@ -64,6 +67,7 @@ export function InvoiceFilters({ filters, onFiltersChange, suppliers, onExport }
   const activeFiltersCount = [
     filters.supplier,
     filters.status,
+    filters.invoiceType,
     filters.dateFrom,
     filters.dateTo,
     filters.amountMin,
@@ -104,6 +108,20 @@ export function InvoiceFilters({ filters, onFiltersChange, suppliers, onExport }
             <SelectItem value="READY_TO_VALIDATE">Prêt à valider</SelectItem>
             <SelectItem value="VALIDATED">Validé</SelectItem>
             <SelectItem value="REJECTED">Rejeté</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Type</Label>
+        <Select value={filters.invoiceType} onValueChange={(v) => updateFilter("invoiceType", v)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Tous" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous</SelectItem>
+            <SelectItem value="FACTURE">Facture</SelectItem>
+            <SelectItem value="AVOIR">Avoir</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -281,6 +299,17 @@ export function InvoiceFilters({ filters, onFiltersChange, suppliers, onExport }
             <SelectItem value="READY_TO_VALIDATE">Prêt à valider</SelectItem>
             <SelectItem value="VALIDATED">Validé</SelectItem>
             <SelectItem value="REJECTED">Rejeté</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={filters.invoiceType} onValueChange={(v) => updateFilter("invoiceType", v)}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous</SelectItem>
+            <SelectItem value="FACTURE">Facture</SelectItem>
+            <SelectItem value="AVOIR">Avoir</SelectItem>
           </SelectContent>
         </Select>
 
