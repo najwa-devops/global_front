@@ -97,14 +97,8 @@ function DossiersPageContent() {
 
   const handleCreateDossier = async (req: CreateDossierRequest) => {
     try {
-      const storedDossierId =
-        typeof window !== "undefined"
-          ? Number(localStorage.getItem("currentDossierId"))
-          : NaN;
-      const hasSelectedDossier =
-        Number.isFinite(storedDossierId) && storedDossierId > 0;
       const adminComptableId =
-        isAdmin() && !hasSelectedDossier && user?.id ? user.id : undefined;
+        isAdmin() && user?.id ? user.id : undefined;
 
       await api.createDossier({
         nom: req.name,

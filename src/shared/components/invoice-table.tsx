@@ -77,6 +77,7 @@ export function InvoiceTable({
   itemsPerPage = 10,
   userRole,
 }: InvoiceTableProps) {
+  const isSupplierLike = userRole === "FOURNISSEUR" || userRole === "CLIENT";
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalPages = Math.ceil(invoices.length / itemsPerPage);
@@ -397,10 +398,10 @@ export function InvoiceTable({
                                 Voir détails
                               </DropdownMenuItem>
 
-                              {userRole === "FOURNISSEUR" &&
+                              {isSupplierLike &&
                                 onConfirm &&
                                 toWorkflowStatus(invoice.status) ===
-                                  "VERIFY" && (
+                                  "READY_TO_TREAT" && (
                                   <DropdownMenuItem
                                     onClick={() => onConfirm(invoice)}
                                     className="gap-2 text-indigo-500 focus:text-indigo-600"
@@ -410,7 +411,7 @@ export function InvoiceTable({
                                   </DropdownMenuItem>
                                 )}
 
-                              {userRole !== "FOURNISSEUR" && (
+                              {!isSupplierLike && (
                                 <DropdownMenuItem
                                   onClick={() => onProcessInline(invoice)}
                                   className="gap-2"
@@ -423,7 +424,7 @@ export function InvoiceTable({
                                 </DropdownMenuItem>
                               )}
 
-                              {userRole !== "FOURNISSEUR" &&
+                              {!isSupplierLike &&
                                 onFinalValidate &&
                                 toWorkflowStatus(invoice.status) ===
                                   "READY_TO_VALIDATE" && (
@@ -436,7 +437,7 @@ export function InvoiceTable({
                                   </DropdownMenuItem>
                                 )}
 
-                              {userRole !== "FOURNISSEUR" &&
+                              {!isSupplierLike &&
                                 onAccount &&
                                 toWorkflowStatus(invoice.status) ===
                                   "VALIDATED" &&

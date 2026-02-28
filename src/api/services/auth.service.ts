@@ -1,4 +1,5 @@
 import apiClient from '../api-client';
+import { ApiError } from '../api-client';
 import { LoginRequest, User } from '@/src/types';
 
 const AUTH_USER_KEY = 'auth_user';
@@ -63,8 +64,11 @@ export class AuthService {
             const mapped = mapBackendUser(response.data);
             storeUser(mapped);
             return mapped;
-        } catch {
+        } catch (error) {
             clearStoredUser();
+            if (error instanceof ApiError) {
+                throw error;
+            }
             throw new Error('Unable to fetch current user');
         }
     }

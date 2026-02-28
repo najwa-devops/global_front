@@ -69,13 +69,17 @@ apiClient.interceptors.response.use(
     async (error: AxiosError) => {
         const status = error.response?.status;
         const url = error.config?.url;
+        const normalizedUrl = (url || '').split('?')[0];
+        const isAuthMeProbe = normalizedUrl.endsWith('/api/auth/me');
 
-        logger.error(`API Error: ${status || 'Unknown'} ${url}`, error.response?.data);
+        if (!(status === 401 && isAuthMeProbe)) {
+            logger.error(`API Error: ${status || 'Unknown'} ${url}`, error.response?.data);
+        }
 
-        if (status === 401) {
+        if (status === 401 && !isAuthMeProbe) {
             logger.warn('Unauthorized access detected. Redirecting to login.');
             if (typeof window !== 'undefined') {
-                localStorage.removeItem('auth_session');
+                localStorage.removeItem('auth_user');
                 if (!window.location.pathname.startsWith('/login')) {
                     window.location.href = '/login';
                 }

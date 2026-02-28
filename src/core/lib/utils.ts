@@ -8,8 +8,8 @@ import type {
   BackendInvoiceStatus,
   FieldPosition,
 } from "./types";
-import { DEFAULT_FIELDS } from "./types";
-import { getFileUrl } from "./api";
+import { DEFAULT_FIELDS, SALES_DEFAULT_FIELDS } from "./types";
+import { getFileUrl, getSalesInvoicePdfUrl } from "./api";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -118,6 +118,9 @@ export function normalizeStatus(status: any): DynamicInvoiceStatus {
     PROCESSING: "processing",
     TREATED: "treated",
     ERROR: "error",
+    // Vente-specific statuses
+    EXTRACTED: "ready_to_validate",
+    ACCOUNTED: "validated",
   };
 
   const normalized = statusMap[statusStr as BackendInvoiceStatus] || "pending";
@@ -140,9 +143,9 @@ export function toWorkflowStatus(
   if (s === "VERIFY" || s === "TO_VERIFY") return "VERIFY";
   if (s === "READY_TO_TREAT" || s === "PENDING" || s === "PROCESSING")
     return "READY_TO_TREAT";
-  if (s === "READY_TO_VALIDATE" || s === "TREATED" || s === "PROCESSED")
+  if (s === "READY_TO_VALIDATE" || s === "TREATED" || s === "PROCESSED" || s === "EXTRACTED")
     return "READY_TO_VALIDATE";
-  if (s === "VALIDATED") return "VALIDATED";
+  if (s === "VALIDATED" || s === "ACCOUNTED") return "VALIDATED";
   if (s === "REJECTED" || s === "ERROR") return "REJECTED";
 
   return "READY_TO_TREAT";
@@ -302,6 +305,99 @@ export function dynamicInvoiceToUpdateDto(
 // Alias pour compatibilité avec les pages héritées
 export const invoiceDtoToLocal = dynamicInvoiceDtoToLocal;
 export const localInvoiceToUpdateDto = dynamicInvoiceToUpdateDto;
+
+// ============================================
+// CONVERSION FACTURE VENTE (SALES)
+// ============================================
+
+export function salesInvoiceDtoToLocal(dto: DynamicInvoiceDto): DynamicInvoice {
+  const ocrText = dto.rawOcrText || dto.extractedText;
+  const fields = dto.fieldsData
+    ? ParseBackendFieldsData(dto.fieldsData, SALES_DEFAULT_FIELDS, dto, ocrText)
+    : SALES_DEFAULT_FIELDS.map((field) => ({ ...field }));
+
+  const technicalFields = [
+    "pendingFields", "warnings", "suggestedCorrections", "status",
+    "footerExtractionForced", "footerExtractionDate", "footerFieldsFound",
+    "iceSource", "iceAddedDate", "iceAddedBy", "canCreateTemplate",
+    "canValidate", "templateName", "templateVersion", "detectedIce",
+    "detectedIf", "detectedSupplier", "fileType", "processed",
+    "processingDate", "extractionTimestamp", "extractionVersion",
+    "extractionMethod", "missingFields", "lowConfidenceFields",
+    "overallConfidence", "averageConfidence", "allFieldsFound", "templateDetected",
+  ];
+
+  if (dto.fieldsData) {
+    Object.keys(dto.fieldsData).forEach((key) => {
+      const isMetadata = technicalFields.includes(key);
+      const isSalesField = SALES_DEFAULT_FIELDS.some((f) => f.key === key);
+      if (!isMetadata && !isSalesField) {
+        const fieldData = dto.fieldsData[key];
+        let value: any = "";
+        let position = undefined;
+        let confidence = undefined;
+        let normalizedValue = undefined;
+        if (typeof fieldData === "object" && fieldData !== null && "value" in fieldData) {
+          value = fieldData.value;
+          position = fieldData.position;
+          confidence = fieldData.confidence;
+          normalizedValue = fieldData.normalizedValue;
+        } else {
+          value = fieldData;
+        }
+        fields.push({
+          key,
+          label: key,
+          value: value || "",
+          normalizedValue,
+          type: typeof value === "number" ? "number" : "text",
+          detected: true,
+          position,
+          confidence,
+        });
+      }
+    });
+  }
+
+  const dossierRef = dto.dossierId !== undefined ? { dossierId: dto.dossierId } : {};
+
+  return {
+    id: dto.id,
+    ...dossierRef,
+    filename: dto.filename,
+    originalName: dto.originalName,
+    filePath: dto.filePath,
+    fileSize: dto.fileSize,
+    fileUrl: getSalesInvoicePdfUrl(dto.id, dto.dossierId),
+    extractedText: dto.extractedText,
+    headerText: dto.headerRawText || dto.fieldsData?.headerRawText,
+    footerText: dto.footerRawText || dto.fieldsData?.footerRawText,
+    fields,
+    pendingFields: dto.fieldsData?.pendingFields || dto.pendingFields || [],
+    missingFields: dto.fieldsData?.missingFields || [],
+    lowConfidenceFields: dto.fieldsData?.lowConfidenceFields || [],
+    autoFilledFields: dto.autoFilledFields || dto.fieldsData?.autoFilledFields || [],
+    overallConfidence: dto.overallConfidence,
+    averageConfidence: dto.averageConfidence,
+    templateId: dto.templateId,
+    templateName: dto.templateName,
+    extractionMethod: dto.extractionMethod,
+    status: dto.status as any,
+    templateDetected: dto.templateDetected,
+    allFieldsFound: dto.allFieldsFound,
+    canValidate: dto.canValidate,
+    canCreateTemplate: dto.canCreateTemplate,
+    tier: dto.tier,
+    isAvoir: dto.isAvoir,
+    accounted: dto.accounted,
+    accountedAt: dto.accountedAt ? new Date(dto.accountedAt) : undefined,
+    accountedBy: dto.accountedBy,
+    createdAt: new Date(dto.createdAt),
+    updatedAt: dto.updatedAt ? new Date(dto.updatedAt) : undefined,
+    validatedAt: dto.validatedAt ? new Date(dto.validatedAt) : undefined,
+    validatedBy: dto.validatedBy,
+  };
+}
 
 // ============================================
 // FORMATAGE
