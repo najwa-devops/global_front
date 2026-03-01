@@ -223,18 +223,18 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         ]
     },
     {
-        id: "Vents",
+        id: "Vente",
         href: "#",
-        label: "Facture Vents",
+        label: "Facture Vente",
         icon: FileText,
         roles: ["COMPTABLE", "ADMIN", "CLIENT"],
         children: [
-            { id: "upload", href: "/achat/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "invoices", href: "/achat/invoices", label: "Factures scannées", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
-            { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "vente-upload", href: "/vente/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "vente-pending", href: "/vente/invoices", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "vente-invoices", href: "/vente/scanned", label: "Factures scannées", icon: FileText, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "vente-validated", href: "/vente/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
+            { id: "vente-accounted", href: "/vente/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "vente-journal", href: "/vente/journal", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
         ]
     },
     {
@@ -282,6 +282,13 @@ export const ROUTE_METADATA: Record<string, { title: string; breadcrumb?: string
     "/settings/patterns": { title: "Filtres & Patterns", breadcrumb: "Patterns" },
     "/achat/templates": { title: "Modèles OCR", breadcrumb: "Templates" },
     "/dashboard": { title: "Tableau de bord", breadcrumb: "Dashboard" },
+    "/vente/upload": { title: "Nouveau dépôt vente", breadcrumb: "Upload Vente" },
+    "/vente/invoices": { title: "Factures vente en traitement", breadcrumb: "Factures Vente" },
+    "/vente/scanned": { title: "Factures vente scannées", breadcrumb: "Vente Scannées" },
+    "/vente/validated": { title: "Factures vente validées", breadcrumb: "Vente Validées" },
+    "/vente/accounted": { title: "Factures vente comptabilisées", breadcrumb: "Vente Comptabilisées" },
+    "/vente/journal": { title: "Journal comptable vente", breadcrumb: "Journal Vente" },
+    "/vente/ocr": { title: "Détail facture vente", breadcrumb: "OCR Vente" },
 };
 
 // Helper to get metadata based on matching prefix

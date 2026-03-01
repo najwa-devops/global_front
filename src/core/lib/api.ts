@@ -274,10 +274,84 @@ export function getDynamicInvoicePdfUrl(
   return getFileUrl(filePath, invoiceId);
 }
 
+export function getSalesInvoicePdfUrl(
+  invoiceId: number,
+  dossierId?: number,
+): string {
+  const resolvedDossierId = dossierId || getCurrentDossierId();
+  return url(`/api/sales/invoices/${invoiceId}/download`, {
+    dossierId: resolvedDossierId,
+  });
+}
+
 function mapInvoice(raw: any): DynamicInvoiceDto {
   return {
     ...raw,
     status: raw?.status,
+  } as DynamicInvoiceDto;
+}
+
+/** Maps the flat SalesInvoiceResponse from backend into a DynamicInvoiceDto-compatible shape. */
+function mapSalesStatusToBackend(status: string | undefined): string {
+  switch ((status || "").toUpperCase()) {
+    case "VALIDATED":
+      return "VALIDATED";
+    case "ACCOUNTED":
+      return "ACCOUNTED";
+    case "EXTRACTED":
+      return "READY_TO_VALIDATE";
+    case "PROCESSING":
+      return "PROCESSING";
+    case "ERROR":
+      return "ERROR";
+    default:
+      return "PENDING";
+  }
+}
+
+function mapSalesInvoiceResponse(raw: any): DynamicInvoiceDto {
+  // Build a fieldsData record from the flat response fields
+  const salesFieldKeys = [
+    "clientName", "clientIce", "invoiceNumber", "invoiceDate",
+    "totalHt", "totalTva", "totalTtc", "tvaRate", "isAvoir",
+    "tierNumber", "displayAccount", "chargeAccount", "tvaAccount",
+  ];
+  const fieldsData: Record<string, any> = {};
+  for (const key of salesFieldKeys) {
+    if (raw[key] !== undefined && raw[key] !== null) {
+      fieldsData[key] = raw[key];
+    }
+  }
+  // Compatibility aliases for shared UI components (purchase-style keys)
+  fieldsData.supplier = raw.clientName || raw.tierName || "";
+  fieldsData.amountHT = raw.totalHt;
+  fieldsData.tva = raw.totalTva;
+  fieldsData.amountTTC = raw.totalTtc;
+
+  return {
+    id: raw.id,
+    filename: raw.filename || "",
+    originalName: raw.filename,
+    filePath: raw.filePath || "",
+    fileSize: raw.fileSize || 0,
+    dossierId: raw.dossierId,
+    fieldsData,
+    status: mapSalesStatusToBackend(raw.status) as any,
+    missingFields: raw.missingFields || [],
+    lowConfidenceFields: raw.lowConfidenceFields || [],
+    overallConfidence: raw.ocrConfidence,
+    averageConfidence: raw.ocrConfidence,
+    isAvoir: raw.isAvoir,
+    accounted: raw.accounted,
+    accountedAt: raw.accountedAt,
+    accountedBy: raw.accountedBy,
+    createdAt: raw.createdAt || new Date().toISOString(),
+    updatedAt: raw.updatedAt,
+    validatedAt: raw.validatedAt,
+    validatedBy: raw.validatedBy,
+    canValidate: raw.status === "EXTRACTED",
+    canCreateTemplate: false,
+    templateDetected: false,
   } as DynamicInvoiceDto;
 }
 
@@ -551,6 +625,27 @@ export async function linkTierToDynamicInvoice(
   const dossierId = getCurrentDossierId();
   const result = await request<any>(
     `/api/dynamic-invoices/${invoiceId}/link-tier`,
+    {
+      method: "POST",
+      body: JSON.stringify({ tierId }),
+    },
+    { dossierId },
+  );
+
+  return {
+    success: Boolean(result?.success),
+    message: result?.message || "Tier linked",
+    invoice: mapInvoice(result?.invoice || {}),
+  };
+}
+
+export async function linkTierToSalesInvoice(
+  invoiceId: number,
+  tierId: number,
+): Promise<{ success: boolean; message: string; invoice: DynamicInvoiceDto }> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(
+    `/api/sales/invoices/${invoiceId}/link-tier`,
     {
       method: "POST",
       body: JSON.stringify({ tierId }),
@@ -1255,18 +1350,15 @@ export async function createDossier(payload: {
 }): Promise<any> {
   const username = payload.fournisseurEmail.trim();
   const displayName = username.split("@")[0] || username;
-  const result = await request<any>("/api/dossiers", {
-    method: "POST",
-    body: JSON.stringify({
-      dossierName: payload.nom,
-      clientUsername: username,
-      clientPassword: payload.password,
-      clientDisplayName: displayName,
-      ...(payload.comptableId ? { comptableId: payload.comptableId } : {}),
-    }),
-  });
+  const createPayload = {
+    dossierName: payload.nom,
+    clientUsername: username,
+    clientPassword: payload.password,
+    clientDisplayName: displayName,
+    ...(payload.comptableId ? { comptableId: payload.comptableId } : {}),
+  };
 
-  return {
+  const mapResult = (result: any) => ({
     success: true,
     dossier: {
       id: result?.id,
@@ -1275,7 +1367,48 @@ export async function createDossier(payload: {
       comptableId: result?.comptableId,
       fournisseurId: result?.clientId,
     },
-  };
+  });
+
+  try {
+    const result = await request<any>("/api/dossiers", {
+      method: "POST",
+      body: JSON.stringify(createPayload),
+    });
+    return mapResult(result);
+  } catch (error: any) {
+    const message = String(error?.message || "").toLowerCase();
+    if (!message.includes("client_invalid")) {
+      throw error;
+    }
+
+    let users: any[] = [];
+    try {
+      users = await request<any[]>("/api/auth/users");
+    } catch {
+      throw error;
+    }
+
+    const existingClient = (users || []).find((u) => {
+      const sameUsername =
+        String(u?.username || "").toLowerCase() === username.toLowerCase();
+      const isClient = String(u?.role || "").toUpperCase() === "CLIENT";
+      return sameUsername && isClient;
+    });
+
+    if (!existingClient?.id) {
+      throw error;
+    }
+
+    const retryResult = await request<any>("/api/dossiers", {
+      method: "POST",
+      body: JSON.stringify({
+        dossierName: payload.nom,
+        clientId: existingClient.id,
+        ...(payload.comptableId ? { comptableId: payload.comptableId } : {}),
+      }),
+    });
+    return mapResult(retryResult);
+  }
 }
 
 export async function deleteDossier(id: number): Promise<void> {
@@ -1336,6 +1469,283 @@ export async function rejectPattern(patternId: number): Promise<void> {
   patternStatusOverrides.set(patternId, "REJECTED");
 }
 
+// ============================================
+// SALES (VENTE) INVOICE FUNCTIONS
+// ============================================
+
+export async function uploadSalesInvoice(
+  file: File,
+  dossierId?: number,
+): Promise<DynamicInvoiceDto> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const resolvedDossierId = dossierId || getCurrentDossierId();
+  if (resolvedDossierId) {
+    formData.append("dossierId", String(resolvedDossierId));
+  }
+  const result = await request<any>("/api/sales/invoices/upload", {
+    method: "POST",
+    body: formData,
+  });
+  return mapInvoice(result?.invoice || result);
+}
+
+export async function getSalesInvoicesByDossier(
+  dossierId: number,
+  status?: string,
+): Promise<DynamicInvoiceDto[]> {
+  const normalizedStatus = String(status || "").toUpperCase();
+  const backendStatuses = (() => {
+    if (!normalizedStatus) return [undefined];
+    if (normalizedStatus === "ACCOUNTED") return ["VALIDATED"];
+    if (normalizedStatus === "VERIFY" || normalizedStatus === "TO_VERIFY")
+      return ["PENDING"];
+    if (normalizedStatus === "READY_TO_TREAT")
+      return ["PENDING", "PROCESSING"];
+    if (normalizedStatus === "READY_TO_VALIDATE")
+      return ["TREATED", "READY_TO_VALIDATE"];
+    if (normalizedStatus === "REJECTED") return ["ERROR"];
+    if (normalizedStatus === "PROCESSED") return ["TREATED"];
+    return [normalizedStatus];
+  })();
+
+  const fetchSalesInvoices = async (
+    requestedStatus?: string,
+    withLimit: boolean = true,
+  ): Promise<any[]> => {
+    const result = await request<any>("/api/sales/invoices", undefined, {
+      dossierId,
+      status: requestedStatus,
+      limit: withLimit ? 200 : undefined,
+    });
+    if (Array.isArray(result)) return result;
+    if (Array.isArray(result?.invoices)) return result.invoices;
+    return [];
+  };
+
+  try {
+    const batches = await Promise.all(
+      backendStatuses.map((s) => fetchSalesInvoices(s, true)),
+    );
+    const deduped = new Map<number, DynamicInvoiceDto>();
+    for (const batch of batches) {
+      for (const row of batch) {
+        const mapped = mapInvoice(row);
+        if (Number.isFinite(Number(mapped.id))) {
+          deduped.set(Number(mapped.id), mapped);
+        }
+      }
+    }
+    const invoices = Array.from(deduped.values());
+    if (normalizedStatus === "ACCOUNTED") {
+      return invoices.filter((invoice) =>
+        Boolean(invoice.accounted || invoice.accountedAt),
+      );
+    }
+    return invoices;
+  } catch (error: any) {
+    if (error?.status !== 500) {
+      throw error;
+    }
+
+    const fallbackStatuses = backendStatuses.some((s) => Boolean(s))
+      ? backendStatuses
+      : ["PENDING", "PROCESSING", "TREATED", "READY_TO_VALIDATE", "VALIDATED", "ERROR"];
+
+    const batches = await Promise.all(
+      fallbackStatuses.map((s) => fetchSalesInvoices(s, false).catch(() => [])),
+    );
+
+    const deduped = new Map<number, DynamicInvoiceDto>();
+    for (const batch of batches) {
+      for (const row of batch) {
+        const mapped = mapInvoice(row);
+        if (Number.isFinite(Number(mapped.id))) {
+          deduped.set(Number(mapped.id), mapped);
+        }
+      }
+    }
+
+    const invoices = Array.from(deduped.values());
+    if (normalizedStatus === "ACCOUNTED") {
+      return invoices.filter((invoice) =>
+        Boolean(invoice.accounted || invoice.accountedAt),
+      );
+    }
+    return invoices;
+  }
+}
+
+export async function getSalesPendingInvoices(
+  dossierId: number,
+): Promise<DynamicInvoiceDto[]> {
+  const pendingStatuses = [
+    "PENDING",
+    "READY_TO_TREAT",
+    "TREATED",
+    "READY_TO_VALIDATE",
+    "PROCESSING",
+    "ERROR",
+  ];
+  const batches = await Promise.all(
+    pendingStatuses.map((status) =>
+      getSalesInvoicesByDossier(dossierId, status).catch(() => []),
+    ),
+  );
+  const deduped = new Map<number, DynamicInvoiceDto>();
+  for (const batch of batches) {
+    for (const invoice of batch) {
+      deduped.set(Number(invoice.id), invoice);
+    }
+  }
+  return Array.from(deduped.values());
+}
+
+export async function getSalesScannedInvoices(
+  dossierId: number,
+): Promise<DynamicInvoiceDto[]> {
+  const scannedStatuses = [
+    "PENDING",
+    "READY_TO_TREAT",
+    "TREATED",
+    "READY_TO_VALIDATE",
+    "VALIDATED",
+    "PROCESSING",
+    "ERROR",
+  ];
+  const batches = await Promise.all(
+    scannedStatuses.map((status) =>
+      getSalesInvoicesByDossier(dossierId, status).catch(() => []),
+    ),
+  );
+  const deduped = new Map<number, DynamicInvoiceDto>();
+  for (const batch of batches) {
+    for (const invoice of batch) {
+      deduped.set(Number(invoice.id), invoice);
+    }
+  }
+  return Array.from(deduped.values());
+}
+
+export async function getSalesInvoiceById(
+  id: number,
+): Promise<DynamicInvoiceDto> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(`/api/sales/invoices/${id}`, undefined, {
+    dossierId,
+  });
+  return mapInvoice(result);
+}
+
+export async function processSalesInvoice(
+  id: number,
+): Promise<DynamicInvoiceDto> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(
+    `/api/sales/invoices/${id}/reprocess`,
+    { method: "POST" },
+    { dossierId },
+  );
+  return mapInvoice(result?.invoice || result);
+}
+
+export async function updateSalesInvoiceFields(
+  id: number,
+  fields: Record<string, any>,
+): Promise<DynamicInvoiceDto> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(
+    `/api/sales/invoices/${id}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(fields),
+    },
+    { dossierId },
+  );
+  return mapInvoice(result);
+}
+
+export async function validateSalesInvoice(
+  id: number,
+): Promise<DynamicInvoiceDto> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(
+    `/api/sales/invoices/${id}/validate`,
+    { method: "POST" },
+    { dossierId },
+  );
+  return mapInvoice(result?.invoice || result);
+}
+
+export async function clientValidateSalesInvoice(id: number): Promise<any> {
+  const dossierId = getCurrentDossierId();
+  return request<any>(
+    `/api/sales/invoices/${id}/client-validate`,
+    { method: "POST" },
+    { dossierId },
+  );
+}
+
+export async function deleteSalesInvoice(id: number): Promise<void> {
+  const dossierId = getCurrentDossierId();
+  await request<void>(
+    `/api/sales/invoices/${id}`,
+    { method: "DELETE" },
+    { dossierId },
+  );
+}
+
+export async function updateSalesInvoiceStatus(
+  id: number | string,
+  status: string,
+): Promise<any> {
+  const normalized = normalizeInvoiceStatus(status);
+  const dossierId = getCurrentDossierId();
+
+  if (normalized === "READY_TO_TREAT") {
+    return request<any>(
+      `/api/sales/invoices/${id}/client-validate`,
+      { method: "POST" },
+      { dossierId },
+    );
+  }
+
+  throw new Error(
+    "Backend sales n'expose pas de mise a jour generique pour ce statut",
+  );
+}
+
+export async function accountSalesInvoice(
+  id: number,
+): Promise<DynamicInvoiceDto> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(
+    `/api/sales/invoices/${id}/account`,
+    { method: "POST" },
+    { dossierId },
+  );
+  return mapInvoice(result?.invoice || result);
+}
+
+export async function getSalesJournalEntries(
+  dossierId?: number,
+): Promise<AccountingEntry[]> {
+  const resolvedDossierId = dossierId || getCurrentDossierId();
+  const result = await request<any>("/api/sales/invoices/journal", undefined, {
+    dossierId: resolvedDossierId,
+  });
+  return (result?.entries || []) as AccountingEntry[];
+}
+
+export async function getSalesInvoiceStats(
+  dossierId?: number,
+): Promise<Record<string, number>> {
+  const resolvedDossierId = dossierId || getCurrentDossierId();
+  return request<any>("/api/sales/invoices/stats", undefined, {
+    dossierId: resolvedDossierId,
+  });
+}
+
 export const api = {
   uploadDynamicInvoice,
   processDynamicInvoice,
@@ -1351,6 +1761,7 @@ export const api = {
   reprocessDynamicInvoicesBulk,
   getDynamicAvailableSignatures,
   linkTierToDynamicInvoice,
+  linkTierToSalesInvoice,
   getCurrentUser,
   listUsers,
   createUser,
@@ -1449,4 +1860,20 @@ export const api = {
   updateDynamicTemplate: updateTemplate,
   updateInvoiceStatus,
   isBankApiEnabled,
+  // Sales (Vente) invoices
+  uploadSalesInvoice,
+  getSalesInvoicesByDossier,
+  getSalesPendingInvoices,
+  getSalesScannedInvoices,
+  getSalesInvoiceById,
+  processSalesInvoice,
+  updateSalesInvoiceFields,
+  validateSalesInvoice,
+  clientValidateSalesInvoice,
+  updateSalesInvoiceStatus,
+  deleteSalesInvoice,
+  accountSalesInvoice,
+  getSalesJournalEntries,
+  getSalesInvoiceStats,
+  getSalesInvoicePdfUrl,
 };

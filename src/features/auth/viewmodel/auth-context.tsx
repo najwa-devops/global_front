@@ -2,6 +2,7 @@
 
 import { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AuthService } from '@/src/core/services/authService';
+import { ApiError } from '@/src/api/api-client';
 import { User, LoginRequest } from '@/src/types';
 
 interface AuthContextType {
@@ -26,7 +27,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData);
       setAuthenticated(true);
     } catch (error) {
-      console.error('Authentication check failed', error);
+      const isExpectedUnauthorized = error instanceof ApiError && error.status === 401;
+      if (!isExpectedUnauthorized) {
+        console.error('Authentication check failed', error);
+      }
       setUser(null);
       setAuthenticated(false);
     } finally {

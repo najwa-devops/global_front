@@ -3,7 +3,7 @@
 import type React from "react";
 import { useState, useRef, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +67,11 @@ import { api } from "@/lib/api";
 import { formatDate, normalizeStatus, toWorkflowStatus } from "@/lib/utils";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { dynamicInvoiceDtoToLocal, ParseBackendFieldsData } from "@/lib/utils";
+import {
+  dynamicInvoiceDtoToLocal,
+  ParseBackendFieldsData,
+  salesInvoiceDtoToLocal,
+} from "@/lib/utils";
 import { TierCreationModal } from "@/components/tier-creation-modal";
 import { TierSelectionModal } from "@/components/tier-selection-modal";
 import { CreateTemplateModal } from "@/components/create-template-modal";
@@ -94,6 +98,11 @@ interface OcrProcessingPageProps {
   onBack: () => void;
   onSave: (invoice: DynamicInvoice, template?: LocalTemplate) => void;
   isDemoMode?: boolean;
+  // Optional overrides for non-achat invoice types (e.g. vente)
+  onUpdateFields?: (id: number, fields: Record<string, any>) => Promise<any>;
+  onValidateInvoice?: (id: number) => Promise<any>;
+  // When true, renders all fields dynamically instead of the hardcoded achat grid
+  useDynamicFieldLayout?: boolean;
 }
 
 interface SelectionBox {
@@ -116,6 +125,9 @@ export function OcrProcessingPage({
   onBack,
   onSave,
   isDemoMode = false,
+  onUpdateFields,
+  onValidateInvoice,
+  useDynamicFieldLayout = false,
 }: OcrProcessingPageProps) {
   const parseTvaValues = (raw: unknown): string[] => {
     if (Array.isArray(raw)) {
@@ -181,6 +193,8 @@ export function OcrProcessingPage({
   };
 
   const router = useRouter();
+  const pathname = usePathname();
+  const isSalesFlow = pathname?.startsWith("/vente") ?? false;
   const initialTvaValues = parseTvaValues(invoice.fieldsData?.tvaValues);
   const [fields, setFields] = useState<DynamicInvoiceField[]>(
     syncDetectedTvaFields(invoice.fields, initialTvaValues),
@@ -394,11 +408,15 @@ export function OcrProcessingPage({
     const toastId = toast.loading("Liaison du fournisseur en cours...");
 
     try {
-      const result = await api.linkTierToInvoice(invoice.id, selectedTierId);
+      const result = isSalesFlow
+        ? await api.linkTierToSalesInvoice(invoice.id, selectedTierId)
+        : await api.linkTierToInvoice(invoice.id, selectedTierId);
 
       // On met à jour l'état local avec la nouvelle facture renvoyée
       if (result.invoice) {
-        const updatedInvoice = dynamicInvoiceDtoToLocal(result.invoice);
+        const updatedInvoice = isSalesFlow
+          ? salesInvoiceDtoToLocal(result.invoice)
+          : dynamicInvoiceDtoToLocal(result.invoice);
         setFields(updatedInvoice.fields);
         setTier(updatedInvoice.tier || null);
         setStatus(updatedInvoice.status);
@@ -520,10 +538,9 @@ export function OcrProcessingPage({
 
         // CAS 2: Fichier sur serveur
         if (invoice.filePath || invoice.filename) {
-          const url = api.getFileUrl(
-            invoice.filePath || invoice.filename,
-            invoice.id,
-          );
+          const url = isSalesFlow
+            ? api.getSalesInvoicePdfUrl(invoice.id, invoice.dossierId)
+            : api.getFileUrl(invoice.filePath || invoice.filename, invoice.id);
           setDocumentUrl(url);
           setIsLoadingDocument(false);
           return;
@@ -546,7 +563,7 @@ export function OcrProcessingPage({
         URL.revokeObjectURL(documentUrl);
       }
     };
-  }, [file, invoice.filePath, invoice.filename, isDemoMode]);
+  }, [file, invoice.filePath, invoice.filename, invoice.id, invoice.dossierId, isDemoMode, isSalesFlow]);
 
   const getStatusBadge = () => {
     switch (status) {
@@ -646,29 +663,36 @@ export function OcrProcessingPage({
 
       let result: any;
       if (forcedTemplateId) {
-        // Version avec template forcé
-        console.log(
-          "Appel extractWithTemplate pour templateId:",
-          forcedTemplateId,
-        );
-        const extractionResponse = await api.extractWithTemplate(
-          invoice.id,
-          forcedTemplateId,
-        );
+        if (isSalesFlow) {
+          // Le flux vente utilise son endpoint de retraitement dédié.
+          result = await api.processSalesInvoice(invoice.id);
+        } else {
+          // Version avec template forcé
+          console.log(
+            "Appel extractWithTemplate pour templateId:",
+            forcedTemplateId,
+          );
+          await api.extractWithTemplate(invoice.id, forcedTemplateId);
 
-        // Comme extractWithTemplate renvoie un format spécifique, on récupère le DTO complet pour la mise à jour UI
-        // car le backend met à jour la facture en base lors de l'extraction
-        result = await api.getDynamicInvoiceById(invoice.id);
-      } else {
-        // Mode Reprocess standard (nouvel endpoint V2)
-        console.log("Appel processDynamicInvoice (Reprocess)...");
-        const currentWorkflowStatus = toWorkflowStatus(
-          status || invoice.status,
-        );
-        if (currentWorkflowStatus === "VERIFY") {
-          await api.updateInvoiceStatus(invoice.id, "READY_TO_TREAT");
+          // Comme extractWithTemplate renvoie un format spécifique, on récupère le DTO complet pour la mise à jour UI
+          // car le backend met à jour la facture en base lors de l'extraction
+          result = await api.getDynamicInvoiceById(invoice.id);
         }
-        result = await api.processDynamicInvoice(invoice.id);
+      } else {
+        if (isSalesFlow) {
+          console.log("Appel processSalesInvoice (Reprocess)...");
+          result = await api.processSalesInvoice(invoice.id);
+        } else {
+          // Mode Reprocess standard (nouvel endpoint V2)
+          console.log("Appel processDynamicInvoice (Reprocess)...");
+          const currentWorkflowStatus = toWorkflowStatus(
+            status || invoice.status,
+          );
+          if (currentWorkflowStatus === "VERIFY") {
+            await api.updateInvoiceStatus(invoice.id, "READY_TO_TREAT");
+          }
+          result = await api.processDynamicInvoice(invoice.id);
+        }
       }
 
       console.log("=== DYNAMIC OCR RESULT (V2 - Corrected Endpoint) ===");
@@ -987,7 +1011,8 @@ export function OcrProcessingPage({
           fieldPatterns,
         );
         // Enregistrer les champs avec patterns (V2) pour apprentissage immédiat
-        const savedInvoice = await api.updateDynamicInvoiceFields(
+        const updateFn = onUpdateFields ?? api.updateDynamicInvoiceFields;
+        const savedInvoice = await updateFn(
           invoice.id,
           fieldsForBackend,
         );
@@ -1037,7 +1062,8 @@ export function OcrProcessingPage({
 
     try {
       if (!isDemoMode) {
-        await api.validateInvoice(invoice.id);
+        const validateFn = onValidateInvoice ?? api.validateInvoice;
+        await validateFn(invoice.id);
       } else {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
@@ -1886,68 +1912,76 @@ export function OcrProcessingPage({
             <CardContent className="p-6">
               {/* Grid Layout - 2 colonnes */}
               <div className="grid grid-cols-2 gap-4">
-                {/* Ligne 1: Date | N° Facture */}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "invoiceDate") || fields[1],
-                )}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "invoiceNumber") || fields[0],
-                )}
+                {useDynamicFieldLayout ? (
+                  /* Dynamic layout: render all fields in order (for vente and other non-achat types) */
+                  fields.map((field) => renderFieldCard(field))
+                ) : (
+                  /* Hardcoded achat layout */
+                  <>
+                    {/* Ligne 1: Date | N° Facture */}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "invoiceDate") || fields[1],
+                    )}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "invoiceNumber") || fields[0],
+                    )}
 
-                {/* Ligne 2: Fournisseur | Compte Tiers */}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "supplier") || {
-                    ...fields[2],
-                    key: "supplier",
-                    label: "Fournisseur",
-                  },
-                )}
-                {renderAccountFieldCard(
-                  "tierNumber",
-                  "Compte Tiers",
-                  "tierNumber",
-                )}
+                    {/* Ligne 2: Fournisseur | Compte Tiers */}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "supplier") || {
+                        ...fields[2],
+                        key: "supplier",
+                        label: "Fournisseur",
+                      },
+                    )}
+                    {renderAccountFieldCard(
+                      "tierNumber",
+                      "Compte Tiers",
+                      "tierNumber",
+                    )}
 
-                {/* Ligne 3: Montant HT | Compte HT */}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "amountHT") || fields[3],
-                )}
-                {renderAccountFieldCard(
-                  "chargeAccount",
-                  "Compte HT",
-                  "defaultChargeAccount",
-                )}
+                    {/* Ligne 3: Montant HT | Compte HT */}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "amountHT") || fields[3],
+                    )}
+                    {renderAccountFieldCard(
+                      "chargeAccount",
+                      "Compte HT",
+                      "defaultChargeAccount",
+                    )}
 
-                {/* Ligne 4: TVA | Compte TVA */}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "tva") || fields[4],
-                )}
-                {renderAccountFieldCard(
-                  "tvaAccount",
-                  "Compte TVA",
-                  "tvaAccount",
-                )}
-                {fields.find((f) => f.key === "tva2")
-                  ? renderFieldCard(
-                      fields.find((f) => f.key === "tva2"),
-                      true,
-                    )
-                  : null}
+                    {/* Ligne 4: TVA | Compte TVA */}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "tva") || fields[4],
+                    )}
+                    {renderAccountFieldCard(
+                      "tvaAccount",
+                      "Compte TVA",
+                      "tvaAccount",
+                    )}
+                    {fields.find((f) => f.key === "tva2")
+                      ? renderFieldCard(
+                          fields.find((f) => f.key === "tva2"),
+                          true,
+                        )
+                      : null}
 
-                {/* Ligne 5: Montant TTC | ICE */}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "amountTTC") || fields[5],
-                )}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "ice") || fields[7],
-                )}
+                    {/* Ligne 5: Montant TTC | ICE */}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "amountTTC") || fields[5],
+                    )}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "ice") || fields[7],
+                    )}
 
-                {/* Ligne 6: RC | IF */}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "rcNumber") || fields[8],
-                )}
-                {renderFieldCard(
-                  fields.find((f) => f.key === "ifNumber") || fields[6],
+                    {/* Ligne 6: RC | IF */}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "rcNumber") || fields[8],
+                    )}
+                    {renderFieldCard(
+                      fields.find((f) => f.key === "ifNumber") || fields[6],
+                    )}
+                  </>
                 )}
               </div>
             </CardContent>

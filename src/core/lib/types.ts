@@ -104,6 +104,73 @@ export const DEFAULT_FIELDS: DynamicInvoiceField[] = [
   },
 ];
 
+// Default fields for VENTE (sales) invoices
+export const SALES_DEFAULT_FIELDS: DynamicInvoiceField[] = [
+  {
+    key: "invoiceNumber",
+    label: "N° Facture",
+    value: "",
+    type: "text",
+    required: true,
+  },
+  {
+    key: "clientName",
+    label: "Client",
+    value: "",
+    type: "text",
+    required: true,
+  },
+  {
+    key: "clientIce",
+    label: "ICE Client",
+    value: "",
+    type: "text",
+    required: false,
+  },
+  {
+    key: "invoiceDate",
+    label: "Date",
+    value: "",
+    type: "date",
+    required: true,
+  },
+  {
+    key: "totalHt",
+    label: "Montant HT",
+    value: "",
+    type: "number",
+    required: true,
+  },
+  {
+    key: "totalTva",
+    label: "TVA",
+    value: "",
+    type: "number",
+    required: false,
+  },
+  {
+    key: "totalTtc",
+    label: "Montant TTC",
+    value: "",
+    type: "number",
+    required: true,
+  },
+  {
+    key: "tvaRate",
+    label: "Taux TVA (%)",
+    value: "",
+    type: "number",
+    required: false,
+  },
+  {
+    key: "isAvoir",
+    label: "Avoir ?",
+    value: "",
+    type: "text",
+    required: false,
+  },
+];
+
 // ============================================
 // TYPES FACTURE LOCALE
 // ============================================
@@ -113,12 +180,14 @@ export type DynamicInvoiceStatus =
   | "READY_TO_TREAT"
   | "READY_TO_VALIDATE"
   | "VALIDATED"
+  | "ACCOUNTED"
   | "REJECTED"
   | "pending"
   | "processing"
   | "treated"
   | "ready_to_validate"
   | "validated"
+  | "accounted"
   | "error"
   | "to_verify";
 export type BackendInvoiceStatus =
@@ -126,6 +195,7 @@ export type BackendInvoiceStatus =
   | "READY_TO_TREAT"
   | "READY_TO_VALIDATE"
   | "VALIDATED"
+  | "ACCOUNTED"
   | "REJECTED"
   | "PENDING"
   | "PROCESSING"
@@ -757,12 +827,14 @@ export const STATUS_LABELS: Record<DynamicInvoiceStatus, string> = {
   READY_TO_TREAT: "En attente",
   READY_TO_VALIDATE: "Prêt",
   VALIDATED: "Validé",
+  ACCOUNTED: "Comptabilisé",
   REJECTED: "Rejeté",
   pending: "En attente",
   processing: "En cours",
   ready_to_validate: "Prêt",
   treated: "Traité",
   validated: "Validé",
+  accounted: "Comptabilisé",
   error: "Erreur",
   to_verify: "À vérifier",
 };
@@ -772,12 +844,14 @@ export const STATUS_COLORS: Record<DynamicInvoiceStatus, string> = {
   READY_TO_TREAT: "bg-yellow-500",
   READY_TO_VALIDATE: "bg-green-400",
   VALIDATED: "bg-green-600",
+  ACCOUNTED: "bg-emerald-700",
   REJECTED: "bg-red-500",
   pending: "bg-yellow-500",
   processing: "bg-blue-500",
   ready_to_validate: "bg-green-400",
   treated: "bg-green-400",
   validated: "bg-green-600",
+  accounted: "bg-emerald-700",
   error: "bg-red-500",
   to_verify: "bg-indigo-500",
 };

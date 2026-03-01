@@ -1,4 +1,4 @@
-import apiClient from "../api-client";
+import apiClient, { ApiError } from "../api-client";
 import { CreateComptableRequest, ComptableAdminDto, UserRole } from "@/src/types";
 
 const LOCAL_CREATED_COMPTABLES_KEY = "created_comptables_cache";
@@ -24,6 +24,13 @@ type BackendDossier = {
 };
 
 let userCache: AdminUserDto[] | null = null;
+
+function getStoredDossierId(): number | undefined {
+    if (typeof window === "undefined") return undefined;
+    const raw = window.localStorage.getItem("currentDossierId");
+    const id = Number(raw);
+    return Number.isFinite(id) && id > 0 ? id : undefined;
+}
 
 function toComptableDto(user: AdminUserDto): ComptableAdminDto {
     return {
@@ -102,8 +109,26 @@ export class AdminService {
     }
 
     static async getGlobalInvoiceStats(): Promise<AdminInvoiceStatsDto> {
-        const response = await apiClient.get<AdminInvoiceStatsDto>("/api/dynamic-invoices/stats");
-        return response.data || {};
+        const dossierId = getStoredDossierId();
+        if (!dossierId) {
+            return {};
+        }
+
+        try {
+            const response = await apiClient.get<AdminInvoiceStatsDto>("/api/dynamic-invoices/stats", {
+                params: { dossierId },
+            });
+            return response.data || {};
+        } catch (error) {
+            if (
+                error instanceof ApiError &&
+                error.status === 400 &&
+                (error.message === "dossier_required" || error.code === "dossier_required")
+            ) {
+                return {};
+            }
+            throw error;
+        }
     }
 
     static async listDossiers(): Promise<AdminDossierDto[]> {
