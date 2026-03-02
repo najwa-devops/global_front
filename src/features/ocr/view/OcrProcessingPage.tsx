@@ -200,6 +200,89 @@ export function OcrProcessingPage({
     syncDetectedTvaFields(invoice.fields, initialTvaValues),
   );
   const allFields = fields;
+  const FIELD_ALIAS_GROUPS: string[][] = [
+    ["clientName", "supplier"],
+    ["clientIce", "iceClient", "iceCliznt", "ice"],
+    ["totalHt", "amountHt", "amountHT"],
+    ["totalTva", "tva"],
+    ["totalTtc", "amountTTc", "amountTTC"],
+  ];
+  const HIDDEN_DYNAMIC_FIELD_KEYS = new Set([
+    "tvaValues",
+    "calculatedTvaRate",
+    "calculatedRateTva",
+    "calculatedratetva",
+    "isAvoir",
+    "isavoir",
+    "avoir",
+  ]);
+
+  const FIELD_LABEL_ALIASES: Record<string, string> = {
+    clientName: "Client",
+    supplier: "Client",
+    clientIce: "ICE",
+    iceClient: "ICE",
+    iceCliznt: "ICE",
+    ice: "ICE",
+    totalHt: "Montant HT",
+    amountHt: "Montant HT",
+    amountHT: "Montant HT",
+    totalTva: "TVA",
+    tva: "TVA",
+    totalTtc: "Montant TTC",
+    amountTTc: "Montant TTC",
+    amountTTC: "Montant TTC",
+  };
+
+  const getLinkedPartyKeys = (key: string): string[] =>
+    FIELD_ALIAS_GROUPS.find((group) => group.includes(key)) || [key];
+  const isFieldAutoFilled = (key: string): boolean =>
+    getLinkedPartyKeys(key).some((k) => autoFilledFields?.includes(k));
+
+  const renderedDynamicFields = useMemo(() => {
+    if (!useDynamicFieldLayout) return fields;
+    const visibleFields = fields.filter(
+      (f) => !HIDDEN_DYNAMIC_FIELD_KEYS.has(f.key),
+    );
+    const consumed = new Set<string>();
+    const merged: DynamicInvoiceField[] = [];
+
+    for (const field of visibleFields) {
+      const linkedKeys = getLinkedPartyKeys(field.key);
+      const groupId = linkedKeys.join("|");
+      if (consumed.has(groupId)) continue;
+      consumed.add(groupId);
+
+      if (linkedKeys.length === 1) {
+        merged.push({
+          ...field,
+          label: FIELD_LABEL_ALIASES[field.key] || field.label,
+        });
+        continue;
+      }
+
+      const candidates = linkedKeys
+        .map((k) => visibleFields.find((f) => f.key === k))
+        .filter(Boolean) as DynamicInvoiceField[];
+      const representative = candidates[0] || field;
+      const withValue = candidates.find(
+        (f) => String(f.value ?? "").trim() !== "",
+      );
+      const value = withValue ? withValue.value : representative.value;
+      const detected =
+        candidates.some((f) => !!f.detected) || String(value ?? "").trim() !== "";
+
+      merged.push({
+        ...representative,
+        value,
+        detected,
+        label:
+          FIELD_LABEL_ALIASES[representative.key] || representative.label,
+      });
+    }
+
+    return merged;
+  }, [fields, useDynamicFieldLayout]);
   const [extractedText, setExtractedText] = useState(
     invoice.rawOcrText || invoice.extractedText || "",
   );
@@ -808,11 +891,14 @@ export function OcrProcessingPage({
 
   const updateFieldValue = (key: string, value: string | number) => {
     const valueStr = String(value);
+    const linkedKeys = getLinkedPartyKeys(key);
     setFields((prev) =>
-      prev.map((f) => (f.key === key ? { ...f, value: valueStr } : f)),
+      prev.map((f) =>
+        linkedKeys.includes(f.key) ? { ...f, value: valueStr } : f,
+      ),
     );
-    setPendingFields((prev) => prev.filter((f) => f !== key));
-    setWarnings((prev) => prev.filter((w) => w.field !== key));
+    setPendingFields((prev) => prev.filter((f) => !linkedKeys.includes(f)));
+    setWarnings((prev) => prev.filter((w) => !linkedKeys.includes(w.field)));
   };
 
   const updateTierField = (key: keyof Tier, value: string) => {
@@ -949,15 +1035,16 @@ export function OcrProcessingPage({
   }, [focusedFieldKey, isSelectingPosition, updateFieldValue, fields]);
 
   const clearFieldValue = (key: string) => {
+    const linkedKeys = getLinkedPartyKeys(key);
     setFields((prev) =>
       prev.map((f) =>
-        f.key === key
+        linkedKeys.includes(f.key)
           ? { ...f, value: "", detected: false, position: undefined }
           : f,
       ),
     );
-    setPendingFields((prev) => prev.filter((f) => f !== key));
-    setWarnings((prev) => prev.filter((w) => w.field !== key));
+    setPendingFields((prev) => prev.filter((f) => !linkedKeys.includes(f)));
+    setWarnings((prev) => prev.filter((w) => !linkedKeys.includes(w.field)));
     toast.info(`Champ "${fields.find((f) => f.key === key)?.label}" vidé`);
   };
 
@@ -1195,6 +1282,9 @@ export function OcrProcessingPage({
 
     const isPending = pendingFields.includes(field.key);
     const hasWarning = warnings.some((w) => w.field === field.key);
+    const isAvoirField = field.key.toLowerCase() === "isavoir";
+    const rawAvoir = String(field.value ?? "").trim().toLowerCase();
+    const isAvoirValue = ["true", "1", "yes", "oui", "avoir"].includes(rawAvoir);
 
     return (
       <Card
@@ -1214,7 +1304,7 @@ export function OcrProcessingPage({
                   Personnalisé
                 </Badge>
               )}
-              {autoFilledFields?.includes(field.key) && (
+              {isFieldAutoFilled(field.key) && (
                 <Badge className="text-[10px] px-1.5 py-0.5 bg-green-500 text-white">
                   <Sparkles className="h-2 w-2 mr-1" />
                   Auto
@@ -1230,50 +1320,54 @@ export function OcrProcessingPage({
 
             {/* Boutons d'action */}
             <div className="flex items-center gap-1">
-              {isSelectingPosition === field.key ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={`h-7 px-2 text-[10px] animate-pulse ${
-                    selectionMode === "PATTERN"
-                      ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                      : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                  }`}
-                  onClick={cancelPositionSelection}
-                  title="Annuler la sélection"
-                >
-                  Annuler
-                </Button>
-              ) : (
+              {!isAvoirField && (
                 <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0 hover:bg-blue-50 text-blue-600"
-                    onClick={() => startSelection(field.key, "PATTERN")}
-                    title="Détecter pattern (ancrage)"
-                  >
-                    <MousePointer2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0 hover:bg-emerald-50 text-emerald-600"
-                    onClick={() => startSelection(field.key, "VALUE")}
-                    title="Détecter valeur"
-                  >
-                    <Crosshair className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
-                    onClick={() => clearFieldValue(field.key)}
-                    title="Vider la valeur"
-                    disabled={!field.value || String(field.value).trim() === ""}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isSelectingPosition === field.key ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className={`h-7 px-2 text-[10px] animate-pulse ${
+                        selectionMode === "PATTERN"
+                          ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                      }`}
+                      onClick={cancelPositionSelection}
+                      title="Annuler la sélection"
+                    >
+                      Annuler
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 hover:bg-blue-50 text-blue-600"
+                        onClick={() => startSelection(field.key, "PATTERN")}
+                        title="Détecter pattern (ancrage)"
+                      >
+                        <MousePointer2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 hover:bg-emerald-50 text-emerald-600"
+                        onClick={() => startSelection(field.key, "VALUE")}
+                        title="Détecter valeur"
+                      >
+                        <Crosshair className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
+                        onClick={() => clearFieldValue(field.key)}
+                        title="Vider la valeur"
+                        disabled={!field.value || String(field.value).trim() === ""}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -1307,25 +1401,37 @@ export function OcrProcessingPage({
             Valeur extraite
           </p>
 
-          {/* Input */}
-          <Input
-            id={field.key}
-            value={String(field.value || "")}
-            onChange={(e) => updateFieldValue(field.key, e.target.value)}
-            className={`bg-white transition-all ${
-              isPending ? "border-amber-500 bg-amber-50/10" : ""
-            } ${hasWarning ? "border-red-500" : ""}`}
-            disabled={status === "validated"}
-            onFocus={() => {
-              setFocusedFieldKey(field.key);
-            }}
-            onBlur={() => {
-              setTimeout(() => {
-                setFocusedFieldKey(null);
-              }, 200);
-            }}
-            placeholder={field.key === "tva" ? tvaPlaceholder : ""}
-          />
+          {/* Input / Badge */}
+          {isAvoirField ? (
+            <Badge
+              className={
+                isAvoirValue
+                  ? "bg-rose-600 text-white w-fit"
+                  : "bg-slate-200 text-slate-800 w-fit"
+              }
+            >
+              {isAvoirValue ? "Avoir" : "Facture"}
+            </Badge>
+          ) : (
+            <Input
+              id={field.key}
+              value={String(field.value || "")}
+              onChange={(e) => updateFieldValue(field.key, e.target.value)}
+              className={`bg-white transition-all ${
+                isPending ? "border-amber-500 bg-amber-50/10" : ""
+              } ${hasWarning ? "border-red-500" : ""}`}
+              disabled={status === "validated"}
+              onFocus={() => {
+                setFocusedFieldKey(field.key);
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  setFocusedFieldKey(null);
+                }, 200);
+              }}
+              placeholder={field.key === "tva" ? tvaPlaceholder : ""}
+            />
+          )}
           {field.key === "tva" && tvaPlaceholder ? (
             <p className="text-[11px] text-muted-foreground">{tvaPlaceholder}</p>
           ) : null}
@@ -1914,7 +2020,7 @@ export function OcrProcessingPage({
               <div className="grid grid-cols-2 gap-4">
                 {useDynamicFieldLayout ? (
                   /* Dynamic layout: render all fields in order (for vente and other non-achat types) */
-                  fields.map((field) => renderFieldCard(field))
+                  renderedDynamicFields.map((field) => renderFieldCard(field))
                 ) : (
                   /* Hardcoded achat layout */
                   <>
