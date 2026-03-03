@@ -238,6 +238,16 @@ export function OcrProcessingPage({
     FIELD_ALIAS_GROUPS.find((group) => group.includes(key)) || [key];
   const isFieldAutoFilled = (key: string): boolean =>
     getLinkedPartyKeys(key).some((k) => autoFilledFields?.includes(k));
+  const isAuthzError = (error: any): boolean => {
+    const status = Number(error?.status);
+    const message = String(error?.message || "").toLowerCase();
+    return (
+      status === 401 ||
+      status === 403 ||
+      message.includes("forbidden") ||
+      message.includes("unauthorized")
+    );
+  };
 
   const renderedDynamicFields = useMemo(() => {
     if (!useDynamicFieldLayout) return fields;
@@ -456,26 +466,50 @@ export function OcrProcessingPage({
         }
         setFournisseurAccounts(fournisseurs);
       } catch (error) {
-        try {
-          const [charges, fournisseurs, accounts] = await Promise.all([
-            api.getChargeAccounts(),
-            api.getFournisseurAccounts(),
-            api.getAccounts(true),
-          ]);
-          setChargeAccounts(charges);
-          setFournisseurAccounts(fournisseurs);
+        const [chargesRes, fournisseursRes, accountsRes] = await Promise.allSettled([
+          api.getChargeAccounts(),
+          api.getFournisseurAccounts(),
+          api.getAccounts(true),
+        ]);
+
+        let hasAnyData = false;
+
+        if (chargesRes.status === "fulfilled") {
+          setChargeAccounts(chargesRes.value);
+          hasAnyData = true;
+        }
+        if (fournisseursRes.status === "fulfilled") {
+          setFournisseurAccounts(fournisseursRes.value);
+          hasAnyData = true;
+        }
+        if (accountsRes.status === "fulfilled") {
           setTvaAccounts(
-            accounts.filter(
+            accountsRes.value.filter(
               (a) => a.code.startsWith("345") || a.code.startsWith("445"),
             ),
           );
-        } catch (fallbackError) {
+          hasAnyData = true;
+        }
+
+        if (!hasAnyData) {
+          const fallbackError =
+            chargesRes.status === "rejected"
+              ? chargesRes.reason
+              : fournisseursRes.status === "rejected"
+                ? fournisseursRes.reason
+                : accountsRes.status === "rejected"
+                  ? accountsRes.reason
+                  : error;
+
           console.error(
             "Erreur lors du chargement des comptes:",
             error,
             fallbackError,
           );
-          toast.error("Impossible de charger le plan comptable");
+
+          if (!isAuthzError(error) && !isAuthzError(fallbackError)) {
+            toast.error("Impossible de charger le plan comptable");
+          }
         }
       } finally {
         setIsLoadingAccounts(false);
