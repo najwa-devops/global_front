@@ -220,6 +220,8 @@ export default function InvoicesPage() {
 
       <InvoiceTable
         invoices={applyFilters(invoices)}
+        highlightInvalidTotals={true}
+        highlightCalculatedTotals={true}
         onView={(inv) =>
           router.push(
             inv.dossierId

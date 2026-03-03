@@ -38,7 +38,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { DynamicInvoice } from "@/lib/types";
-import { formatAmount, formatDate, toWorkflowStatus } from "@/lib/utils";
+import {
+  formatAmount,
+  formatDate,
+  toWorkflowStatus,
+  validateAmounts,
+} from "@/lib/utils";
 
 export interface BulkAction {
   id: string;
@@ -64,6 +69,8 @@ export interface InvoiceTableProps {
   bulkActions?: BulkAction[];
   itemsPerPage?: number;
   userRole?: string | undefined;
+  highlightInvalidTotals?: boolean;
+  highlightCalculatedTotals?: boolean;
 }
 
 export function InvoiceTable({
@@ -76,6 +83,8 @@ export function InvoiceTable({
   onAccount,
   itemsPerPage = 10,
   userRole,
+  highlightInvalidTotals = false,
+  highlightCalculatedTotals = false,
 }: InvoiceTableProps) {
   const isSupplierLike = userRole === "FOURNISSEUR" || userRole === "CLIENT";
   const [currentPage, setCurrentPage] = useState(1);
@@ -224,6 +233,39 @@ export function InvoiceTable({
     return numField?.value ? String(numField.value) : "-";
   };
 
+  const parseFieldNumber = (invoice: DynamicInvoice, key: string): number => {
+    const value = invoice.fields.find((f) => f.key === key)?.value;
+    if (value === null || value === undefined || value === "") {
+      return Number.NaN;
+    }
+    const parsed =
+      typeof value === "number"
+        ? value
+        : Number.parseFloat(String(value).replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  };
+
+  const hasInvalidTotals = (invoice: DynamicInvoice): boolean => {
+    if (!highlightInvalidTotals) {
+      return false;
+    }
+    const ht = parseFieldNumber(invoice, "amountHT");
+    const tva = parseFieldNumber(invoice, "tva");
+    const ttc = parseFieldNumber(invoice, "amountTTC");
+    if (!Number.isFinite(ht) || !Number.isFinite(tva) || !Number.isFinite(ttc)) {
+      return false;
+    }
+    return !validateAmounts(ht, tva, ttc).valid;
+  };
+
+  const hasCalculatedTotals = (invoice: DynamicInvoice): boolean => {
+    if (!highlightCalculatedTotals) {
+      return false;
+    }
+    const rawFlag = invoice.fieldsData?.totalsCalculated;
+    return rawFlag === true || String(rawFlag).toLowerCase() === "true";
+  };
+
   const getTierAccount = (invoice: DynamicInvoice): string => {
     if (invoice.tier?.displayAccount) return invoice.tier.displayAccount;
     if (invoice.tier?.tierNumber) return invoice.tier.tierNumber;
@@ -334,13 +376,22 @@ export function InvoiceTable({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedInvoices.map((invoice, index) => (
-                    <TableRow
-                      key={invoice.id}
-                      className="border-border/50 cursor-pointer transition-colors hover:bg-accent/50 animate-fade-in"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                      onClick={() => onView(invoice)}
-                    >
+                  {paginatedInvoices.map((invoice, index) => {
+                    const invalidTotals = hasInvalidTotals(invoice);
+                    const calculatedTotals = hasCalculatedTotals(invoice);
+                    return (
+                      <TableRow
+                        key={invoice.id}
+                        className={`border-border/50 cursor-pointer transition-colors animate-fade-in ${
+                          invalidTotals
+                            ? "bg-red-500/10 hover:bg-red-500/20"
+                            : calculatedTotals
+                              ? "bg-orange-500/10 hover:bg-orange-500/20"
+                            : "hover:bg-accent/50"
+                        }`}
+                        style={{ animationDelay: `${index * 50}ms` }}
+                        onClick={() => onView(invoice)}
+                      >
                       <TableCell>
                         <div className="h-12 w-12 rounded-lg border border-border/50 bg-muted/50 flex items-center justify-center overflow-hidden relative">
                           {invoice.isProcessing && (
@@ -367,19 +418,51 @@ export function InvoiceTable({
                           {getTemplateBadge(invoice)}
                         </div>
                       </TableCell>
-                      <TableCell className="text-foreground">
+                      <TableCell
+                        className={
+                          invalidTotals
+                            ? "text-red-600"
+                            : calculatedTotals
+                              ? "text-orange-700"
+                              : "text-foreground"
+                        }
+                      >
                         {getSupplier(invoice)}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {getInvoiceDate(invoice)}
                       </TableCell>
-                      <TableCell className="font-semibold text-foreground">
+                      <TableCell
+                        className={
+                          invalidTotals
+                            ? "font-semibold text-red-700"
+                            : calculatedTotals
+                              ? "font-semibold text-orange-700"
+                            : "font-semibold text-foreground"
+                        }
+                      >
                         {getHT(invoice)}
                       </TableCell>
-                      <TableCell className="font-semibold text-muted-foreground">
+                      <TableCell
+                        className={
+                          invalidTotals
+                            ? "font-semibold text-red-700"
+                            : calculatedTotals
+                              ? "font-semibold text-orange-700"
+                            : "font-semibold text-muted-foreground"
+                        }
+                      >
                         {getTVA(invoice)}
                       </TableCell>
-                      <TableCell className="font-semibold text-primary">
+                      <TableCell
+                        className={
+                          invalidTotals
+                            ? "font-semibold text-red-700"
+                            : calculatedTotals
+                              ? "font-semibold text-orange-700"
+                            : "font-semibold text-primary"
+                        }
+                      >
                         {getTTC(invoice)}
                       </TableCell>
                       <TableCell className="text-xs font-mono">
@@ -480,8 +563,9 @@ export function InvoiceTable({
                           </DropdownMenu>
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
