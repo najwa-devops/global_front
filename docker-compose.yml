@@ -1,7 +1,8 @@
 services:
   frontend:
     env_file:
-      - .env.local
+      - path: .env.local
+        required: false
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,7 +11,7 @@ services:
         BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://host.docker.internal:8089}
     container_name: invoices-frontend
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-3001}:3000"
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
