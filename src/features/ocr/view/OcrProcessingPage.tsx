@@ -547,7 +547,11 @@ export function OcrProcessingPage({
         if (accountsRes.status === "fulfilled") {
           setTvaAccounts(
             accountsRes.value.filter(
+<<<<<<< HEAD
               (a) => a.code.startsWith("3455") || a.code.startsWith("4455"),
+=======
+              (a) => a.code.startsWith("345") || a.code.startsWith("445"),
+>>>>>>> 1f3c3b80a0beedc18c8eae1e4094829593efdfd6
             ),
           );
           hasAnyData = true;

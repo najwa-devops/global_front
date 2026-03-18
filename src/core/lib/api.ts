@@ -355,6 +355,18 @@ function mapSalesInvoiceResponse(raw: any): DynamicInvoiceDto {
   } as DynamicInvoiceDto;
 }
 
+function unwrapApiData<T = any>(payload: any): T {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    ("success" in payload || "timestamp" in payload)
+  ) {
+    return payload.data as T;
+  }
+  return payload as T;
+}
+
 function mapBankStatus(
   status: string | undefined,
 ): LocalBankStatement["status"] {
@@ -1533,11 +1545,13 @@ export async function uploadSalesInvoice(
   if (resolvedDossierId) {
     formData.append("dossierId", String(resolvedDossierId));
   }
-  const result = await request<any>("/api/sales/invoices/upload", {
-    method: "POST",
-    body: formData,
-  });
-  return mapInvoice(result?.invoice || result);
+  const result = unwrapApiData<any>(
+    await request<any>("/api/sales/invoices/upload", {
+      method: "POST",
+      body: formData,
+    }),
+  );
+  return mapSalesInvoiceResponse(result?.invoice || result);
 }
 
 export async function getSalesInvoicesByDossier(
@@ -1563,13 +1577,16 @@ export async function getSalesInvoicesByDossier(
     requestedStatus?: string,
     withLimit: boolean = true,
   ): Promise<any[]> => {
-    const result = await request<any>("/api/sales/invoices", undefined, {
-      dossierId,
-      status: requestedStatus,
-      limit: withLimit ? 200 : undefined,
-    });
+    const result = unwrapApiData<any>(
+      await request<any>("/api/sales/invoices", undefined, {
+        dossierId,
+        status: requestedStatus,
+        limit: withLimit ? 200 : undefined,
+      }),
+    );
     if (Array.isArray(result)) return result;
     if (Array.isArray(result?.invoices)) return result.invoices;
+    if (Array.isArray(result?.content)) return result.content;
     return [];
   };
 
@@ -1580,7 +1597,7 @@ export async function getSalesInvoicesByDossier(
     const deduped = new Map<number, DynamicInvoiceDto>();
     for (const batch of batches) {
       for (const row of batch) {
-        const mapped = mapInvoice(row);
+        const mapped = mapSalesInvoiceResponse(row);
         if (Number.isFinite(Number(mapped.id))) {
           deduped.set(Number(mapped.id), mapped);
         }
@@ -1600,7 +1617,14 @@ export async function getSalesInvoicesByDossier(
 
     const fallbackStatuses = backendStatuses.some((s) => Boolean(s))
       ? backendStatuses
-      : ["PENDING", "PROCESSING", "TREATED", "READY_TO_VALIDATE", "VALIDATED", "ERROR"];
+      : [
+          "PENDING",
+          "PROCESSING",
+          "TREATED",
+          "READY_TO_VALIDATE",
+          "VALIDATED",
+          "ERROR",
+        ];
 
     const batches = await Promise.all(
       fallbackStatuses.map((s) => fetchSalesInvoices(s, false).catch(() => [])),
@@ -1609,7 +1633,7 @@ export async function getSalesInvoicesByDossier(
     const deduped = new Map<number, DynamicInvoiceDto>();
     for (const batch of batches) {
       for (const row of batch) {
-        const mapped = mapInvoice(row);
+        const mapped = mapSalesInvoiceResponse(row);
         if (Number.isFinite(Number(mapped.id))) {
           deduped.set(Number(mapped.id), mapped);
         }
@@ -1681,22 +1705,26 @@ export async function getSalesInvoiceById(
   id: number,
 ): Promise<DynamicInvoiceDto> {
   const dossierId = getCurrentDossierId();
-  const result = await request<any>(`/api/sales/invoices/${id}`, undefined, {
-    dossierId,
-  });
-  return mapInvoice(result);
+  const result = unwrapApiData<any>(
+    await request<any>(`/api/sales/invoices/${id}`, undefined, {
+      dossierId,
+    }),
+  );
+  return mapSalesInvoiceResponse(result);
 }
 
 export async function processSalesInvoice(
   id: number,
 ): Promise<DynamicInvoiceDto> {
   const dossierId = getCurrentDossierId();
-  const result = await request<any>(
-    `/api/sales/invoices/${id}/reprocess`,
-    { method: "POST" },
-    { dossierId },
+  const result = unwrapApiData<any>(
+    await request<any>(
+      `/api/sales/invoices/${id}/reprocess`,
+      { method: "POST" },
+      { dossierId },
+    ),
   );
-  return mapInvoice(result?.invoice || result);
+  return mapSalesInvoiceResponse(result?.invoice || result);
 }
 
 export async function updateSalesInvoiceFields(
@@ -1704,27 +1732,31 @@ export async function updateSalesInvoiceFields(
   fields: Record<string, any>,
 ): Promise<DynamicInvoiceDto> {
   const dossierId = getCurrentDossierId();
-  const result = await request<any>(
-    `/api/sales/invoices/${id}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(fields),
-    },
-    { dossierId },
+  const result = unwrapApiData<any>(
+    await request<any>(
+      `/api/sales/invoices/${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(fields),
+      },
+      { dossierId },
+    ),
   );
-  return mapInvoice(result);
+  return mapSalesInvoiceResponse(result);
 }
 
 export async function validateSalesInvoice(
   id: number,
 ): Promise<DynamicInvoiceDto> {
   const dossierId = getCurrentDossierId();
-  const result = await request<any>(
-    `/api/sales/invoices/${id}/validate`,
-    { method: "POST" },
-    { dossierId },
+  const result = unwrapApiData<any>(
+    await request<any>(
+      `/api/sales/invoices/${id}/validate`,
+      { method: "POST" },
+      { dossierId },
+    ),
   );
-  return mapInvoice(result?.invoice || result);
+  return mapSalesInvoiceResponse(result?.invoice || result);
 }
 
 export async function clientValidateSalesInvoice(id: number): Promise<any> {
@@ -1769,12 +1801,14 @@ export async function accountSalesInvoice(
   id: number,
 ): Promise<DynamicInvoiceDto> {
   const dossierId = getCurrentDossierId();
-  const result = await request<any>(
-    `/api/sales/invoices/${id}/account`,
-    { method: "POST" },
-    { dossierId },
+  const result = unwrapApiData<any>(
+    await request<any>(
+      `/api/sales/invoices/${id}/account`,
+      { method: "POST" },
+      { dossierId },
+    ),
   );
-  return mapInvoice(result?.invoice || result);
+  return mapSalesInvoiceResponse(result?.invoice || result);
 }
 
 export async function getSalesJournalEntries(
