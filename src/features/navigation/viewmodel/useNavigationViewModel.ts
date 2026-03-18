@@ -17,7 +17,15 @@ import {
 
 function filterByRole(items: NavItemConfig[], role: string): NavItemConfig[] {
   return items
-    .filter((item) => !item.roles || item.roles.includes(role as any))
+    .filter((item) => {
+      if (role === "FOURNISSEUR") {
+        const href = item.href || "";
+        if (item.id === "bank" || item.id === "global-bank" || href.startsWith("/bank") || href === "/centre-monetique") {
+          return false;
+        }
+      }
+      return !item.roles || item.roles.includes(role as any);
+    })
     .map((item) => ({
       ...item,
       children: item.children ? filterByRole(item.children, role) : undefined,

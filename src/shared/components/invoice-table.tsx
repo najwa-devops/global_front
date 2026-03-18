@@ -78,6 +78,8 @@ export function InvoiceTable({
   userRole,
 }: InvoiceTableProps) {
   const isSupplierLike = userRole === "FOURNISSEUR" || userRole === "CLIENT";
+  const isAccountingRole =
+    userRole === "ADMIN" || userRole === "COMPTABLE" || userRole === "SUPER_ADMIN";
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalPages = Math.ceil(invoices.length / itemsPerPage);
@@ -87,7 +89,78 @@ export function InvoiceTable({
     startIndex + itemsPerPage,
   );
 
+  const normalizeKey = (value: string) => value.trim().toLowerCase();
+
+  const getInvoiceNumberValue = (invoice: DynamicInvoice): string => {
+    const numField = invoice.fields.find((f) => f.key === "invoiceNumber");
+    return numField?.value ? String(numField.value) : "";
+  };
+
+  const getDuplicateReason = (() => {
+    const nameCounts = new Map<string, number>();
+    invoices.forEach((inv) => {
+      const name = normalizeKey(inv.originalName || inv.filename || "");
+      if (!name) return;
+      nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+    });
+    const duplicateNameSet = new Set(
+      Array.from(nameCounts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([name]) => name),
+    );
+
+    const numberCounts = new Map<string, number>();
+    invoices.forEach((inv) => {
+      const name = normalizeKey(inv.originalName || inv.filename || "");
+      if (duplicateNameSet.has(name)) return;
+      const num = normalizeKey(getInvoiceNumberValue(inv));
+      if (!num) return;
+      numberCounts.set(num, (numberCounts.get(num) || 0) + 1);
+    });
+    const duplicateNumberSet = new Set(
+      Array.from(numberCounts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([num]) => num),
+    );
+
+    return (invoice: DynamicInvoice) => {
+      const name = normalizeKey(invoice.originalName || invoice.filename || "");
+      if (name && duplicateNameSet.has(name)) return "name";
+      const num = normalizeKey(getInvoiceNumberValue(invoice));
+      if (num && duplicateNumberSet.has(num)) return "number";
+      return null;
+    };
+  })();
+
+  const hasMissingData = (invoice: DynamicInvoice) =>
+    Boolean(
+      invoice.missingFields?.length ||
+        invoice.pendingFields?.length ||
+        invoice.allFieldsFound === false,
+    );
+
   const getStatusBadge = (invoice: DynamicInvoice) => {
+    const duplicateReason = getDuplicateReason(invoice);
+    if (duplicateReason === "name") {
+      return (
+        <Badge
+          className="bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20"
+          title="Cette facture est doublon par nom"
+        >
+          fac-nom
+        </Badge>
+      );
+    }
+    if (duplicateReason === "number") {
+      return (
+        <Badge
+          className="bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20"
+          title="Cette facture est doublon par numero de facture"
+        >
+          fac-numF
+        </Badge>
+      );
+    }
     if (invoice.accounted || invoice.accountedAt) {
       return (
         <Badge className="bg-teal-500/10 text-teal-600 border-teal-500/30 hover:bg-teal-500/20">
@@ -113,7 +186,7 @@ export function InvoiceTable({
       case "READY_TO_VALIDATE":
         return (
           <Badge className="bg-blue-400/10 text-blue-400 border-blue-400/30 hover:bg-blue-400/20">
-            Prêt à valider
+            {isAccountingRole ? "Prêt à comptabiliser" : "Prêt à valider"}
           </Badge>
         );
       case "VALIDATED":
@@ -179,24 +252,27 @@ export function InvoiceTable({
   };
 
   const getInvoiceDate = (invoice: DynamicInvoice): string => {
-    const dateField = invoice.fields.find((f) => f.key === "invoiceDate");
-    if (dateField?.value) {
-      if (
-        typeof dateField.value === "string" &&
-        dateField.value.includes("/")
-      ) {
-        return dateField.value;
-      }
-      try {
-        const date = new Date(dateField.value);
-        if (!isNaN(date.getTime())) {
-          return formatDate(date);
-        }
-      } catch {
-        return String(dateField.value);
-      }
+    const dateField = invoice.fields.find(
+      (f) => f.key === "invoiceDate" || f.key === "date" || f.key === "invoice_date",
+    );
+    const raw = dateField?.value;
+    if (!raw) return "-";
+
+    const rawStr = String(raw).trim();
+    if (!rawStr) return "-";
+
+    if (rawStr.includes("/") || rawStr.includes("-") || rawStr.includes(".")) {
+      return rawStr;
     }
-    return formatDate(invoice.createdAt);
+    try {
+      const date = new Date(rawStr);
+      if (!isNaN(date.getTime())) {
+        return formatDate(date);
+      }
+    } catch {
+      return rawStr;
+    }
+    return rawStr;
   };
 
   const getSupplier = (invoice: DynamicInvoice): string => {
@@ -220,8 +296,8 @@ export function InvoiceTable({
   };
 
   const getInvoiceNumber = (invoice: DynamicInvoice): string => {
-    const numField = invoice.fields.find((f) => f.key === "invoiceNumber");
-    return numField?.value ? String(numField.value) : "-";
+    const num = getInvoiceNumberValue(invoice);
+    return num ? num : "-";
   };
 
   const getTierAccount = (invoice: DynamicInvoice): string => {
@@ -320,7 +396,7 @@ export function InvoiceTable({
                       Montant TTC
                     </TableHead>
                     <TableHead className="text-muted-foreground">
-                      Compte Tier
+                      Numero Compte
                     </TableHead>
                     <TableHead className="text-muted-foreground">
                       Cpt HT
@@ -334,13 +410,22 @@ export function InvoiceTable({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedInvoices.map((invoice, index) => (
-                    <TableRow
-                      key={invoice.id}
-                      className="border-border/50 cursor-pointer transition-colors hover:bg-accent/50 animate-fade-in"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                      onClick={() => onView(invoice)}
-                    >
+                  {paginatedInvoices.map((invoice, index) => {
+                    const duplicateReason = getDuplicateReason(invoice);
+                    const isDuplicate = Boolean(duplicateReason);
+                    const isMissing = hasMissingData(invoice);
+                    const rowHoverClass = isDuplicate
+                      ? "hover:bg-red-500/10"
+                      : isMissing
+                        ? "hover:bg-orange-500/10"
+                        : "hover:bg-accent/50";
+                    return (
+                      <TableRow
+                        key={invoice.id}
+                        className={`border-border/50 cursor-pointer transition-colors ${rowHoverClass} animate-fade-in`}
+                        style={{ animationDelay: `${index * 50}ms` }}
+                        onClick={() => onView(invoice)}
+                      >
                       <TableCell>
                         <div className="h-12 w-12 rounded-lg border border-border/50 bg-muted/50 flex items-center justify-center overflow-hidden relative">
                           {invoice.isProcessing && (
@@ -432,7 +517,7 @@ export function InvoiceTable({
                                 <DropdownMenuItem
                                   onClick={() => onProcessInline(invoice)}
                                   className="gap-2"
-                                  disabled={invoice.isProcessing}
+                                  disabled={invoice.isProcessing || isDuplicate}
                                 >
                                   <Scan className="h-4 w-4" />
                                   {invoice.isProcessing
@@ -442,6 +527,7 @@ export function InvoiceTable({
                               )}
 
                               {!isSupplierLike &&
+                                !isAccountingRole &&
                                 onFinalValidate &&
                                 toWorkflowStatus(invoice.status) ===
                                   "READY_TO_VALIDATE" && (
@@ -456,32 +542,39 @@ export function InvoiceTable({
 
                               {!isSupplierLike &&
                                 onAccount &&
-                                toWorkflowStatus(invoice.status) ===
-                                  "VALIDATED" &&
+                                (toWorkflowStatus(invoice.status) ===
+                                  "VALIDATED" ||
+                                  (isAccountingRole &&
+                                    toWorkflowStatus(invoice.status) ===
+                                      "READY_TO_VALIDATE")) &&
                                 !invoice.accounted &&
                                 !invoice.accountedAt && (
                                   <DropdownMenuItem
                                     onClick={() => onAccount(invoice)}
                                     className="gap-2 text-emerald-600 focus:text-emerald-700 font-medium"
+                                    disabled={isDuplicate}
                                   >
                                     <BookOpenCheck className="h-4 w-4" />
                                     Comptabiliser
                                   </DropdownMenuItem>
                                 )}
 
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(invoice)}
-                                className="gap-2 text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Supprimer
-                              </DropdownMenuItem>
+                              {!invoice.accounted && !invoice.accountedAt && (
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(invoice)}
+                                  className="gap-2 text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Supprimer
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

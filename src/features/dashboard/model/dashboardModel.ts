@@ -27,6 +27,7 @@ export function filterDashboardInvoices(
   toWorkflowStatus: (status?: string) => string,
 ): DynamicInvoice[] {
   return invoices.filter((invoice) => {
+    if (invoice.accounted || invoice.accountedAt) return false;
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       const matchesFilename = invoice.filename.toLowerCase().includes(searchLower);

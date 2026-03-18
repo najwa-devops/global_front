@@ -10,8 +10,21 @@ export default function SalesOcrPage() {
   const params = useParams();
   const id = params.id ? Number(params.id) : null;
 
-  const { invoice, isLoading, onBack, onInvoiceSaved } =
-    useSalesOcrPageViewModel(id);
+  const {
+    invoice,
+    isLoading,
+    onBack,
+    onInvoiceSaved,
+    exerciseStartDate,
+    exerciseEndDate,
+    canGoPrevious,
+    canGoNext,
+    goToPrevious,
+    goToNext,
+    currentIndex,
+    totalInvoices,
+    isNavigating,
+  } = useSalesOcrPageViewModel(id);
 
   if (isLoading || !invoice) {
     return (
@@ -41,6 +54,15 @@ export default function SalesOcrPage() {
       onUpdateFields={handleUpdateFields}
       onValidateInvoice={handleValidate}
       useDynamicFieldLayout={true}
+      exerciseStartDate={exerciseStartDate ?? undefined}
+      exerciseEndDate={exerciseEndDate ?? undefined}
+      canGoPrevious={canGoPrevious}
+      canGoNext={canGoNext}
+      onGoPrevious={goToPrevious}
+      onGoNext={goToNext}
+      currentIndex={currentIndex}
+      totalInvoices={totalInvoices}
+      isNavigating={isNavigating}
     />
   );
 }

@@ -53,6 +53,13 @@ export const DEFAULT_FIELDS: DynamicInvoiceField[] = [
     required: true,
   },
   {
+    key: "activity",
+    label: "Activité",
+    value: "",
+    type: "text",
+    required: false,
+  },
+  {
     key: "amountHT",
     label: "Montant HT",
     value: "",
@@ -76,7 +83,7 @@ export const DEFAULT_FIELDS: DynamicInvoiceField[] = [
   },
   {
     key: "tierNumber",
-    label: "Compte Tier",
+    label: "Numero Compte",
     value: "",
     type: "text",
     required: false,
@@ -275,6 +282,7 @@ export interface Tier {
   id: number;
   dossierId?: number | undefined;
   libelle: string;
+  activity?: string | undefined;
 
   // Mode Auxiliaire
   auxiliaireMode: boolean;
@@ -304,6 +312,7 @@ export interface Tier {
 
 export interface CreateTierRequest {
   libelle: string;
+  activity?: string | undefined;
   auxiliaireMode: boolean;
   tierNumber: string;
   collectifAccount?: string | undefined;

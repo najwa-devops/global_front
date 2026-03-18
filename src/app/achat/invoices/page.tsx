@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { api } from "@/lib/api";
-import { dynamicInvoiceDtoToLocal, toWorkflowStatus } from "@/lib/utils";
+import { dynamicInvoiceDtoToLocal } from "@/lib/utils";
 import { type DynamicInvoice } from "@/lib/types";
 import {
   InvoiceFilters,
@@ -42,9 +42,8 @@ export default function InvoicesPage() {
       setIsLoading(true);
       const dtos = await api.getAllInvoices();
       const localInvoices = dtos.map(dynamicInvoiceDtoToLocal);
-      // Filtrer pour ne garder que les non-validées (comportement original de currentPage === "invoices")
       const pending = localInvoices.filter(
-        (inv) => toWorkflowStatus(inv.status) !== "VALIDATED",
+        (inv) => !inv.accounted && !inv.accountedAt,
       );
       setInvoices(pending);
     } catch (err) {
@@ -140,6 +139,10 @@ export default function InvoicesPage() {
   };
 
   const { user } = useAuth();
+  const isAccountingRole =
+    user?.role === "ADMIN" ||
+    user?.role === "COMPTABLE" ||
+    user?.role === "SUPER_ADMIN";
 
   const handleConfirmInvoice = async (invoice: DynamicInvoice) => {
     try {
@@ -170,6 +173,20 @@ export default function InvoicesPage() {
       toast.error("Erreur de validation finale", {
         id: `validate-${invoice.id}`,
       });
+    }
+  };
+
+  const handleAccountInvoice = async (invoice: DynamicInvoice) => {
+    try {
+      const result = await api.accountInvoiceEntries(invoice.id);
+      setInvoices((prev) => prev.filter((inv) => inv.id !== invoice.id));
+      toast.success(result?.message || "Facture comptabilisée");
+    } catch (err: any) {
+      const message =
+        err?.message === "missing_accounting_data"
+          ? "Données comptables manquantes pour cette facture."
+          : err?.message || "Erreur lors de la comptabilisation";
+      toast.error(message);
     }
   };
 
@@ -231,7 +248,8 @@ export default function InvoicesPage() {
         onProcessInline={handleProcessInline}
         onDelete={handleDeleteInvoice}
         onConfirm={handleConfirmInvoice}
-        onFinalValidate={handleFinalValidate}
+        onFinalValidate={isAccountingRole ? undefined : handleFinalValidate}
+        onAccount={isAccountingRole ? handleAccountInvoice : undefined}
         userRole={user?.role}
       />
 

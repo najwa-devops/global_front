@@ -47,7 +47,9 @@ export default function VenteInvoicesPage() {
       }
       const dtos = await api.getSalesPendingInvoices(dossierId);
       const localInvoices = dtos.map(salesInvoiceDtoToLocal);
-      setInvoices(localInvoices);
+      setInvoices(
+        localInvoices.filter((inv) => !inv.accounted && !inv.accountedAt),
+      );
     } catch (err) {
       console.error("Error loading sales invoices:", err);
       toast.error("Erreur lors du chargement des factures vente.");
@@ -110,6 +112,10 @@ export default function VenteInvoicesPage() {
   };
 
   const { user } = useAuth();
+  const isAccountingRole =
+    user?.role === "ADMIN" ||
+    user?.role === "COMPTABLE" ||
+    user?.role === "SUPER_ADMIN";
 
   const handleProcessInline = async (invoice: DynamicInvoice) => {
     try {
@@ -149,6 +155,18 @@ export default function VenteInvoicesPage() {
       toast.success("Facture vente validée", { id: `validate-${invoice.id}` });
     } catch (err) {
       toast.error("Erreur de validation", { id: `validate-${invoice.id}` });
+    }
+  };
+
+  const handleAccountInvoice = async (invoice: DynamicInvoice) => {
+    try {
+      const result = await api.accountSalesInvoice(invoice.id);
+      setInvoices((prev) => prev.filter((inv) => inv.id !== invoice.id));
+      toast.success(
+        result?.status ? "Facture comptabilisée" : "Comptabilisation effectuée",
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de la comptabilisation");
     }
   };
 
@@ -209,7 +227,8 @@ export default function VenteInvoicesPage() {
         onProcessInline={handleProcessInline}
         onDelete={handleDeleteInvoice}
         onConfirm={handleConfirmInvoice}
-        onFinalValidate={handleFinalValidate}
+        onFinalValidate={isAccountingRole ? undefined : handleFinalValidate}
+        onAccount={isAccountingRole ? handleAccountInvoice : undefined}
         userRole={user?.role}
       />
 

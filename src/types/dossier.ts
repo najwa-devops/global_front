@@ -18,6 +18,8 @@ export interface Dossier {
     validatedInvoicesCount: number
     status: "active" | "inactive"
     createdAt: string
+    exerciseStartDate?: string
+    exerciseEndDate?: string
 }
 
 export interface CreateDossierRequest {
@@ -26,6 +28,8 @@ export interface CreateDossierRequest {
     fournisseurName: string
     ice: string
     fournisseurPassword?: string | undefined
+    exerciseStartDate: string
+    exerciseEndDate: string
 }
 
 export interface ComptableUser {

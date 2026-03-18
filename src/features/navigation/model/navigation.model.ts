@@ -9,6 +9,8 @@ const DOSSIER_SCOPED_PATHS = [
   "/bank/upload",
   "/bank/list",
   "/bank/validated",
+  "/bank/accounted",
+  "/centre-monetique",
   "/settings/accounting",
   "/settings/patterns",
   "/achat/templates",

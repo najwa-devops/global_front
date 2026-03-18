@@ -29,7 +29,78 @@ export function UploadedFilesPage({
   const [processingIds, setProcessingIds] = useState<Set<number>>(new Set())
 
   // --- HELPERS (Copied from InvoiceTable for consistency) ---
-  const getStatusBadge = (status?: string) => {
+  const normalizeKey = (value: string) => value.trim().toLowerCase()
+
+  const getInvoiceNumberValue = (invoice: DynamicInvoice): string => {
+    const numField = invoice.fields.find((f: DynamicInvoiceField) => f.key === "invoiceNumber")
+    return numField?.value ? String(numField.value) : ""
+  }
+
+  const getDuplicateReason = (() => {
+    const nameCounts = new Map<string, number>()
+    invoices.forEach((inv) => {
+      const name = normalizeKey(inv.originalName || inv.filename || "")
+      if (!name) return
+      nameCounts.set(name, (nameCounts.get(name) || 0) + 1)
+    })
+    const duplicateNameSet = new Set(
+      Array.from(nameCounts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([name]) => name),
+    )
+
+    const numberCounts = new Map<string, number>()
+    invoices.forEach((inv) => {
+      const name = normalizeKey(inv.originalName || inv.filename || "")
+      if (duplicateNameSet.has(name)) return
+      const num = normalizeKey(getInvoiceNumberValue(inv))
+      if (!num) return
+      numberCounts.set(num, (numberCounts.get(num) || 0) + 1)
+    })
+    const duplicateNumberSet = new Set(
+      Array.from(numberCounts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([num]) => num),
+    )
+
+    return (invoice: DynamicInvoice) => {
+      const name = normalizeKey(invoice.originalName || invoice.filename || "")
+      if (name && duplicateNameSet.has(name)) return "name"
+      const num = normalizeKey(getInvoiceNumberValue(invoice))
+      if (num && duplicateNumberSet.has(num)) return "number"
+      return null
+    }
+  })()
+
+  const hasMissingData = (invoice: DynamicInvoice) =>
+    Boolean(
+      invoice.missingFields?.length ||
+        invoice.pendingFields?.length ||
+        invoice.allFieldsFound === false,
+    )
+
+  const getStatusBadge = (status?: string, invoice?: DynamicInvoice) => {
+    const duplicateReason = invoice ? getDuplicateReason(invoice) : null
+    if (duplicateReason === "name") {
+      return (
+        <Badge
+          className="bg-red-500/10 text-red-500 border-red-500/30"
+          title="Cette facture est doublon par nom"
+        >
+          fac-nom
+        </Badge>
+      )
+    }
+    if (duplicateReason === "number") {
+      return (
+        <Badge
+          className="bg-red-500/10 text-red-500 border-red-500/30"
+          title="Cette facture est doublon par numero de facture"
+        >
+          fac-numF
+        </Badge>
+      )
+    }
     switch (status) {
       case "pending":
         return <Badge className="bg-amber-400/10 text-amber-400 border-amber-400/30">En attente</Badge>
@@ -66,8 +137,8 @@ export function UploadedFilesPage({
   }
 
   const getInvoiceNumber = (invoice: DynamicInvoice): string => {
-    const numField = invoice.fields.find((f: DynamicInvoiceField) => f.key === "invoiceNumber")
-    return numField?.value ? String(numField.value) : "-"
+    const num = getInvoiceNumberValue(invoice)
+    return num ? num : "-"
   }
 
   const getSupplier = (invoice: DynamicInvoice): string => {
@@ -76,9 +147,26 @@ export function UploadedFilesPage({
   }
 
   const getInvoiceDate = (invoice: DynamicInvoice): string => {
-    const dateField = invoice.fields.find((f: DynamicInvoiceField) => f.key === "invoiceDate")
-    if (dateField?.value) return String(dateField.value)
-    return formatDate(invoice.createdAt)
+    const dateField = invoice.fields.find(
+      (f: DynamicInvoiceField) =>
+        f.key === "invoiceDate" || f.key === "date" || f.key === "invoice_date"
+    )
+    const raw = dateField?.value
+    if (!raw) return "-"
+    const rawStr = String(raw).trim()
+    if (!rawStr) return "-"
+    if (rawStr.includes("/") || rawStr.includes("-") || rawStr.includes(".")) {
+      return rawStr
+    }
+    try {
+      const date = new Date(rawStr)
+      if (!isNaN(date.getTime())) {
+        return formatDate(date)
+      }
+    } catch {
+      return rawStr
+    }
+    return rawStr
   }
 
   const getHT = (invoice: DynamicInvoice): string => {
@@ -243,13 +331,14 @@ export function UploadedFilesPage({
               <TableHeader>
                 <TableRow className="border-border/50 hover:bg-transparent">
                   <TableHead className="w-16">Aperçu</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>N° Facture</TableHead>
                   <TableHead>Fournisseur</TableHead>
                   <TableHead>Date Facture</TableHead>
                   <TableHead>HT</TableHead>
                   <TableHead>TVA</TableHead>
                   <TableHead>TTC</TableHead>
-                  <TableHead>Compte Tier</TableHead>
+                  <TableHead>Numero Compte</TableHead>
                   <TableHead>Cpt HT</TableHead>
                   <TableHead>Cpt TVA</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -260,8 +349,16 @@ export function UploadedFilesPage({
                   const isProcessing = processingIds.has(invoice.id) || invoice.isProcessing
                   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(invoice.filename)
 
+                  const duplicateReason = getDuplicateReason(invoice)
+                  const isDuplicate = Boolean(duplicateReason)
+                  const isMissing = hasMissingData(invoice)
+                  const rowHoverClass = isDuplicate
+                    ? "hover:bg-red-500/10"
+                    : isMissing
+                      ? "hover:bg-orange-500/10"
+                      : "hover:bg-accent/50"
                   return (
-                    <TableRow key={invoice.id} className="border-border/50">
+                    <TableRow key={invoice.id} className={`border-border/50 ${rowHoverClass}`}>
                       <TableCell>
                         <div className="h-12 w-12 rounded-lg border border-border/50 bg-muted/50 flex items-center justify-center overflow-hidden relative">
                           {isProcessing && (
@@ -281,6 +378,7 @@ export function UploadedFilesPage({
                         </div>
                       </TableCell>
 
+                      <TableCell>{getStatusBadge(invoice.status, invoice)}</TableCell>
                       <TableCell className="font-medium">{getInvoiceNumber(invoice)}</TableCell>
                       <TableCell>{getSupplier(invoice)}</TableCell>
                       <TableCell className="text-muted-foreground">{getInvoiceDate(invoice)}</TableCell>

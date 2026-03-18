@@ -106,7 +106,7 @@ function getCurrentDossierId(): number | undefined {
 
 export default function Page() {
   return (
-    <AuthGuard allowedRoles={["COMPTABLE", "ADMIN", "CLIENT"]}>
+    <AuthGuard allowedRoles={["CLIENT"]}>
       <VenteValidatedPageContent />
     </AuthGuard>
   );

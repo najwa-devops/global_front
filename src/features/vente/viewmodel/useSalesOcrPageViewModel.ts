@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { toWorkflowStatus } from "@/lib/utils";
 import type { DynamicInvoice } from "@/lib/types";
 import { fetchSalesInvoiceById } from "@/src/features/vente/model/sales-invoice.model";
+import { getDynamicInvoicesForNavigation, getDossiers } from "@/src/core/lib/api";
 
 function isValidDossierId(value: number) {
   return Number.isFinite(value) && value > 0;
@@ -17,6 +18,13 @@ export function useSalesOcrPageViewModel(invoiceId: number | null) {
 
   const [invoice, setInvoice] = useState<DynamicInvoice | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [exerciseStartDate, setExerciseStartDate] = useState<string | null>(null);
+  const [exerciseEndDate, setExerciseEndDate] = useState<string | null>(null);
+
+  // Navigation entre factures
+  const [invoiceList, setInvoiceList] = useState<{ id: number; invoiceNumber?: string }[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(-1);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -42,6 +50,26 @@ export function useSalesOcrPageViewModel(invoiceId: number | null) {
       try {
         const loadedInvoice = await fetchSalesInvoiceById(invoiceId);
         setInvoice(loadedInvoice);
+
+        // Charger les dates d'exercice du dossier courant
+        const currentDossierId = Number(
+          searchParams.get("dossierId") || localStorage.getItem("currentDossierId")
+        );
+        if (currentDossierId) {
+          try {
+            const dossiers = await getDossiers();
+            const currentDossier = dossiers.find(d => d.id === currentDossierId);
+            if (currentDossier) {
+              setExerciseStartDate(currentDossier.exerciseStartDate || null);
+              setExerciseEndDate(currentDossier.exerciseEndDate || null);
+            }
+          } catch (e) {
+            console.error("Failed to load dossier exercise dates:", e);
+          }
+        }
+
+        // Charger la liste des factures pour navigation
+        await loadInvoiceList(invoiceId, searchParams);
       } catch (error) {
         console.error("Error loading sales OCR data:", error);
         toast.error("Impossible de charger la facture vente");
@@ -53,6 +81,51 @@ export function useSalesOcrPageViewModel(invoiceId: number | null) {
 
     loadData();
   }, [invoiceId, router, searchParams]);
+
+  // Charger la liste des factures pour la navigation
+  const loadInvoiceList = async (currentId: number, params: URLSearchParams) => {
+    try {
+      const dossierId = params.get("dossierId");
+      
+      const invoices = await getDynamicInvoicesForNavigation({
+        dossierId: dossierId ? Number(dossierId) : undefined,
+      });
+      
+      setInvoiceList(invoices);
+      setCurrentIndex(invoices.findIndex(inv => inv.id === currentId));
+    } catch (error) {
+      console.error("Error loading invoice list for navigation:", error);
+    }
+  };
+
+  // Navigation vers facture précédente
+  const goToPrevious = () => {
+    if (currentIndex > 0) {
+      setIsNavigating(true);
+      const prevId = invoiceList[currentIndex - 1].id;
+      navigateToInvoice(prevId);
+    }
+  };
+
+  // Navigation vers facture suivante
+  const goToNext = () => {
+    if (currentIndex < invoiceList.length - 1) {
+      setIsNavigating(true);
+      const nextId = invoiceList[currentIndex + 1].id;
+      navigateToInvoice(nextId);
+    }
+  };
+
+  // Navigation vers une facture spécifique
+  const navigateToInvoice = (id: number) => {
+    const dossierId = searchParams.get("dossierId");
+    
+    const url = dossierId 
+      ? `/vente/ocr/${id}?dossierId=${dossierId}`
+      : `/vente/ocr/${id}`;
+    
+    router.push(url);
+  };
 
   const onInvoiceSaved = (updatedInvoice: DynamicInvoice) => {
     setInvoice(updatedInvoice);
@@ -73,5 +146,15 @@ export function useSalesOcrPageViewModel(invoiceId: number | null) {
     isLoading,
     onBack,
     onInvoiceSaved,
+    exerciseStartDate,
+    exerciseEndDate,
+    // Navigation
+    canGoPrevious: currentIndex > 0,
+    canGoNext: currentIndex < invoiceList.length - 1,
+    currentIndex,
+    totalInvoices: invoiceList.length,
+    goToPrevious,
+    goToNext,
+    isNavigating,
   };
 }

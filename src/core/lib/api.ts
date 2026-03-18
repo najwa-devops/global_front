@@ -522,6 +522,44 @@ export async function getAllDynamicInvoices(
   return (result?.invoices || []).map(mapInvoice);
 }
 
+/**
+ * Get invoice list for navigation (lightweight, IDs only or minimal data)
+ * Note: This is a lightweight version that doesn't map full invoice objects
+ */
+export async function getDynamicInvoicesForNavigation(
+  options?: {
+    dossierId?: number;
+    status?: string[];
+    type?: 'achat' | 'vente';
+  }
+): Promise<{ id: number; invoiceNumber?: string }[]> {
+  try {
+    const dossierId = options?.dossierId || getCurrentDossierId();
+
+    const result = await request<{ invoices?: any[] }>(
+      "/api/dynamic-invoices",
+      undefined,
+      {
+        dossierId,
+        limit: 1000, // High limit for navigation
+      },
+    );
+
+    if (!result?.invoices) {
+      return [];
+    }
+
+    return result.invoices.map(inv => ({
+      id: inv.id,
+      invoiceNumber: inv.fieldsData?.invoiceNumber || inv.invoiceNumber,
+    }));
+  } catch (error) {
+    // Silent fail - navigation buttons will just be hidden
+    console.warn("Navigation: Unable to load invoice list. Navigation buttons will be disabled.");
+    return [];
+  }
+}
+
 export async function deleteDynamicInvoice(id: number): Promise<void> {
   const dossierId = getCurrentDossierId();
   await request<void>(
@@ -1126,6 +1164,10 @@ export async function uploadBankStatement(
 ): Promise<LocalBankStatement> {
   const formData = new FormData();
   formData.append("file", file);
+  const dossierId = getCurrentDossierId();
+  if (dossierId) {
+    formData.append("dossierId", String(dossierId));
+  }
   if (bankType && bankType !== "AUTO") {
     formData.append("bankType", bankType);
   }
@@ -1335,6 +1377,8 @@ export async function getDossiers(): Promise<BackendDossierDto[]> {
     fournisseurEmail: d.clientUsername,
     comptableEmail: d.comptableUsername,
     createdAt: d.createdAt,
+    exerciseStartDate: d.exerciseStartDate,
+    exerciseEndDate: d.exerciseEndDate,
     invoicesCount: d.invoicesCount || 0,
     bankStatementsCount: d.bankStatementsCount || 0,
     pendingInvoicesCount: d.pendingInvoicesCount || 0,
@@ -1347,6 +1391,8 @@ export async function createDossier(payload: {
   fournisseurEmail: string;
   comptableId?: number;
   password?: string;
+  exerciseStartDate?: string;
+  exerciseEndDate?: string;
 }): Promise<any> {
   const username = payload.fournisseurEmail.trim();
   const displayName = username.split("@")[0] || username;
@@ -1355,6 +1401,8 @@ export async function createDossier(payload: {
     clientUsername: username,
     clientPassword: payload.password,
     clientDisplayName: displayName,
+    exerciseStartDate: payload.exerciseStartDate,
+    exerciseEndDate: payload.exerciseEndDate,
     ...(payload.comptableId ? { comptableId: payload.comptableId } : {}),
   };
 
@@ -1404,6 +1452,8 @@ export async function createDossier(payload: {
       body: JSON.stringify({
         dossierName: payload.nom,
         clientId: existingClient.id,
+        exerciseStartDate: payload.exerciseStartDate,
+        exerciseEndDate: payload.exerciseEndDate,
         ...(payload.comptableId ? { comptableId: payload.comptableId } : {}),
       }),
     });
@@ -1850,6 +1900,7 @@ export const api = {
   getAvailableSignatures: getDynamicAvailableSignatures,
   linkTierToInvoice: linkTierToDynamicInvoice,
   getInvoicePdfUrl: getDynamicInvoicePdfUrl,
+  accountInvoice: accountInvoiceEntries,
   reprocessDynamic: processDynamicInvoice,
   processBulkDynamic: processDynamicInvoicesBulk,
   reprocessBulkDynamic: reprocessDynamicInvoicesBulk,

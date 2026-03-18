@@ -122,7 +122,7 @@ function ValidatedPageContent() {
 
 export default function Page() {
   return (
-    <AuthGuard allowedRoles={["COMPTABLE", "ADMIN", "CLIENT"]}>
+    <AuthGuard allowedRoles={["CLIENT"]}>
       <ValidatedPageContent />
     </AuthGuard>
   );

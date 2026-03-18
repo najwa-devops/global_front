@@ -9,8 +9,22 @@ export default function OcrPageView() {
   const params = useParams();
   const id = params.id ? Number(params.id) : null;
 
-  const { invoice, templates, isLoading, onBack, onInvoiceSaved } =
-    useOcrPageViewModel(id);
+  const {
+    invoice,
+    templates,
+    isLoading,
+    onBack,
+    onInvoiceSaved,
+    exerciseStartDate,
+    exerciseEndDate,
+    canGoPrevious,
+    canGoNext,
+    goToPrevious,
+    goToNext,
+    currentIndex,
+    totalInvoices,
+    isNavigating,
+  } = useOcrPageViewModel(id);
 
   if (isLoading || !invoice) {
     return (
@@ -29,6 +43,15 @@ export default function OcrPageView() {
       onBack={onBack}
       onSave={onInvoiceSaved}
       isDemoMode={false}
+      exerciseStartDate={exerciseStartDate ?? undefined}
+      exerciseEndDate={exerciseEndDate ?? undefined}
+      canGoPrevious={canGoPrevious}
+      canGoNext={canGoNext}
+      onGoPrevious={goToPrevious}
+      onGoNext={goToNext}
+      currentIndex={currentIndex}
+      totalInvoices={totalInvoices}
+      isNavigating={isNavigating}
     />
   );
 }

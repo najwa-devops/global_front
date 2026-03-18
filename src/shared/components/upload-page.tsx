@@ -40,19 +40,32 @@ export function UploadPage({ onUpload, onViewInvoice, isDemoMode }: UploadPagePr
     return null
   }
 
+  const normalizeFilename = (name: string) => name.trim().toLowerCase()
+
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const fileArray = Array.from(newFiles)
-    const newFileItems: FileItem[] = fileArray.map((file) => {
-      const error = validateFile(file)
-      return {
-        file,
-        id: `${file.name}-${Date.now()}-${Math.random()}`,
-        status: error ? "error" : "pending",
-        progress: 0,
-        error: error || undefined,
-      }
+    setFiles((prev) => {
+      const existingNames = new Set(prev.map((f) => normalizeFilename(f.file.name)))
+      const newFileItems: FileItem[] = fileArray.map((file) => {
+        const error = validateFile(file)
+        const normalized = normalizeFilename(file.name)
+        const isDuplicateName = existingNames.has(normalized)
+        if (!isDuplicateName) {
+          existingNames.add(normalized)
+        }
+        const duplicateError = isDuplicateName
+          ? "Cette facture est doublon par nom"
+          : null
+        return {
+          file,
+          id: `${file.name}-${Date.now()}-${Math.random()}`,
+          status: error || duplicateError ? "error" : "pending",
+          progress: 0,
+          error: error || duplicateError || undefined,
+        }
+      })
+      return [...prev, ...newFileItems]
     })
-    setFiles((prev) => [...prev, ...newFileItems])
   }, [])
 
   const handleDrop = useCallback(

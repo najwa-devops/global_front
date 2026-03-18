@@ -58,6 +58,7 @@ export function TierCreationModal({
 }: TierCreationModalProps) {
   const [formData, setFormData] = useState<Partial<Tier>>({
     libelle: "",
+    activity: "",
     ice: "",
     ifNumber: "",
     rcNumber: "",
@@ -78,6 +79,7 @@ export function TierCreationModal({
     if (isOpen) {
       setFormData({
         libelle: existingTier?.libelle || initialData.libelle || "",
+        activity: existingTier?.activity || "",
         ice: existingTier?.ice || initialData.ice || "",
         ifNumber: existingTier?.ifNumber || initialData.ifNumber || "",
         rcNumber: existingTier?.rcNumber || initialData.rcNumber || "",
@@ -93,8 +95,8 @@ export function TierCreationModal({
         defaultTvaRate: existingTier?.defaultTvaRate ?? 20,
         taxCode:
           existingTier?.taxCode ||
-          (existingTier?.tvaAccount?.startsWith("345") ||
-          existingTier?.tvaAccount?.startsWith("445")
+          (existingTier?.tvaAccount?.startsWith("3455") ||
+          existingTier?.tvaAccount?.startsWith("4455")
             ? "146"
             : ""),
       });
@@ -118,16 +120,16 @@ export function TierCreationModal({
           );
         }
         if (!formData.tierNumber)
-          throw new Error("Le compte tier est obligatoire");
+          throw new Error("Le numero compte est obligatoire");
       } else {
         if (!formData.tierNumber)
-          throw new Error("Le compte tier est obligatoire");
+          throw new Error("Le numero compte est obligatoire");
       }
 
       // Regex Validation
       if (formData.tierNumber && !/^[A-Z0-9-]+$/.test(formData.tierNumber)) {
         throw new Error(
-          "Le compte tier ne doit contenir que des majuscules, chiffres et tirets",
+          "Le numero compte ne doit contenir que des majuscules, chiffres et tirets",
         );
       }
       if (formData.ice && !/^\d{15}$/.test(formData.ice)) {
@@ -217,118 +219,105 @@ export function TierCreationModal({
                 Identité & Configuration
               </h4>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {formData.auxiliaireMode ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Compte Collectif</Label>
-                      <Select
-                        value={formData.collectifAccount}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, collectifAccount: v })
-                        }
-                        disabled={isEditMode}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fournisseurAccounts.map((c) => (
-                            <SelectItem key={c.code} value={c.code}>
-                              {c.code}
-                            </SelectItem>
-                          ))}
-                          {fournisseurAccounts.length === 0 && (
-                            <SelectItem value="441100000">441100000</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Compte Tier</Label>
-                      <Input
-                        value={formData.tierNumber}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            tierNumber: e.target.value
-                              .toUpperCase()
-                              .replace(/[^A-Z0-9-]/g, "")
-                              .slice(0, 31),
-                          })
-                        }
-                        placeholder="ex: FFF-555-555"
-                      />
-                    </div>
-                    <div className="space-y-2 col-span-2">
-                      <Label>Libellé Fournisseur</Label>
-                      <Input
-                        value={formData.libelle}
-                        onChange={(e) =>
-                          setFormData({ ...formData, libelle: e.target.value })
-                        }
-                        placeholder="ex: IAM"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Compte Tier</Label>
-                      <Input
-                        value={formData.tierNumber}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            tierNumber: e.target.value
-                              .toUpperCase()
-                              .replace(/[^A-Z0-9-]/g, "")
-                              .slice(0, 31),
-                          })
-                        }
-                        placeholder="ex: 441100001"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Libellé Fournisseur</Label>
-                      <Input
-                        value={formData.libelle}
-                        onChange={(e) =>
-                          setFormData({ ...formData, libelle: e.target.value })
-                        }
-                        placeholder="ex: IAM"
-                      />
-                    </div>
-                  </>
+              <div className="space-y-4">
+                {formData.auxiliaireMode && (
+                  <div className="space-y-2">
+                    <Label>Compte Collectif</Label>
+                    <Select
+                      value={formData.collectifAccount}
+                      onValueChange={(v) =>
+                        setFormData({ ...formData, collectifAccount: v })
+                      }
+                      disabled={isEditMode}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fournisseurAccounts.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            {c.code}
+                          </SelectItem>
+                        ))}
+                        {fournisseurAccounts.length === 0 && (
+                          <SelectItem value="441100000">441100000</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Numero Compte</Label>
+                    <Input
+                      value={formData.tierNumber}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          tierNumber: e.target.value
+                            .toUpperCase()
+                            .replace(/[^A-Z0-9-]/g, "")
+                            .slice(0, 31),
+                        })
+                      }
+                      placeholder="ex: 441100001"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nom / Libelle</Label>
+                    <Input
+                      value={formData.libelle}
+                      onChange={(e) =>
+                        setFormData({ ...formData, libelle: e.target.value })
+                      }
+                      placeholder="ex: IAM"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>ICE</Label>
+                  <Label>Activite</Label>
                   <Input
-                    value={formData.ice}
+                    value={formData.activity || ""}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        ice: e.target.value.replace(/\D/g, "").slice(0, 15),
-                      })
+                      setFormData({ ...formData, activity: e.target.value })
                     }
-                    placeholder="15 chiffres"
+                    placeholder="ex: Import-Export, BTP, Telecommunications..."
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>IF</Label>
-                  <Input
-                    value={formData.ifNumber}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        ifNumber: e.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 10),
-                      })
-                    }
-                    placeholder="7 à 10 chiffres"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>IF</Label>
+                    <Input
+                      value={formData.ifNumber}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          ifNumber: e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 10),
+                        })
+                      }
+                      placeholder="7 a 10 chiffres"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>ICE</Label>
+                    <Input
+                      value={formData.ice}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          ice: e.target.value.replace(/\D/g, "").slice(0, 15),
+                        })
+                      }
+                      placeholder="15 chiffres"
+                    />
+                  </div>
                 </div>
+
                 <div className="space-y-2">
                   <Label>RC</Label>
                   <Input
@@ -346,7 +335,7 @@ export function TierCreationModal({
               <h4 className="text-sm font-semibold">Configuration Comptable</h4>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Compte Charge (6...)</Label>
+                  <Label>Compte HT</Label>
                   <Select
                     value={formData.defaultChargeAccount}
                     onValueChange={(v) =>
@@ -367,12 +356,12 @@ export function TierCreationModal({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Compte TVA (345/445...)</Label>
+                  <Label>Compte TVA</Label>
                   <Select
                     value={formData.tvaAccount}
                     onValueChange={(v) => {
                       const updates: any = { tvaAccount: v };
-                      if (v.startsWith("345") || v.startsWith("445")) {
+                      if (v.startsWith("3455") || v.startsWith("4455")) {
                         updates.defaultTvaRate = 20;
                         updates.taxCode = "146";
                       }
@@ -398,22 +387,9 @@ export function TierCreationModal({
                   </Select>
                 </div>
 
-                {(formData.tvaAccount?.startsWith("345") ||
-                  formData.tvaAccount?.startsWith("445")) && (
+                {(formData.tvaAccount?.startsWith("3455") ||
+                  formData.tvaAccount?.startsWith("4455")) && (
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] uppercase text-muted-foreground">
-                        Code Taux
-                      </Label>
-                      <Input
-                        value={formData.taxCode}
-                        onChange={(e) =>
-                          setFormData({ ...formData, taxCode: e.target.value })
-                        }
-                        placeholder="146"
-                        className="h-9"
-                      />
-                    </div>
                     <div className="space-y-1">
                       <Label className="text-[10px] uppercase text-muted-foreground">
                         Taux TVA (%)
@@ -434,6 +410,19 @@ export function TierCreationModal({
                           %
                         </span>
                       </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] uppercase text-muted-foreground">
+                        Code Taux
+                      </Label>
+                      <Input
+                        value={formData.taxCode}
+                        onChange={(e) =>
+                          setFormData({ ...formData, taxCode: e.target.value })
+                        }
+                        placeholder="146"
+                        className="h-9"
+                      />
                     </div>
                   </div>
                 )}

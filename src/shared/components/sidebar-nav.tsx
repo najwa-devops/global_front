@@ -44,16 +44,39 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
     setMounted(true)
   }, [])
 
-  // Auto-expand menus based on current path
-  useEffect(() => {
-    items.forEach(item => {
-      if (item.children?.some(child => pathname.startsWith(child.href))) {
-        if (!openMenus.includes(item.id)) {
-          setOpenMenus(prev => [...prev, item.id])
-        }
+  const hasActiveDescendant = (item: NavItemConfig): boolean => {
+    if (!item.children || item.children.length === 0) return false
+    return item.children.some(child => {
+      if (child.href && child.href !== "#" && pathname.startsWith(child.href)) {
+        return true
       }
+      return hasActiveDescendant(child)
     })
-  }, [pathname, items])
+  }
+
+  const collectActiveMenuIds = (item: NavItemConfig, acc: string[]) => {
+    if (!item.children || item.children.length === 0) return
+    if (hasActiveDescendant(item)) {
+      acc.push(item.id)
+    }
+    item.children.forEach(child => collectActiveMenuIds(child, acc))
+  }
+
+  // Auto-expand menus based on current path (supports nested menus)
+  useEffect(() => {
+    const activeIds: string[] = []
+    items.forEach(item => collectActiveMenuIds(item, activeIds))
+    if (activeIds.length === 0) return
+    setOpenMenus(prev => {
+      const newSet = new Set([...prev, ...activeIds])
+      // Only update if actually changed
+      const prevSet = new Set(prev)
+      if (newSet.size === prevSet.size && [...newSet].every(id => prevSet.has(id))) {
+        return prev
+      }
+      return Array.from(newSet)
+    })
+  }, [pathname]) // Removed items from dependencies to prevent infinite loop
 
   const toggleMenu = (id: string) => {
     setOpenMenus(prev =>
@@ -67,13 +90,14 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
     localStorage.removeItem("currentDossierName")
   }
 
-  const renderNavItem = (item: NavItemConfig, isChild = false) => {
-    const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href) && !item.children)
-    const isExpanded = openMenus.includes(item.id)
+  const renderNavItem = (item: NavItemConfig, depth = 0) => {
     const hasChildren = item.children && item.children.length > 0
+    const isActive = pathname === item.href || (item.href !== "/" && item.href !== "#" && pathname.startsWith(item.href) && !hasChildren)
+    const isExpanded = openMenus.includes(item.id)
     const IconComponent = item.icon
 
-    const isParentActive = item.children?.some(child => pathname.startsWith(child.href))
+    const isParentActive = hasActiveDescendant(item)
+    const depthClass = depth === 1 ? "pl-9 text-sm h-9" : depth >= 2 ? "pl-12 text-sm h-8" : ""
 
     return (
       <div key={item.id} className="w-full">
@@ -82,7 +106,7 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
           className={cn(
             "w-full justify-start gap-3 transition-all duration-200",
             !isMobile && collapsed && "justify-center px-2",
-            isChild && "pl-9 text-sm h-9",
+            depthClass,
             isActive || (isParentActive && !isExpanded)
               ? "bg-primary/10 text-primary font-medium"
               : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
@@ -122,7 +146,7 @@ export function SidebarNav({ pendingCount = 0, onLogout }: SidebarNavProps) {
 
         {hasChildren && isExpanded && (isMobile || !collapsed) && (
           <div className="mt-1 flex flex-col gap-1 border-l ml-5 border-border/50">
-            {item.children?.map(child => renderNavItem(child, true))}
+            {item.children?.map(child => renderNavItem(child, depth + 1))}
           </div>
         )}
       </div>

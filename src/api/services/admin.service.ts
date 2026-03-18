@@ -165,6 +165,8 @@ export class AdminService {
         comptableId: number;
         fournisseurName?: string;
         fournisseurPassword?: string;
+        exerciseStartDate?: string;
+        exerciseEndDate?: string;
     }): Promise<Record<string, unknown>> {
         const displayName = payload.fournisseurName || payload.fournisseurEmail.split("@")[0] || payload.fournisseurEmail;
         const response = await apiClient.post<Record<string, unknown>>("/api/dossiers", {
@@ -173,6 +175,8 @@ export class AdminService {
             clientDisplayName: displayName,
             clientPassword: payload.fournisseurPassword || "ChangeMe123!",
             comptableId: payload.comptableId,
+            exerciseStartDate: payload.exerciseStartDate,
+            exerciseEndDate: payload.exerciseEndDate,
         });
 
         userCache = null;

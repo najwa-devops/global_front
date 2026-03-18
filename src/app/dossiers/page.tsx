@@ -60,6 +60,8 @@ function mapBackendDossier(raw: any): Dossier {
         ? "inactive"
         : "active",
     createdAt: raw.createdAt ?? new Date().toISOString(),
+    exerciseStartDate: raw.exerciseStartDate ?? undefined,
+    exerciseEndDate: raw.exerciseEndDate ?? undefined,
   };
 }
 
@@ -106,6 +108,8 @@ function DossiersPageContent() {
         fournisseurEmail: req.fournisseurEmail,
         comptableId: adminComptableId,
         password: req.fournisseurPassword,
+        exerciseStartDate: req.exerciseStartDate,
+        exerciseEndDate: req.exerciseEndDate,
       });
       const createdDossierId = Number(created?.dossier?.id);
       if (Number.isFinite(createdDossierId) && createdDossierId > 0) {

@@ -30,6 +30,8 @@ import {
   AlertTriangle,
   RefreshCw,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
   ZoomIn,
   ZoomOut,
@@ -76,6 +78,7 @@ import { TierCreationModal } from "@/components/tier-creation-modal";
 import { TierSelectionModal } from "@/components/tier-selection-modal";
 import { CreateTemplateModal } from "@/components/create-template-modal";
 import { DynamicTemplateWizard } from "@/components/dynamic-template-wizard";
+import { useAuth } from "@/hooks/use-auth";
 
 // CSS pour react-pdf
 import "react-pdf/dist/Page/TextLayer.css";
@@ -103,6 +106,17 @@ interface OcrProcessingPageProps {
   onValidateInvoice?: (id: number) => Promise<any>;
   // When true, renders all fields dynamically instead of the hardcoded achat grid
   useDynamicFieldLayout?: boolean;
+  // Navigation entre factures
+  canGoPrevious?: boolean;
+  canGoNext?: boolean;
+  onGoPrevious?: () => void;
+  onGoNext?: () => void;
+  currentIndex?: number;
+  totalInvoices?: number;
+  isNavigating?: boolean;
+  // Dates d'exercice du dossier (ISO string)
+  exerciseStartDate?: string;
+  exerciseEndDate?: string;
 }
 
 interface SelectionBox {
@@ -128,7 +142,18 @@ export function OcrProcessingPage({
   onUpdateFields,
   onValidateInvoice,
   useDynamicFieldLayout = false,
+  canGoPrevious = false,
+  canGoNext = false,
+  onGoPrevious,
+  onGoNext,
+  currentIndex = -1,
+  totalInvoices = 0,
+  isNavigating = false,
+  exerciseStartDate,
+  exerciseEndDate,
 }: OcrProcessingPageProps) {
+  const { isClient } = useAuth();
+  const isClientUser = isClient();
   const parseTvaValues = (raw: unknown): string[] => {
     if (Array.isArray(raw)) {
       return raw.map((v: unknown) => String(v).trim()).filter(Boolean);
@@ -137,6 +162,39 @@ export function OcrProcessingPage({
       .split("|")
       .map((v) => v.trim())
       .filter(Boolean);
+  };
+
+  const normalizeInvoiceDate = (raw: string): string => {
+    const cleaned = raw.trim();
+    if (!cleaned) return "";
+
+    if (/^\d{4}[\/\-.]\d{2}[\/\-.]\d{2}$/.test(cleaned)) {
+      const [yyyy, mm, dd] = cleaned.split(/[\/\-.]/);
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    if (/^\d{2}[\/\-.]\d{2}[\/\-.]\d{2,4}$/.test(cleaned)) {
+      const [dd, mm, yy] = cleaned.split(/[\/\-.]/);
+      const yyyy = yy.length === 2 ? `20${yy}` : yy;
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    return cleaned;
+  };
+
+  const extractInvoiceDateFromText = (text: string): string | null => {
+    const normalizedText = text.replace(/\s+/g, " ");
+    const labeledRegex =
+      /\bDate\s*[:\-]?\s*(\d{2}[\/\-.]\d{2}[\/\-.]\d{2,4}|\d{4}[\/\-.]\d{2}[\/\-.]\d{2})/i;
+    const labeledMatch = normalizedText.match(labeledRegex);
+    if (labeledMatch?.[1]) return normalizeInvoiceDate(labeledMatch[1]);
+
+    const genericRegex =
+      /(\d{2}[\/\-.]\d{2}[\/\-.]\d{4}|\d{4}[\/\-.]\d{2}[\/\-.]\d{2})/;
+    const genericMatch = normalizedText.match(genericRegex);
+    if (genericMatch?.[1]) return normalizeInvoiceDate(genericMatch[1]);
+
+    return null;
   };
 
   const upsertSecondaryTvaField = (
@@ -238,6 +296,16 @@ export function OcrProcessingPage({
     FIELD_ALIAS_GROUPS.find((group) => group.includes(key)) || [key];
   const isFieldAutoFilled = (key: string): boolean =>
     getLinkedPartyKeys(key).some((k) => autoFilledFields?.includes(k));
+  const isAuthzError = (error: any): boolean => {
+    const status = Number(error?.status);
+    const message = String(error?.message || "").toLowerCase();
+    return (
+      status === 401 ||
+      status === 403 ||
+      message.includes("forbidden") ||
+      message.includes("unauthorized")
+    );
+  };
 
   const renderedDynamicFields = useMemo(() => {
     if (!useDynamicFieldLayout) return fields;
@@ -291,6 +359,8 @@ export function OcrProcessingPage({
   const [isProcessingOcr, setIsProcessingOcr] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [isAccounting, setIsAccounting] = useState(false);
+  const [isRebuildingJournal, setIsRebuildingJournal] = useState(false);
   const [isSelectingPosition, setIsSelectingPosition] = useState<string | null>(
     null,
   );
@@ -344,6 +414,8 @@ export function OcrProcessingPage({
   );
   const [hasShownTierToast, setHasShownTierToast] = useState(false);
   const [focusedFieldKey, setFocusedFieldKey] = useState<string | null>(null);
+  const [activityManuallyEdited, setActivityManuallyEdited] =
+    useState<boolean>(false);
   const [isTierModalOpen, setIsTierModalOpen] = useState(false);
   const [isTierSelectionModalOpen, setIsTierSelectionModalOpen] =
     useState(false);
@@ -450,32 +522,56 @@ export function OcrProcessingPage({
           const accounts = await api.getAccounts(true);
           setTvaAccounts(
             accounts.filter(
-              (a) => a.code.startsWith("345") || a.code.startsWith("445"),
+              (a) => a.code.startsWith("3455") || a.code.startsWith("4455"),
             ),
           );
         }
         setFournisseurAccounts(fournisseurs);
       } catch (error) {
-        try {
-          const [charges, fournisseurs, accounts] = await Promise.all([
-            api.getChargeAccounts(),
-            api.getFournisseurAccounts(),
-            api.getAccounts(true),
-          ]);
-          setChargeAccounts(charges);
-          setFournisseurAccounts(fournisseurs);
+        const [chargesRes, fournisseursRes, accountsRes] = await Promise.allSettled([
+          api.getChargeAccounts(),
+          api.getFournisseurAccounts(),
+          api.getAccounts(true),
+        ]);
+
+        let hasAnyData = false;
+
+        if (chargesRes.status === "fulfilled") {
+          setChargeAccounts(chargesRes.value);
+          hasAnyData = true;
+        }
+        if (fournisseursRes.status === "fulfilled") {
+          setFournisseurAccounts(fournisseursRes.value);
+          hasAnyData = true;
+        }
+        if (accountsRes.status === "fulfilled") {
           setTvaAccounts(
-            accounts.filter(
-              (a) => a.code.startsWith("345") || a.code.startsWith("445"),
+            accountsRes.value.filter(
+              (a) => a.code.startsWith("3455") || a.code.startsWith("4455"),
             ),
           );
-        } catch (fallbackError) {
+          hasAnyData = true;
+        }
+
+        if (!hasAnyData) {
+          const fallbackError =
+            chargesRes.status === "rejected"
+              ? chargesRes.reason
+              : fournisseursRes.status === "rejected"
+                ? fournisseursRes.reason
+                : accountsRes.status === "rejected"
+                  ? accountsRes.reason
+                  : error;
+
           console.error(
             "Erreur lors du chargement des comptes:",
             error,
             fallbackError,
           );
-          toast.error("Impossible de charger le plan comptable");
+
+          if (!isAuthzError(error) && !isAuthzError(fallbackError)) {
+            toast.error("Impossible de charger le plan comptable");
+          }
         }
       } finally {
         setIsLoadingAccounts(false);
@@ -683,6 +779,22 @@ export function OcrProcessingPage({
     setFields(syncDetectedTvaFields(invoice.fields, tvaValues));
   }, [invoice.id, invoice.fieldsData?.tvaValues]);
 
+  useEffect(() => {
+    const invoiceDateField = fields.find((f) => f.key === "invoiceDate");
+    const currentDate = String(invoiceDateField?.value || "").trim();
+    if (currentDate) return;
+
+    const sourceText = [headerText, extractedText, footerText]
+      .filter(Boolean)
+      .join("\n");
+    if (!sourceText) return;
+
+    const extractedDate = extractInvoiceDateFromText(sourceText);
+    if (extractedDate) {
+      updateFieldValue("invoiceDate", extractedDate);
+    }
+  }, [fields, headerText, extractedText, footerText]);
+
   const handleOcrExtract = async (forcedTemplateId?: number) => {
     setIsProcessingOcr(true);
     setStatus("processing");
@@ -889,7 +1001,11 @@ export function OcrProcessingPage({
     }
   };
 
-  const updateFieldValue = (key: string, value: string | number) => {
+  const updateFieldValue = (
+    key: string,
+    value: string | number,
+    options?: { manual?: boolean },
+  ) => {
     const valueStr = String(value);
     const linkedKeys = getLinkedPartyKeys(key);
     setFields((prev) =>
@@ -899,6 +1015,9 @@ export function OcrProcessingPage({
     );
     setPendingFields((prev) => prev.filter((f) => !linkedKeys.includes(f)));
     setWarnings((prev) => prev.filter((w) => !linkedKeys.includes(w.field)));
+    if (key === "activity" && options?.manual !== false) {
+      setActivityManuallyEdited(true);
+    }
   };
 
   const updateTierField = (key: keyof Tier, value: string) => {
@@ -983,6 +1102,15 @@ export function OcrProcessingPage({
             updateFieldValue("tvaAccount", foundTier.tvaAccount);
           if (foundTier.defaultTvaRate)
             updateFieldValue("tvaRate", foundTier.defaultTvaRate);
+          // Activité : depuis le tier, ou à défaut le libellé du compte HT
+          const activityValue =
+            foundTier.activity ||
+            chargeAccounts.find(
+              (a) => a.code === foundTier.defaultChargeAccount,
+            )?.libelle ||
+            "";
+          if (activityValue)
+            updateFieldValue("activity", activityValue, { manual: false });
         } else {
           setIsExistingSupplier(false);
           // Mark as tried to avoid spamming 404s
@@ -1000,6 +1128,29 @@ export function OcrProcessingPage({
 
     checkExistingSupplier();
   }, [fields, tier]);
+
+  useEffect(() => {
+    const activityValue = String(
+      fields.find((f) => f.key === "activity")?.value || "",
+    ).trim();
+    if (activityValue || activityManuallyEdited) return;
+
+    const chargeAccountValue = String(
+      fields.find((f) => f.key === "chargeAccount")?.value || "",
+    ).trim();
+    if (!chargeAccountValue) return;
+
+    const chargeAccountLabel = chargeAccounts.find(
+      (account) => account.code === chargeAccountValue,
+    )?.libelle;
+    if (!chargeAccountLabel) return;
+
+    updateFieldValue("activity", chargeAccountLabel, { manual: false });
+  }, [fields, chargeAccounts, activityManuallyEdited]);
+
+  useEffect(() => {
+    setActivityManuallyEdited(false);
+  }, [invoice.id]);
 
   // NOUVEAU: Synchronisation de la sélection native avec le champ actif
   // Simplified to only handle "PASSIVE" focus updates (when checking fields)
@@ -1072,7 +1223,45 @@ export function OcrProcessingPage({
 
   // Manual extraction features removed as they are not supported by the new backend controllers
 
+  // Vérifie si la date de facture est dans la période d'exercice du dossier
+  const checkExerciseDate = (): boolean => {
+    if (!exerciseStartDate && !exerciseEndDate) return true;
+    const invoiceDateField = fields.find((f) => f.key === "invoiceDate");
+    if (!invoiceDateField?.value) return true;
+    // Parsing DD/MM/YYYY
+    const parts = String(invoiceDateField.value).split("/");
+    if (parts.length !== 3) return true;
+    const invoiceDate = new Date(
+      Number(parts[2]),
+      Number(parts[1]) - 1,
+      Number(parts[0])
+    );
+    if (isNaN(invoiceDate.getTime())) return true;
+    if (exerciseStartDate) {
+      const start = new Date(exerciseStartDate);
+      if (invoiceDate < start) {
+        toast.warning(
+          `Attention : la date de la facture (${invoiceDateField.value}) est antérieure au début de l'exercice (${start.toLocaleDateString("fr-FR")}). La facture ne correspond pas à l'exercice du dossier.`,
+          { duration: 6000 }
+        );
+        return false;
+      }
+    }
+    if (exerciseEndDate) {
+      const end = new Date(exerciseEndDate);
+      if (invoiceDate > end) {
+        toast.warning(
+          `Attention : la date de la facture (${invoiceDateField.value}) est postérieure à la fin de l'exercice (${end.toLocaleDateString("fr-FR")}). La facture ne correspond pas à l'exercice du dossier.`,
+          { duration: 6000 }
+        );
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSave = async () => {
+    checkExerciseDate();
     setIsSaving(true);
 
     try {
@@ -1172,6 +1361,59 @@ export function OcrProcessingPage({
       toast.error(`Erreur lors de la validation: ${errorMessage}`);
     } finally {
       setIsValidating(false);
+    }
+  };
+
+  const handleSaveAndAccount = async () => {
+    checkExerciseDate();
+    setIsAccounting(true);
+    try {
+      // 1. Enregistrer d'abord
+      const fieldsForBackend: Record<string, string> = {};
+      fields.forEach((field) => {
+        fieldsForBackend[field.key] = String(field.value || "");
+      });
+      if (!isDemoMode) {
+        const updateFn = onUpdateFields ?? api.updateDynamicInvoiceFields;
+        await updateFn(invoice.id, fieldsForBackend);
+      }
+      // 2. Comptabiliser ensuite
+      if (!isDemoMode) {
+        const result = await api.accountInvoice(invoice.id);
+        toast.success(result?.message || "Facture enregistrée et comptabilisée avec succès");
+      } else {
+        toast.success("Facture enregistrée et comptabilisée (Mode Démo)");
+      }
+      setStatus("accounted");
+      const updatedInvoice: DynamicInvoice = { ...invoice, status: "accounted" };
+      onSave(updatedInvoice);
+    } catch (err: any) {
+      const message =
+        err?.message === "missing_accounting_data"
+          ? "Données comptables manquantes. Veuillez configurer les comptes du fournisseur."
+          : err?.message || "Erreur lors de l'enregistrement/comptabilisation";
+      toast.error(message);
+    } finally {
+      setIsAccounting(false);
+    }
+  };
+
+  const handleRebuildJournal = async () => {
+    if (isRebuildingJournal) return;
+    setIsRebuildingJournal(true);
+    const toastId = toast.loading("Reconstruction du journal...");
+    try {
+      await api.rebuildAccountingEntries(invoice.id);
+      toast.success(
+        "Écritures comptables reconstruites. Rafraîchissez le journal.",
+        { id: toastId },
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de la reconstruction", {
+        id: toastId,
+      });
+    } finally {
+      setIsRebuildingJournal(false);
     }
   };
 
@@ -1396,11 +1638,6 @@ export function OcrProcessingPage({
             </Badge>
           )}
 
-          {/* Label descriptif */}
-          <p className="text-xs text-muted-foreground font-medium">
-            Valeur extraite
-          </p>
-
           {/* Input / Badge */}
           {isAvoirField ? (
             <Badge
@@ -1561,46 +1798,38 @@ export function OcrProcessingPage({
         </div>
         <div className="flex items-center gap-3">
           {/* Bouton Reprocesser OCR */}
-          <Button
-            variant="outline"
-            className="gap-2 bg-transparent"
-            onClick={() => handleOcrExtract()}
-            disabled={isProcessingOcr}
-          >
-            {isProcessingOcr ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Analyse...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                Reprocesser OCR
-              </>
-            )}
-          </Button>
+          {!isClientUser && (
+            <Button
+              variant="outline"
+              className="gap-2 bg-transparent"
+              onClick={() => handleOcrExtract()}
+              disabled={isProcessingOcr}
+            >
+              {isProcessingOcr ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Analyse...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Reprocesser OCR
+                </>
+              )}
+            </Button>
+          )}
 
           {/* Bouton Enregistrer */}
           <Button
             variant="outline"
             className="gap-2 bg-transparent"
-            onClick={() => {
-              const updatedInvoice: DynamicInvoice = {
-                ...invoice,
-                fields: allFields,
-                status,
-                pendingFields,
-                missingFields,
-              };
-              onSave(updatedInvoice);
-              toast.success("Facture enregistrée");
-            }}
-            disabled={isSaving}
+            onClick={handleSave}
+            disabled={isSaving || isAccounting || status === "accounted"}
           >
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Enregistrement...
+                Sauvegarde...
               </>
             ) : (
               <>
@@ -1610,37 +1839,31 @@ export function OcrProcessingPage({
             )}
           </Button>
 
-          {/* Bouton Valider */}
-          <Button
-            className="gap-2"
-            onClick={() => {
-              setIsValidating(true);
-              const updatedInvoice: DynamicInvoice = {
-                ...invoice,
-                fields: allFields,
-                status: "validated",
-                pendingFields: [],
-                missingFields: [],
-              };
-              onSave(updatedInvoice);
-              setStatus("validated");
-              setIsValidating(false);
-              toast.success("Facture validée avec succès");
-            }}
-            disabled={isValidating || status === "validated"}
-          >
-            {isValidating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Validation...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-4 w-4" />
-                Valider
-              </>
-            )}
-          </Button>
+          {/* Bouton Enregistrer/Comptabiliser */}
+          {!isClientUser && (
+            <Button
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleSaveAndAccount}
+              disabled={isSaving || isAccounting || status === "accounted"}
+            >
+              {isSaving || isAccounting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  En cours...
+                </>
+              ) : status === "accounted" ? (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  Comptabilisée
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  Enregistrer/Comptabiliser
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1837,7 +2060,7 @@ export function OcrProcessingPage({
                     disabled={pageNumber === 1}
                     className="pointer-events-auto"
                   >
-                    Précédent
+                    Page Précédente
                   </Button>
                   <span className="text-sm font-medium">
                     Page {pageNumber} / {numPages}
@@ -1851,16 +2074,58 @@ export function OcrProcessingPage({
                     disabled={pageNumber === numPages}
                     className="pointer-events-auto"
                   >
-                    Suivant
+                    Page Suivante
                   </Button>
                 </div>
               )}
+
+              {/* Navigation entre factures - Boutons Précédent / Suivant */}
+              <div className="flex items-center justify-between gap-3 mt-6 pt-6 border-t border-muted">
+                <Button
+                  variant="outline"
+                  onClick={onGoPrevious}
+                  disabled={!canGoPrevious || isNavigating}
+                  className="gap-2 min-w-[140px]"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  {isNavigating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Facture Précédente"
+                  )}
+                </Button>
+
+                <div className="flex flex-col items-center">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Facture
+                  </span>
+                  <span className="text-lg font-bold text-primary">
+                    {totalInvoices > 0 ? `${currentIndex + 1} / ${totalInvoices}` : "—"}
+                  </span>
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={onGoNext}
+                  disabled={!canGoNext || isNavigating}
+                  className="gap-2 min-w-[140px]"
+                >
+                  {isNavigating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      Facture Suivante
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Extraction Form */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Warnings */}
           {warnings.length > 0 && (
             <Card className="border-amber-500/50 bg-amber-500/10">
@@ -2007,14 +2272,6 @@ export function OcrProcessingPage({
 
           {/* Main Form */}
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">
-                  Formulaire d'extraction
-                </CardTitle>
-                <div className="flex items-center gap-2"></div>
-              </div>
-            </CardHeader>
             <CardContent className="p-6">
               {/* Grid Layout - 2 colonnes */}
               <div className="grid grid-cols-2 gap-4">
@@ -2026,13 +2283,17 @@ export function OcrProcessingPage({
                   <>
                     {/* Ligne 1: Date | N° Facture */}
                     {renderFieldCard(
-                      fields.find((f) => f.key === "invoiceDate") || fields[1],
+                      fields.find((f) => f.key === "invoiceDate" || f.key === "date") ||
+                      fields.find((f) => f.label?.toLowerCase().includes("date")) ||
+                      fields[1]
                     )}
                     {renderFieldCard(
-                      fields.find((f) => f.key === "invoiceNumber") || fields[0],
+                      fields.find((f) => f.key === "invoiceNumber" || f.key === "number" || f.key === "factureNumber") ||
+                      fields.find((f) => f.label?.toLowerCase().includes("facture") || f.label?.toLowerCase().includes("n°")) ||
+                      fields[0]
                     )}
 
-                    {/* Ligne 2: Fournisseur | Compte Tiers */}
+                    {/* Ligne 2: Fournisseur | Numero Compte */}
                     {renderFieldCard(
                       fields.find((f) => f.key === "supplier") || {
                         ...fields[2],
@@ -2042,11 +2303,23 @@ export function OcrProcessingPage({
                     )}
                     {renderAccountFieldCard(
                       "tierNumber",
-                      "Compte Tiers",
+                      "Numero Compte",
                       "tierNumber",
                     )}
 
-                    {/* Ligne 3: Montant HT | Compte HT */}
+                    {/* Ligne 3: Activité (pleine largeur) */}
+                    <div className="col-span-2">
+                      {renderFieldCard(
+                        fields.find((f) => f.key === "activity") || {
+                          key: "activity",
+                          label: "Activité",
+                          value: "",
+                          type: "text",
+                        },
+                      )}
+                    </div>
+
+                    {/* Ligne 4: Montant HT | Compte HT */}
                     {renderFieldCard(
                       fields.find((f) => f.key === "amountHT") || fields[3],
                     )}
@@ -2056,7 +2329,7 @@ export function OcrProcessingPage({
                       "defaultChargeAccount",
                     )}
 
-                    {/* Ligne 4: TVA | Compte TVA */}
+                    {/* Ligne 5: TVA | Compte TVA */}
                     {renderFieldCard(
                       fields.find((f) => f.key === "tva") || fields[4],
                     )}
@@ -2065,14 +2338,23 @@ export function OcrProcessingPage({
                       "Compte TVA",
                       "tvaAccount",
                     )}
-                    {fields.find((f) => f.key === "tva2")
-                      ? renderFieldCard(
+
+                    {/* Ligne 5b: TVA 2 | Compte TVA (si deux TVA) */}
+                    {fields.find((f) => f.key === "tva2") && (
+                      <>
+                        {renderFieldCard(
                           fields.find((f) => f.key === "tva2"),
                           true,
-                        )
-                      : null}
+                        )}
+                        {renderAccountFieldCard(
+                          "tvaAccount",
+                          "Compte TVA",
+                          "tvaAccount",
+                        )}
+                      </>
+                    )}
 
-                    {/* Ligne 5: Montant TTC | ICE */}
+                    {/* Ligne 6: TTC | ICE */}
                     {renderFieldCard(
                       fields.find((f) => f.key === "amountTTC") || fields[5],
                     )}
@@ -2080,7 +2362,7 @@ export function OcrProcessingPage({
                       fields.find((f) => f.key === "ice") || fields[7],
                     )}
 
-                    {/* Ligne 6: RC | IF */}
+                    {/* Ligne 7: RC | IF */}
                     {renderFieldCard(
                       fields.find((f) => f.key === "rcNumber") || fields[8],
                     )}
@@ -2170,12 +2452,12 @@ export function OcrProcessingPage({
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            {/* BOUTON ENREGISTRER (toujours disponible sauf si validé) */}
+            {/* BOUTON ENREGISTRER */}
             <Button
               variant="outline"
               className="flex-1 gap-2 bg-transparent"
               onClick={handleSave}
-              disabled={isSaving || isValidated}
+              disabled={isSaving || isAccounting || status === "accounted"}
             >
               {isSaving ? (
                 <>
@@ -2190,52 +2472,55 @@ export function OcrProcessingPage({
               )}
             </Button>
 
-            {/*  BOUTON VALIDER (disponible uniquement si READY_TO_VALIDATE) */}
-            <Button
-              className="flex-1 gap-2"
-              onClick={handleValidate}
-              disabled={
-                isValidating ||
-                isValidated ||
-                status === "pending" ||
-                status === "processing" ||
-                status === "treated" // Pas encore enregistré
-              }
-            >
-              {isValidating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Validation...
-                </>
-              ) : isValidated ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Validée
-                </>
-              ) : status === "ready_to_validate" ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Valider
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Enregistrer d'abord
-                </>
-              )}
-            </Button>
-          </div>
-          {status === "treated" && (
-            <p className="text-sm text-muted-foreground text-center">
-              Enregistrez les données avant de pouvoir valider
-            </p>
-          )}
+            {/* BOUTON ENREGISTRER/COMPTABILISER */}
+            {!isClientUser && (
+              <Button
+                className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={handleSaveAndAccount}
+                disabled={isSaving || isAccounting || status === "accounted"}
+              >
+                {isSaving || isAccounting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    En cours...
+                  </>
+                ) : status === "accounted" ? (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    Comptabilisée
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    Enregistrer/Comptabiliser
+                  </>
+                )}
+              </Button>
+            )}
 
-          {status === "ready_to_validate" && !isValidated && (
-            <p className="text-sm text-emerald-600 text-center">
-              Facture prête à être validée
-            </p>
-          )}
+            {/* BOUTON REBUILD - Pour reconstruire les écritures (multi-TVA) */}
+            {status === "accounted" && (
+              <Button
+                variant="outline"
+                className="gap-2 border-amber-600 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-400 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                onClick={handleRebuildJournal}
+                disabled={isRebuildingJournal}
+                title="Reconstruire les écritures comptables (utile pour multi-TVA)"
+              >
+                {isRebuildingJournal ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Rebuild...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Rebuild
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

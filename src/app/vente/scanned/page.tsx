@@ -32,6 +32,10 @@ export default function VenteScannedPage() {
   });
   const router = useRouter();
   const { user } = useAuth();
+  const isAccountingRole =
+    user?.role === "ADMIN" ||
+    user?.role === "COMPTABLE" ||
+    user?.role === "SUPER_ADMIN";
 
   useEffect(() => {
     if (user?.role === "CLIENT" || user?.role === "FOURNISSEUR") {
@@ -156,6 +160,18 @@ export default function VenteScannedPage() {
     }
   };
 
+  const handleAccountInvoice = async (invoice: DynamicInvoice) => {
+    try {
+      const result = await api.accountSalesInvoice(invoice.id);
+      setInvoices((prev) => prev.filter((inv) => inv.id !== invoice.id));
+      toast.success(
+        result?.status ? "Facture comptabilisée" : "Comptabilisation effectuée",
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de la comptabilisation");
+    }
+  };
+
   const handleDeleteInvoice = async (invoiceId: number) => {
     try {
       await api.deleteSalesInvoice(invoiceId);
@@ -214,7 +230,8 @@ export default function VenteScannedPage() {
         onProcessInline={handleProcessInline}
         onDelete={handleDeleteInvoice}
         onConfirm={handleConfirmInvoice}
-        onFinalValidate={handleFinalValidate}
+        onFinalValidate={isAccountingRole ? undefined : handleFinalValidate}
+        onAccount={isAccountingRole ? handleAccountInvoice : undefined}
         userRole={user?.role}
       />
 

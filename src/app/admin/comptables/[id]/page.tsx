@@ -69,6 +69,8 @@ function ComptableDossiersContent() {
                 comptableId,
                 fournisseurName: req.fournisseurName,
                 fournisseurPassword: req.fournisseurPassword,
+                exerciseStartDate: req.exerciseStartDate,
+                exerciseEndDate: req.exerciseEndDate,
             })
             const createdData = created as { id?: unknown; dossier?: { id?: unknown } }
             const createdDossierId = Number(createdData?.id ?? createdData?.dossier?.id)

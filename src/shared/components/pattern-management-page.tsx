@@ -78,9 +78,11 @@ const DEMO_PATTERNS: FieldPattern[] = [
   {
     id: 4,
     fieldName: "invoiceDate",
-    patternRegex: "(\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{4})",
+    patternRegex:
+      "(\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{2,4}|\\d{4}[/\\-.]\\d{2}[/\\-.]\\d{2})",
     priority: 2,
-    description: "Detecte les dates au format DD/MM/YYYY",
+    description:
+      "Detecte les dates (DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD)",
     active: true,
     createdAt: "2026-01-03T00:00:00Z",
   },

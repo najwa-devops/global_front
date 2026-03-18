@@ -144,6 +144,7 @@ export interface UpdateAccountRequest {
 export interface Tier {
     id: number;
     libelle: string;
+    activity?: string;
     auxiliaireMode: boolean;
     tierNumber: string;
     collectifAccount?: string;
@@ -164,6 +165,7 @@ export interface Tier {
 
 export interface CreateTierRequest {
     libelle: string;
+    activity?: string;
     auxiliaireMode: boolean;
     tierNumber: string;
     collectifAccount?: string;
@@ -178,6 +180,7 @@ export interface CreateTierRequest {
 
 export interface UpdateTierRequest {
     libelle?: string;
+    activity?: string;
     tierNumber?: string;
     collectifAccount?: string;
     ifNumber?: string;

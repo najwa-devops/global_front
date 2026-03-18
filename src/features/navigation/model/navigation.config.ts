@@ -13,7 +13,8 @@ import {
     Sparkles,
     ChevronLeft,
     Clock,
-    BookOpenCheck
+    BookOpenCheck,
+    ReceiptText
 } from "lucide-react";
 import { UserRole } from "@/src/types";
 
@@ -41,7 +42,6 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
                 { id: "upload", href: "/achat/upload", label: "Nouveau dÃ©pÃ´t", icon: Upload },
                 { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
                 { id: "invoices", href: "/achat/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
-                { id: "validated", href: "/achat/validated", label: "Factures validÃ©es", icon: CheckCircle2 },
                 { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisÃ©es", icon: BookOpenCheck },
                 { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
             ]
@@ -52,9 +52,19 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "RelevÃ©s bancaires",
             icon: Building2,
             children: [
-                { id: "bank-upload", href: "/bank/upload", label: "Importer relevÃ©", icon: Upload },
-                { id: "bank-list", href: "/bank/list", label: "Liste des relevÃ©s", icon: List },
-                { id: "bank-validated", href: "/bank/validated", label: "RelevÃ©s validÃ©s", icon: CheckCircle2 },
+                {
+                    id: "bank-statements",
+                    href: "#",
+                    label: "RelevÃ©s",
+                    icon: List,
+                    children: [
+                        { id: "bank-upload", href: "/bank/upload", label: "Importer relevÃ©", icon: Upload },
+                        { id: "bank-list", href: "/bank/list", label: "Liste des relevÃ©s", icon: List },
+                        { id: "bank-validated", href: "/bank/validated", label: "RelevÃ©s validÃ©s", icon: CheckCircle2 },
+                        { id: "bank-accounted", href: "/bank/accounted", label: "RelevÃ©s comptabilisÃ©s", icon: BookOpenCheck },
+                    ]
+                },
+                { id: "bank-centre-monetique", href: "/centre-monetique", label: "Centre MonÃ©tique", icon: ReceiptText },
             ]
         },
         {
@@ -92,7 +102,6 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
                 { id: "upload", href: "/achat/upload", label: "Nouveau dépôt", icon: Upload },
                 { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
                 { id: "invoices", href: "/achat/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
-                { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2 },
                 { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck },
                 { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
             ]
@@ -103,9 +112,19 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Relevés bancaires",
             icon: Building2,
             children: [
-                { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload },
-                { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List },
-                { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2 },
+                {
+                    id: "bank-statements",
+                    href: "#",
+                    label: "Relevés",
+                    icon: List,
+                    children: [
+                        { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload },
+                        { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List },
+                        { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2 },
+                        { id: "bank-accounted", href: "/bank/accounted", label: "Relevés comptabilisés", icon: BookOpenCheck },
+                    ]
+                },
+                { id: "bank-centre-monetique", href: "/centre-monetique", label: "Centre Monétique", icon: ReceiptText },
             ]
         },
         {
@@ -143,7 +162,6 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
                 { id: "upload", href: "/achat/upload", label: "Nouveau dépôt", icon: Upload },
                 { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, badgeKey: "pendingCount" },
                 { id: "invoices", href: "/achat/invoices", label: "Factures en traitement", icon: FileText, badgeKey: "pendingCount" },
-                { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2 },
                 { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck },
                 { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck },
             ]
@@ -154,9 +172,19 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
             label: "Relevés bancaires",
             icon: Building2,
             children: [
-                { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload },
-                { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List },
-                { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2 },
+                {
+                    id: "bank-statements",
+                    href: "#",
+                    label: "Relevés",
+                    icon: List,
+                    children: [
+                        { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload },
+                        { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List },
+                        { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2 },
+                        { id: "bank-accounted", href: "/bank/accounted", label: "Relevés comptabilisés", icon: BookOpenCheck },
+                    ]
+                },
+                { id: "bank-centre-monetique", href: "/centre-monetique", label: "Centre Monétique", icon: ReceiptText },
             ]
         },
         {
@@ -217,8 +245,8 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
             { id: "upload", href: "/achat/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "client-pending", href: "/achat/client-pending", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "invoices", href: "/achat/invoices", label: "Factures scannées", icon: FileText, badgeKey: "pendingCount", roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "validated", href: "/achat/validated", label: "Factures validées", icon: CheckCircle2, roles: ["CLIENT"] },
+            { id: "accounted", href: "/achat/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "comptability", href: "/comptability", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
         ]
     },
@@ -232,8 +260,8 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
             { id: "vente-upload", href: "/vente/upload", label: "Nouveau dépôt", icon: Upload, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "vente-pending", href: "/vente/invoices", label: "Factures en attente", icon: Clock, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "vente-invoices", href: "/vente/scanned", label: "Factures scannées", icon: FileText, roles: ["COMPTABLE", "ADMIN"] },
-            { id: "vente-validated", href: "/vente/validated", label: "Factures validées", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
-            { id: "vente-accounted", href: "/vente/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
+            { id: "vente-validated", href: "/vente/validated", label: "Factures validées", icon: CheckCircle2, roles: ["CLIENT"] },
+            { id: "vente-accounted", href: "/vente/accounted", label: "Factures comptabilisées", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN", "CLIENT"] },
             { id: "vente-journal", href: "/vente/journal", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN"] },
         ]
     },
@@ -242,12 +270,22 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
         href: "#",
         label: "Banque",
         icon: Building2,
-        roles: ["COMPTABLE", "ADMIN"],
+        roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"],
         children: [
-            { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload, roles: ["COMPTABLE", "ADMIN"] },
-            { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List, roles: ["COMPTABLE", "ADMIN"] },
-            { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN"] },
-             { id: "bank-accounted", href: "/bank/accounted", label: "Relevés comptabilisés", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN"] },
+            {
+                id: "bank-statements",
+                href: "#",
+                label: "Relevés",
+                icon: List,
+                roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"],
+                children: [
+                    { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"] },
+                    { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"] },
+                    { id: "bank-validated", href: "/bank/validated", label: "Relevés validés", icon: CheckCircle2, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"] },
+                    { id: "bank-accounted", href: "/bank/accounted", label: "Relevés comptabilisés", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"] },
+                ]
+            },
+            { id: "bank-centre-monetique", href: "/centre-monetique", label: "Centre Monétique", icon: ReceiptText, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"] },
         ]
     },
     {
@@ -277,6 +315,8 @@ export const ROUTE_METADATA: Record<string, { title: string; breadcrumb?: string
     "/bank/list": { title: "Relevés Bancaires", breadcrumb: "Banque" },
     "/bank/upload": { title: "Importer un relevé", breadcrumb: "Import" },
     "/bank/validated": { title: "Relevés validés", breadcrumb: "Validés" },
+    "/bank/accounted": { title: "Relevés comptabilisés", breadcrumb: "Comptabilisés" },
+    "/centre-monetique": { title: "Centre Monétique", breadcrumb: "Centre Monétique" },
     "/settings/general": { title: "Parametres generaux", breadcrumb: "General" },
     "/settings/accounting": { title: "Plan Comptable & Tiers", breadcrumb: "Comptabilité" },
     "/settings/patterns": { title: "Filtres & Patterns", breadcrumb: "Patterns" },

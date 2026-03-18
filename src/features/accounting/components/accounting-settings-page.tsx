@@ -79,6 +79,7 @@ export function AccountingSettingsPage() {
   const [editingTier, setEditingTier] = useState<Tier | null>(null);
   const [tierForm, setTierForm] = useState({
     libelle: "",
+    activity: "",
     auxiliaireMode: false,
     tierNumber: "",
     collectifAccount: "",
@@ -186,6 +187,7 @@ export function AccountingSettingsPage() {
     setEditingTier(null);
     setTierForm({
       libelle: "",
+      activity: "",
       auxiliaireMode: useAuxDialog,
       tierNumber: "",
       collectifAccount: "",
@@ -211,6 +213,7 @@ export function AccountingSettingsPage() {
     setEditingTier(tier);
     setTierForm({
       libelle: tier.libelle,
+      activity: tier.activity || "",
       auxiliaireMode: tier.auxiliaireMode,
       tierNumber: tier.tierNumber,
       collectifAccount: tier.collectifAccount || "",
@@ -228,7 +231,7 @@ export function AccountingSettingsPage() {
   async function handleSaveTier() {
     try {
       if (!tierForm.libelle.trim() || !tierForm.tierNumber.trim()) {
-        toast.error("Nom et Compte tier sont obligatoires");
+        toast.error("Nom et Numero compte sont obligatoires");
         return;
       }
       if (editingTier) {
@@ -261,7 +264,7 @@ export function AccountingSettingsPage() {
     (a) => a.classe === 6 || a.code.startsWith("6"),
   );
   const tvaAccounts = accounts.filter(
-    (a) => a.code.startsWith("345") || a.code.startsWith("445"),
+    (a) => a.code.startsWith("3455") || a.code.startsWith("4455"),
   );
 
   useEffect(() => {
@@ -404,7 +407,8 @@ export function AccountingSettingsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fournisseur</TableHead>
-                      <TableHead>Compte Tier</TableHead>
+                      <TableHead>Activité</TableHead>
+                      <TableHead>Numero Compte</TableHead>
                       <TableHead>Compte HT</TableHead>
                       <TableHead>Compte TVA</TableHead>
                       <TableHead className="text-center">Statut</TableHead>
@@ -416,6 +420,9 @@ export function AccountingSettingsPage() {
                       <TableRow key={tier.id}>
                         <TableCell className="font-medium">
                           {tier.libelle}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {tier.activity || "-"}
                         </TableCell>
                         <TableCell className="font-mono">
                           {tier.tierNumber}
@@ -506,7 +513,7 @@ export function AccountingSettingsPage() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Compte Tier (ex: 44111234)</Label>
+                <Label>Numero Compte (ex: 44111234)</Label>
                 <Input
                   className="font-mono"
                   value={tierForm.tierNumber}
@@ -526,9 +533,20 @@ export function AccountingSettingsPage() {
               </div>
             </div>
 
+            <div className="space-y-2 border-t pt-4">
+              <Label>Activite</Label>
+              <Input
+                value={tierForm.activity}
+                onChange={(e) =>
+                  setTierForm({ ...tierForm, activity: e.target.value })
+                }
+                placeholder="ex: Import-Export, BTP, Telecommunications..."
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4 border-t pt-4">
               <div className="space-y-2">
-                <Label>IF (Identifiant Fiscal)</Label>
+                <Label>IF</Label>
                 <Input
                   value={tierForm.ifNumber}
                   onChange={(e) =>
@@ -547,9 +565,9 @@ export function AccountingSettingsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 border-t pt-4">
+            <div className="space-y-4 border-t pt-4">
               <div className="space-y-2">
-                <Label>Compte HT (Charge)</Label>
+                <Label>Compte HT</Label>
                 <Select
                   value={tierForm.defaultChargeAccount}
                   onValueChange={(v) =>
@@ -572,22 +590,60 @@ export function AccountingSettingsPage() {
                 <Label>Compte TVA</Label>
                 <Select
                   value={tierForm.tvaAccount}
-                  onValueChange={(v) =>
-                    setTierForm({ ...tierForm, tvaAccount: v })
-                  }
+                  onValueChange={(v) => {
+                    const updates: any = { tvaAccount: v };
+                    if (v.startsWith("3455") || v.startsWith("4455")) {
+                      updates.defaultTvaRate = tierForm.defaultTvaRate || 20;
+                      updates.taxCode = tierForm.taxCode || "146";
+                    }
+                    setTierForm({ ...tierForm, ...updates });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Choisir un compte" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tvaAccounts.map((a) => (
-                      <SelectItem key={a.id} value={a.code}>
-                        {a.code} - {a.libelle}
-                      </SelectItem>
-                    ))}
+                    {tvaAccounts
+                      .filter(
+                        (a) =>
+                          a.code.startsWith("345") ||
+                          a.code.startsWith("445"),
+                      )
+                      .map((a) => (
+                        <SelectItem key={a.id} value={a.code}>
+                          {a.code} - {a.libelle}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
+              {(tierForm.tvaAccount?.startsWith("3455") ||
+                tierForm.tvaAccount?.startsWith("4455")) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Taux TVA</Label>
+                    <Input
+                      type="number"
+                      value={tierForm.defaultTvaRate}
+                      onChange={(e) =>
+                        setTierForm({
+                          ...tierForm,
+                          defaultTvaRate: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Code Taux</Label>
+                    <Input
+                      value={tierForm.taxCode}
+                      onChange={(e) =>
+                        setTierForm({ ...tierForm, taxCode: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

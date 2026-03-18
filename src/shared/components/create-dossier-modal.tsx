@@ -20,11 +20,22 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
     const [ice, setIce] = useState("")
     const [fournisseurEmail, setFournisseurEmail] = useState("")
     const [fournisseurPassword, setFournisseurPassword] = useState("")
+    const [exerciseStartDate, setExerciseStartDate] = useState("")
+    const [exerciseEndDate, setExerciseEndDate] = useState("")
+    const [exerciseError, setExerciseError] = useState("")
     const [isLoading, setIsLoading] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!name.trim() || !fournisseurName.trim() || !ice.trim() || !fournisseurEmail.trim() || !fournisseurPassword.trim()) return
+        if (!exerciseStartDate || !exerciseEndDate) {
+            setExerciseError("Veuillez renseigner la période d'exercice.")
+            return
+        }
+        if (new Date(exerciseStartDate) > new Date(exerciseEndDate)) {
+            setExerciseError("La date de début doit être avant la date de fin.")
+            return
+        }
         if (fournisseurPassword.trim().length < 6) return
         setIsLoading(true)
         // Simulate API delay
@@ -34,7 +45,9 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
             fournisseurName: fournisseurName.trim(),
             ice: ice.trim(),
             fournisseurEmail: fournisseurEmail.trim(),
-            fournisseurPassword: fournisseurPassword.trim()
+            fournisseurPassword: fournisseurPassword.trim(),
+            exerciseStartDate,
+            exerciseEndDate
         })
         setIsLoading(false)
         setName("")
@@ -42,6 +55,9 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
         setIce("")
         setFournisseurEmail("")
         setFournisseurPassword("")
+        setExerciseStartDate("")
+        setExerciseEndDate("")
+        setExerciseError("")
     }
 
     return (
@@ -69,6 +85,44 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
                             onChange={e => setName(e.target.value)}
                             required
                         />
+                    </div>
+
+                    <div className="border-t border-border/50 pt-4">
+                        <p className="text-sm font-medium mb-3">Exercice comptable</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="exercise-start">Date de début</Label>
+                                <Input
+                                    id="exercise-start"
+                                    type="date"
+                                    value={exerciseStartDate}
+                                    onChange={e => {
+                                        setExerciseStartDate(e.target.value)
+                                        setExerciseError("")
+                                    }}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="exercise-end">Date de fin</Label>
+                                <Input
+                                    id="exercise-end"
+                                    type="date"
+                                    value={exerciseEndDate}
+                                    onChange={e => {
+                                        setExerciseEndDate(e.target.value)
+                                        setExerciseError("")
+                                    }}
+                                    required
+                                />
+                            </div>
+                        </div>
+                        {exerciseError && (
+                            <p className="text-[11px] text-destructive mt-2">{exerciseError}</p>
+                        )}
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                            Période pendant laquelle les factures et relevés doivent se situer.
+                        </p>
                     </div>
 
                     <div className="border-t border-border/50 pt-4">
@@ -135,7 +189,7 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
                         <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                             Annuler
                         </Button>
-                        <Button type="submit" disabled={isLoading || !name || !fournisseurName || !ice || !fournisseurEmail || fournisseurPassword.trim().length < 6}>
+                        <Button type="submit" disabled={isLoading || !name || !fournisseurName || !ice || !fournisseurEmail || fournisseurPassword.trim().length < 6 || !exerciseStartDate || !exerciseEndDate}>
                             {isLoading ? "Création en cours..." : "Créer le dossier"}
                         </Button>
                     </DialogFooter>

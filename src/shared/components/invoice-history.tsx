@@ -212,9 +212,14 @@ export function InvoiceHistory({
                   const invoiceNumber =
                     invoice.fields.find((f) => f.key === "invoiceNumber")
                       ?.value || "";
-                  const date =
-                    invoice.fields.find((f) => f.key === "invoiceDate")
-                      ?.value || invoice.createdAt.toLocaleDateString("fr-FR");
+                  const rawDate =
+                    invoice.fields.find(
+                      (f) =>
+                        f.key === "invoiceDate" ||
+                        f.key === "date" ||
+                        f.key === "invoice_date",
+                    )?.value || "";
+                  const date = rawDate ? String(rawDate) : "-";
                   const supplier =
                     invoice.fields.find((f) => f.key === "supplier")?.value ||
                     "";
