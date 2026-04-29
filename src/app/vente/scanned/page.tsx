@@ -29,6 +29,7 @@ export default function VenteScannedPage() {
     search: "",
     supplier: "",
     status: "",
+    invoiceType: "",
   });
   const router = useRouter();
   const { user } = useAuth();
@@ -168,7 +169,11 @@ export default function VenteScannedPage() {
         result?.status ? "Facture comptabilisée" : "Comptabilisation effectuée",
       );
     } catch (err: any) {
-      toast.error(err?.message || "Erreur lors de la comptabilisation");
+      const message =
+        err?.message === "duplicate_invoice_number"
+          ? "Comptabilisation impossible: facture déjà existe avec même numéro."
+          : err?.message || "Erreur lors de la comptabilisation";
+      toast.error(message);
     }
   };
 

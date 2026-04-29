@@ -5,6 +5,7 @@
 export interface Dossier {
     id: number
     name: string
+    ice?: string
     fournisseur: {
         id: number
         name: string
@@ -14,6 +15,7 @@ export interface Dossier {
     comptableName: string
     invoicesCount: number
     bankStatementsCount: number
+    centreMonetiqueCount: number
     pendingInvoicesCount: number
     validatedInvoicesCount: number
     status: "active" | "inactive"

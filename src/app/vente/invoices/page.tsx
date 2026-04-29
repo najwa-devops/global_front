@@ -29,8 +29,11 @@ export default function VenteInvoicesPage() {
     search: "",
     supplier: "",
     status: "",
+    invoiceType: "",
   });
   const router = useRouter();
+  const { user } = useAuth();
+  const isClient = user?.role === "CLIENT";
 
   useEffect(() => {
     loadInvoices();
@@ -45,10 +48,14 @@ export default function VenteInvoicesPage() {
         router.push("/dossiers");
         return;
       }
-      const dtos = await api.getSalesPendingInvoices(dossierId);
+      const dtos = isClient
+        ? await api.getSalesInvoicesByDossier(dossierId)
+        : await api.getSalesPendingInvoices(dossierId);
       const localInvoices = dtos.map(salesInvoiceDtoToLocal);
       setInvoices(
-        localInvoices.filter((inv) => !inv.accounted && !inv.accountedAt),
+        isClient
+          ? localInvoices
+          : localInvoices.filter((inv) => !inv.accounted && !inv.accountedAt),
       );
     } catch (err) {
       console.error("Error loading sales invoices:", err);
@@ -111,7 +118,6 @@ export default function VenteInvoicesPage() {
     });
   };
 
-  const { user } = useAuth();
   const isAccountingRole =
     user?.role === "ADMIN" ||
     user?.role === "COMPTABLE" ||
@@ -166,7 +172,22 @@ export default function VenteInvoicesPage() {
         result?.status ? "Facture comptabilisée" : "Comptabilisation effectuée",
       );
     } catch (err: any) {
-      toast.error(err?.message || "Erreur lors de la comptabilisation");
+      const message =
+        err?.message === "duplicate_invoice_number"
+          ? "Comptabilisation impossible: facture déjà existe avec même numéro."
+          : err?.message || "Erreur lors de la comptabilisation";
+      toast.error(message);
+    }
+  };
+
+  const handleClientValidateSalesInvoice = async (invoice: DynamicInvoice) => {
+    try {
+      toast.loading("Validation en cours...", { id: `client-validate-${invoice.id}` });
+      await api.clientValidateSalesInvoice(invoice.id);
+      await loadInvoices();
+      toast.success("Facture validée", { id: `client-validate-${invoice.id}` });
+    } catch (err) {
+      toast.error("Erreur lors de la validation", { id: `client-validate-${invoice.id}` });
     }
   };
 
@@ -193,17 +214,21 @@ export default function VenteInvoicesPage() {
     <div className="space-y-6">
       <Card className="border-border/50 bg-card/50">
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10">
-              <Clock className="h-6 w-6 text-blue-500" />
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10">
+                <Clock className="h-6 w-6 text-blue-500" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">
+                  {isClient ? "Mes factures de vente" : "Factures Vente En Attente"}
+                </CardTitle>
+                <CardDescription>
+                  {isClient
+                    ? `${invoices.length} document${invoices.length > 1 ? "s" : ""} dans votre dossier`
+                    : `${invoices.length} facture${invoices.length > 1 ? "s" : ""} à traiter`}
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-2xl">Factures Vente En Attente</CardTitle>
-              <CardDescription>
-                {invoices.length} facture{invoices.length > 1 ? "s" : ""} à traiter
-              </CardDescription>
-            </div>
-          </div>
         </CardHeader>
       </Card>
 
@@ -229,6 +254,7 @@ export default function VenteInvoicesPage() {
         onConfirm={handleConfirmInvoice}
         onFinalValidate={isAccountingRole ? undefined : handleFinalValidate}
         onAccount={isAccountingRole ? handleAccountInvoice : undefined}
+        onClientValidate={isClient ? handleClientValidateSalesInvoice : undefined}
         userRole={user?.role}
       />
 

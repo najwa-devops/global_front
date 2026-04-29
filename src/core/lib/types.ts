@@ -75,6 +75,13 @@ export const DEFAULT_FIELDS: DynamicInvoiceField[] = [
     required: true,
   },
   {
+    key: "amountTTCEnLettres",
+    label: "Montant TTC en lettres",
+    value: "",
+    type: "text",
+    required: false,
+  },
+  {
     key: "collectifAccount",
     label: "Compte Collectif",
     value: "",
@@ -163,6 +170,13 @@ export const SALES_DEFAULT_FIELDS: DynamicInvoiceField[] = [
     required: true,
   },
   {
+    key: "amountTTCEnLettres",
+    label: "Montant TTC en lettres",
+    value: "",
+    type: "text",
+    required: false,
+  },
+  {
     key: "tvaRate",
     label: "Taux TVA (%)",
     value: "",
@@ -242,29 +256,70 @@ export interface CreateUserRequest {
 // ============================================
 
 export interface Account {
-  id: number;
-  code: string;
-  libelle: string;
-  classe: number;
-  active: boolean;
-  // Optional/Computed fields
-  classeName?: string;
-  tvaRate?: number;
-  taxCode?: string;
+    id: number;
+    code: string;
+    libelle: string;
+    classe: number;
+    active: boolean;
+    xCom?: string;
+    delai?: number;
+    ville?: string;
+    adresse?: string;
+    activite?: string;
+    cdClt?: number;
+    cdFrs?: number;
+    typeCmpt?: string;
+    numcat?: number;
+    idF?: string;
+    cod?: string;
+    cnss?: string;
+    tp?: string;
+    ice?: string;
+    rc?: string;
+    rib?: string;
+    tva?: string;
+    charge?: string;
+    // Optional/Computed fields
+    classeName?: string;
+    tvaRate?: number;
+    taxCode?: string;
   isFournisseurAccount?: boolean;
   isChargeAccount?: boolean;
   isTvaAccount?: boolean;
-  displayWithTva?: string;
-  createdAt?: string;
-  updatedAt?: string;
+    displayWithTva?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    createdBy?: string;
+    updatedBy?: string;
 }
 
 export interface CreateAccountRequest {
-  code: string;
-  libelle: string;
-  active?: boolean;
-  tvaRate?: number;
-  taxCode?: string;
+    code: string;
+    libelle: string;
+    classe: number;
+    active?: boolean;
+    tvaRate?: number;
+    taxCode?: string;
+    xCom?: string;
+    delai?: number;
+    ville?: string;
+    adresse?: string;
+    activite?: string;
+    cdClt?: number;
+    cdFrs?: number;
+    typeCmpt?: string;
+    numcat?: number;
+    idF?: string;
+    cod?: string;
+    cnss?: string;
+    tp?: string;
+    ice?: string;
+    rc?: string;
+    rib?: string;
+    tva?: string;
+    charge?: string;
+    createdBy?: string;
+    updatedBy?: string;
 }
 
 export interface UpdateAccountRequest {
@@ -272,6 +327,26 @@ export interface UpdateAccountRequest {
   active?: boolean;
   tvaRate?: number;
   taxCode?: string;
+  xCom?: string;
+  delai?: number;
+  ville?: string;
+  adresse?: string;
+  activite?: string;
+  cdClt?: number;
+  cdFrs?: number;
+  typeCmpt?: string;
+  numcat?: number;
+  idF?: string;
+  cod?: string;
+  cnss?: string;
+  tp?: string;
+  ice?: string;
+  rc?: string;
+  rib?: string;
+  tva?: string;
+  charge?: string;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 // ============================================
@@ -327,6 +402,7 @@ export interface CreateTierRequest {
 
 export interface UpdateTierRequest {
   libelle?: string | undefined;
+  activity?: string | undefined;
   tierNumber?: string | undefined;
   collectifAccount?: string | undefined;
   ifNumber?: string | undefined;
@@ -392,6 +468,19 @@ export interface BankTransaction {
   isValid?: boolean;
 }
 
+export interface BankTransactionPreview {
+  id: number;
+  date: string;
+  libelle: string;
+  debit: number;
+  credit: number;
+  compte?: string;
+  isLinked?: boolean;
+  transactionIndex?: number;
+  sens?: "DEBIT" | "CREDIT";
+  isValid?: boolean;
+}
+
 export interface BankTransactionV2 {
   id: number;
   statementId: number;
@@ -405,6 +494,7 @@ export interface BankTransactionV2 {
   compte: string;
   compteLibelle?: string | null;
   isLinked: boolean;
+  cmApplied?: boolean;
   categorie: string;
   role: string;
   extractionConfidence: number;
@@ -414,12 +504,17 @@ export interface BankTransactionV2 {
   extractionErrors: string[] | null;
   lineNumber: number;
   transactionIndex?: number;
+  fraisRuleApplied?: boolean;
+  fraisSplitGroupId?: string | null;
+  fraisSplitRole?: string | null;
+  fraisOriginalAmount?: number | null;
+  ruleLabel?: string | null;
 }
 
 export interface LocalBankStatement {
   id: number;
   filename: string;
-  originalName?: string | undefined;
+  originalName: string;
   filePath: string;
   fileSize: number;
   fileUrl?: string | undefined;
@@ -443,7 +538,10 @@ export interface LocalBankStatement {
     | "TRAITE"
     | "PRET_A_VALIDER"
     | "COMPTABILISE"
-    | "COMPTABILISÉ";
+    | "COMPTABILISÉ"
+    | "VIDE"
+    | "DUPLIQUE"
+    | "ERREUR";
   isProcessing?: boolean | undefined;
   createdAt: Date | string;
   updatedAt?: Date | string | undefined;
@@ -457,15 +555,35 @@ export interface LocalBankStatement {
   closingBalance?: number | null;
   totalCredit?: number;
   totalDebit?: number;
+  totalCreditPdf?: number | null;
+  totalDebitPdf?: number | null;
   balanceDifference?: number | null;
   transactionCount?: number;
   validTransactionCount?: number;
   errorTransactionCount?: number;
   overallConfidence?: number;
   continuityStatus?: string;
+  displayStatus?: string;
   isBalanceValid?: boolean | null;
   isContinuityValid?: boolean;
   isLinked?: boolean;
+  isCmLinked?: boolean;
+  applyTtcRule?: boolean;
+  applyFraisRule?: boolean;
+  applyAgiosRule?: boolean;
+  applyPackageRule?: boolean;
+  ttcRuleAppliedCount?: number;
+  hasTtcRuleApplied?: boolean;
+  fraisRuleAppliedCount?: number;
+  hasFraisRuleApplied?: boolean;
+  agiosRuleAppliedCount?: number;
+  hasAgiosRuleApplied?: boolean;
+  packageRuleAppliedCount?: number;
+  hasPackageRuleApplied?: boolean;
+  fraisRuleWarningMessage?: string | null;
+  ttcRuleWarningMessage?: string | null;
+  agiosRuleWarningMessage?: string | null;
+  packageRuleWarningMessage?: string | null;
   canReprocess?: boolean;
   canDelete?: boolean;
   validatedAt?: string | null;
@@ -478,9 +596,15 @@ export interface LocalBankStatement {
   accountedBy?: string | null;
   extractionErrors?: string[] | null;
   metadata?: Record<string, any>;
+  insertedEntries?: number;
+  syncedRows?: number;
+  simulationId?: string | null;
   readyForValidation?: boolean;
   validationErrors?: string[] | string | null;
-  transactionsPreview?: BankTransactionV2[];
+  verificationStatus?: string | null;
+  duplicateOfId?: number | null;
+  isDuplicate?: boolean;
+  transactionsPreview?: BankTransactionPreview[];
   transactions?: BankTransactionV2[];
 }
 
@@ -512,6 +636,8 @@ export interface DynamicInvoice {
   dossierId?: number;
   filename: string;
   originalName?: string | undefined;
+  invoiceNumber?: string | undefined;
+  supplier?: string | undefined;
   filePath: string;
   fileSize: number;
   fileUrl?: string | undefined;
@@ -519,6 +645,21 @@ export interface DynamicInvoice {
   headerText?: string | undefined;
   footerText?: string | undefined;
   rawOcrText?: string | undefined;
+  cleanedOcrText?: string | undefined;
+  scanned?: boolean | undefined;
+  documentType?: string | undefined;
+  amountsValid?: boolean | undefined;
+  validationMessage?: string | undefined;
+  qualityScore?: number | undefined;
+  difficultyClass?: string | undefined;
+  qualityFlags?: string[] | undefined;
+  reviewRequired?: boolean | undefined;
+  reviewReasons?: string[] | undefined;
+  fieldConfidences?: Record<string, number> | undefined;
+  fieldSources?: Record<string, string> | undefined;
+  olmocrUsed?: boolean | undefined;
+  olmocrDurationMs?: number | undefined;
+  olmocrMode?: string | undefined;
   fields: DynamicInvoiceField[];
   fieldsData?: Record<string, any> | undefined;
   extractedData?: Record<string, any> | undefined;
@@ -537,6 +678,7 @@ export interface DynamicInvoice {
   extractionMethod?:
     | "DYNAMIC_TEMPLATE"
     | "PATTERNS"
+    | "ALPHA_AGENT"
     | "MANUAL"
     | "NONE"
     | undefined;
@@ -707,7 +849,7 @@ export interface DynamicExtractionResponse {
   extractionDurationMs?: number;
   rawOcrText?: string;
   extractedText?: string;
-  extractionMethod?: "DYNAMIC_TEMPLATE" | "PATTERNS" | "MANUAL" | "NONE";
+  extractionMethod?: "DYNAMIC_TEMPLATE" | "PATTERNS" | "ALPHA_AGENT" | "MANUAL" | "NONE";
   status?: string;
   autoFilledFields?: string[];
 }
@@ -791,6 +933,7 @@ export interface DynamicInvoiceDto {
   headerRawText?: string;
   footerRawText?: string;
   rawOcrText?: string;
+  cleanedOcrText?: string;
   fieldsData: Record<string, any>;
   pendingFields?: string[];
   missingFields?: string[];
@@ -800,7 +943,7 @@ export interface DynamicInvoiceDto {
   averageConfidence?: number;
   templateId?: number;
   templateName?: string;
-  extractionMethod?: "DYNAMIC_TEMPLATE" | "PATTERNS" | "MANUAL" | "NONE";
+  extractionMethod?: "DYNAMIC_TEMPLATE" | "PATTERNS" | "ALPHA_AGENT" | "MANUAL" | "NONE";
   status?: BackendInvoiceStatus;
   createdAt: string;
   updatedAt?: string;
@@ -819,6 +962,20 @@ export interface DynamicInvoiceDto {
   accountedAt?: string;
   accountedBy?: string;
   isAvoir?: boolean;
+  scanned?: boolean;
+  documentType?: string;
+  amountsValid?: boolean;
+  validationMessage?: string;
+  qualityScore?: number;
+  difficultyClass?: string;
+  qualityFlags?: string[];
+  reviewRequired?: boolean;
+  reviewReasons?: string[];
+  fieldConfidences?: Record<string, number>;
+  fieldSources?: Record<string, string>;
+  olmocrUsed?: boolean;
+  olmocrDurationMs?: number;
+  olmocrMode?: string;
 }
 
 export interface DynamicInvoiceCreateResponseDto {
@@ -875,6 +1032,7 @@ export const FIELD_LABELS: Record<string, string> = {
   amountHT: "Montant HT",
   tva: "TVA",
   amountTTC: "Montant TTC",
+  amountTTCEnLettres: "Montant TTC en lettres",
 };
 
 // ============================================

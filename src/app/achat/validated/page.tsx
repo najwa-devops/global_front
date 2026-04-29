@@ -1,41 +1,56 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { api } from "@/lib/api";
-import { dynamicInvoiceDtoToLocal, toWorkflowStatus } from "@/lib/utils";
-import { type DynamicInvoice } from "@/lib/types";
-import { ValidatedInvoicesPage } from "@/components/validated-invoices-page";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Clock } from "lucide-react";
-import { AuthGuard } from "@/components/auth-guard";
-import { ApiError } from "@/src/api/api-client";
+import { Clock, CheckCircle, Trash2 } from "lucide-react";
+import { api } from "@/lib/api";
+import { invoiceDtoToLocal, toWorkflowStatus } from "@/lib/utils";
+import { type DynamicInvoice, type UserRole } from "@/lib/types";
+import {
+  InvoiceFilters,
+  type FilterValues,
+} from "@/components/invoice-filters";
+import { ValidatedInvoicesPage } from "@/components/validated-invoices-page";
 
-function ValidatedPageContent() {
+export default function ValidatedInvoicesRoutePage() {
   const [invoices, setInvoices] = useState<DynamicInvoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [filters, setFilters] = useState<FilterValues>({
+    search: "",
+    supplier: "",
+    status: "all",
+    invoiceType: "all",
+  });
   const router = useRouter();
 
   useEffect(() => {
     loadInvoices();
   }, []);
 
+  useEffect(() => {
+    api
+      .getCurrentUser()
+      .then((u) => setUserRole(u.role))
+      .catch(() => setUserRole(null));
+  }, []);
+
   const loadInvoices = async () => {
     try {
       setIsLoading(true);
       const dtos = await api.getAllInvoices();
-      const localInvoices = dtos.map(dynamicInvoiceDtoToLocal);
+      const localInvoices = dtos.map(invoiceDtoToLocal);
       setInvoices(
         localInvoices.filter(
           (inv) =>
-            toWorkflowStatus(inv.status) === "VALIDATED" &&
-            !inv.accounted &&
-            !inv.accountedAt,
+            toWorkflowStatus(inv.status) === "VALIDATED" ||
+            Boolean(inv.accounted || inv.accountedAt),
         ),
       );
     } catch (err) {
       console.error("Error loading validated invoices:", err);
-      toast.error("Impossible de charger les factures validées.");
+      toast.error("Impossible de charger les factures validées");
     } finally {
       setIsLoading(false);
     }
@@ -50,23 +65,65 @@ function ValidatedPageContent() {
     return Array.from(supplierSet);
   }, [invoices]);
 
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((invoice) => {
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesFilename = invoice.filename.toLowerCase().includes(searchLower);
+        const matchesNumber = String(
+          invoice.fields.find((f) => f.key === "invoiceNumber")?.value || "",
+        )
+          .toLowerCase()
+          .includes(searchLower);
+        const matchesSupplier = String(
+          invoice.fields.find((f) => f.key === "supplier")?.value || "",
+        )
+          .toLowerCase()
+          .includes(searchLower);
+        if (!matchesFilename && !matchesNumber && !matchesSupplier) return false;
+      }
+
+      if (filters.supplier && filters.supplier !== "all") {
+        const supplier = invoice.fields.find((f) => f.key === "supplier")?.value;
+        if (supplier !== filters.supplier) return false;
+      }
+
+      if (filters.status && filters.status !== "all") {
+        if (toWorkflowStatus(invoice.status) !== String(filters.status).toUpperCase()) {
+          return false;
+        }
+      }
+
+      if (filters.invoiceType && filters.invoiceType !== "all") {
+        const isAvoir = Boolean(invoice.isAvoir);
+        const matchesType =
+          (filters.invoiceType === "AVOIR" && isAvoir) ||
+          (filters.invoiceType === "FACTURE" && !isAvoir);
+        if (!matchesType) return false;
+      }
+
+      if (filters.dateFrom && invoice.createdAt < filters.dateFrom) return false;
+      if (filters.dateTo && invoice.createdAt > filters.dateTo) return false;
+
+      if (filters.amountMin !== undefined || filters.amountMax !== undefined) {
+        const ttc = Number.parseFloat(
+          String(invoice.fields.find((f) => f.key === "amountTTC")?.value || "0"),
+        );
+        if (filters.amountMin !== undefined && ttc < filters.amountMin) return false;
+        if (filters.amountMax !== undefined && ttc > filters.amountMax) return false;
+      }
+
+      return true;
+    });
+  }, [invoices, filters]);
+
   const handleDeleteInvoice = async (invoiceId: number) => {
     try {
-      await api.deleteDynamicInvoice(invoiceId);
+      await api.deleteInvoice(invoiceId);
       setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceId));
       toast.success("Facture supprimée");
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === "BUSINESS_LOCKED") {
-          toast.error(
-            "Cette facture est verrouillée et ne peut pas être supprimée.",
-          );
-        } else {
-          toast.error(err.message || "Erreur lors de la suppression");
-        }
-      } else {
-        toast.error("Erreur lors de la suppression");
-      }
+      toast.error("Erreur suppression");
     }
   };
 
@@ -79,7 +136,9 @@ function ValidatedPageContent() {
       const message =
         err?.message === "missing_accounting_data"
           ? "Données comptables manquantes pour cette facture."
-          : err?.message || "Erreur lors de la comptabilisation";
+          : err?.message === "duplicate_invoice_number"
+            ? "Comptabilisation impossible: facture déjà existante avec le même numéro."
+            : err?.message || "Erreur lors de la comptabilisation";
       toast.error(message);
     }
   };
@@ -95,14 +154,9 @@ function ValidatedPageContent() {
 
   return (
     <ValidatedInvoicesPage
-      invoices={invoices}
-      filters={{
-        search: "",
-        supplier: "",
-        status: "VALIDATED",
-        invoiceType: "all",
-      }}
-      onFiltersChange={() => {}}
+      invoices={filteredInvoices}
+      filters={filters}
+      onFiltersChange={setFilters}
       suppliers={suppliers}
       onView={(inv) =>
         router.push(
@@ -112,19 +166,10 @@ function ValidatedPageContent() {
         )
       }
       onDelete={handleDeleteInvoice}
-      onAccount={handleAccountInvoice}
-      onExport={(format) =>
-        toast.info(`Export ${format.toUpperCase()} bientôt disponible`)
+      onAccount={
+        userRole === "CLIENT" ? undefined : handleAccountInvoice
       }
+      onExport={(format) => toast.info(`${format.toUpperCase()} export coming soon`)}
     />
   );
 }
-
-export default function Page() {
-  return (
-    <AuthGuard allowedRoles={["CLIENT"]}>
-      <ValidatedPageContent />
-    </AuthGuard>
-  );
-}
-

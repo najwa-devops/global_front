@@ -67,7 +67,7 @@ export function TierCreationModal({
     tierNumber: "",
     defaultChargeAccount: "611100000",
     tvaAccount: "",
-    defaultTvaRate: 20,
+    defaultTvaRate: 0,
     taxCode: "",
   });
 
@@ -92,7 +92,10 @@ export function TierCreationModal({
         tierNumber: existingTier?.tierNumber || "",
         defaultChargeAccount: existingTier?.defaultChargeAccount || "611100000",
         tvaAccount: existingTier?.tvaAccount || "",
-        defaultTvaRate: existingTier?.defaultTvaRate ?? 20,
+        defaultTvaRate:
+          existingTier?.defaultTvaRate ??
+          getTvaRateForAccount(existingTier?.tvaAccount || "") ??
+          0,
         taxCode:
           existingTier?.taxCode ||
           (existingTier?.tvaAccount?.startsWith("3455") ||
@@ -102,6 +105,11 @@ export function TierCreationModal({
       });
     }
   }, [isOpen, initialData, existingTier]);
+
+  const getTvaRateForAccount = (code: string): number | null => {
+    const account = tvaAccounts.find((item) => item.code === code);
+    return account?.tvaRate ?? null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -360,12 +368,16 @@ export function TierCreationModal({
                   <Select
                     value={formData.tvaAccount}
                     onValueChange={(v) => {
-                      const updates: any = { tvaAccount: v };
-                      if (v.startsWith("3455") || v.startsWith("4455")) {
-                        updates.defaultTvaRate = 20;
-                        updates.taxCode = "146";
-                      }
-                      setFormData({ ...formData, ...updates });
+                      const selectedRate = getTvaRateForAccount(v);
+                      setFormData({
+                        ...formData,
+                        tvaAccount: v,
+                        defaultTvaRate: selectedRate ?? formData.defaultTvaRate,
+                        taxCode:
+                          v.startsWith("3455") || v.startsWith("4455")
+                            ? formData.taxCode || "146"
+                            : formData.taxCode,
+                      });
                     }}
                   >
                     <SelectTrigger className="w-full">
@@ -381,10 +393,19 @@ export function TierCreationModal({
                         .map((a) => (
                           <SelectItem key={a.code} value={a.code}>
                             {a.code} - {a.libelle}
+                            {a.tvaRate != null ? ` (TVA ${a.tvaRate}%)` : ""}
                           </SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
+                  {formData.tvaAccount ? (
+                    <p className="text-xs text-muted-foreground">
+                      Taux TVA du compte:{" "}
+                      {getTvaRateForAccount(formData.tvaAccount) != null
+                        ? `${getTvaRateForAccount(formData.tvaAccount)}%`
+                        : `${formData.defaultTvaRate || 0}%`}
+                    </p>
+                  ) : null}
                 </div>
 
                 {(formData.tvaAccount?.startsWith("3455") ||
@@ -398,13 +419,14 @@ export function TierCreationModal({
                         <Input
                           type="number"
                           value={formData.defaultTvaRate}
+                          readOnly={Boolean(formData.tvaAccount)}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
                               defaultTvaRate: Number(e.target.value),
                             })
                           }
-                          className="h-9 pr-7"
+                          className={`h-9 pr-7 ${formData.tvaAccount ? "bg-muted/50" : ""}`}
                         />
                         <span className="absolute right-2 top-2 text-muted-foreground text-xs">
                           %

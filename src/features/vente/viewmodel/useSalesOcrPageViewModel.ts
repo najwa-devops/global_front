@@ -130,9 +130,18 @@ export function useSalesOcrPageViewModel(invoiceId: number | null) {
   const onInvoiceSaved = (updatedInvoice: DynamicInvoice) => {
     setInvoice(updatedInvoice);
 
+    if (
+      Boolean(updatedInvoice.accounted || updatedInvoice.accountedAt) ||
+      String(updatedInvoice.status || "").toUpperCase() === "ACCOUNTED"
+    ) {
+      toast.success("Facture vente comptabilisée");
+      router.push("/vente/accounted");
+      return;
+    }
+
     if (toWorkflowStatus(updatedInvoice.status) === "VALIDATED") {
       toast.success("Facture vente validée");
-      router.push("/vente/validated");
+      router.push("/vente/invoices");
       return;
     }
 

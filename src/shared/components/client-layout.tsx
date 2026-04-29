@@ -25,6 +25,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     (user?.name && user.name.trim()) ||
     (user?.email ? user.email.split("@")[0] : "Utilisateur");
   const userInitial = displayName.charAt(0).toUpperCase() || "U";
+  const showSimpleUserGuide =
+    pathname.startsWith("/achat") || pathname.startsWith("/vente");
 
   // On peut charger le compte des factures en attente ici pour le badge de la sidebar
   useEffect(() => {
@@ -131,7 +133,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          <SimpleUserGuide />
+          {showSimpleUserGuide && <SimpleUserGuide />}
 
           {children}
         </div>

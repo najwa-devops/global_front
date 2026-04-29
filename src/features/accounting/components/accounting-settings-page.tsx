@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAccounting } from "../hooks/use-accounting";
-import { Account, Tier } from "@/lib/types";
+import { Account, CreateAccountRequest, Tier, UpdateAccountRequest } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,9 +31,89 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, Search, Pencil, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/src/lib/logger";
+
+type AccountFormState = {
+  code: string;
+  libelle: string;
+  classe: number;
+  tvaRate: string;
+  active: boolean;
+  xCom: string;
+  delai: string;
+  ville: string;
+  adresse: string;
+  activite: string;
+  cdClt: string;
+  cdFrs: string;
+  typeCmpt: string;
+  numcat: string;
+  idF: string;
+  cod: string;
+  cnss: string;
+  tp: string;
+  ice: string;
+  rc: string;
+  rib: string;
+  tva: string;
+  charge: string;
+  createdBy: string;
+  updatedBy: string;
+};
+
+const ACCOUNT_CLASS_OPTIONS = [
+  { value: 1, label: "1 - Financement permanent" },
+  { value: 2, label: "2 - Actif immobilisé" },
+  { value: 3, label: "3 - Actif circulant" },
+  { value: 4, label: "4 - Passif circulant" },
+  { value: 5, label: "5 - Trésorerie" },
+  { value: 6, label: "6 - Charges" },
+  { value: 7, label: "7 - Produits" },
+  { value: 8, label: "8 - Résultats" },
+];
+
+const emptyAccountForm = (): AccountFormState => ({
+  code: "",
+  libelle: "",
+  classe: 4,
+  tvaRate: "0",
+  active: true,
+  xCom: "",
+  delai: "",
+  ville: "",
+  adresse: "",
+  activite: "",
+  cdClt: "",
+  cdFrs: "",
+  typeCmpt: "",
+  numcat: "",
+  idF: "",
+  cod: "",
+  cnss: "",
+  tp: "",
+  ice: "",
+  rc: "",
+  rib: "",
+  tva: "",
+  charge: "",
+  createdBy: "",
+  updatedBy: "",
+});
+
+const normalizeOptionalNumber = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const normalizeOptionalText = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
 
 /**
  * Enterprise-grade Accounting Settings page.
@@ -66,13 +146,9 @@ export function AccountingSettingsPage() {
   // Dialog states
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [accountForm, setAccountForm] = useState({
-    code: "",
-    libelle: "",
-    tvaRate: 20,
-    taxCode: "",
-    active: true,
-  });
+  const [accountForm, setAccountForm] = useState<AccountFormState>(
+    emptyAccountForm(),
+  );
 
   // Tier Dialog State
   const [isTierDialogOpen, setIsTierDialogOpen] = useState(false);
@@ -88,7 +164,7 @@ export function AccountingSettingsPage() {
     rcNumber: "",
     defaultChargeAccount: "",
     tvaAccount: "",
-    defaultTvaRate: 20,
+    defaultTvaRate: 0,
     taxCode: "",
   });
 
@@ -107,19 +183,20 @@ export function AccountingSettingsPage() {
     return result.filter(
       (a) =>
         a.code.toLowerCase().includes(lower) ||
-        a.libelle.toLowerCase().includes(lower),
+        a.libelle.toLowerCase().includes(lower) ||
+        (a.ville || "").toLowerCase().includes(lower) ||
+        (a.activite || "").toLowerCase().includes(lower),
     );
   }, [accounts, searchAccountQuery, accountClassFilter]);
 
+  const getTvaRateForAccount = (code: string): number | null => {
+    const account = tvaAccounts.find((item) => item.code === code);
+    return account?.tvaRate ?? null;
+  };
+
   function openAddAccount() {
     setEditingAccount(null);
-    setAccountForm({
-      code: "",
-      libelle: "",
-      tvaRate: 20,
-      taxCode: "",
-      active: true,
-    });
+    setAccountForm(emptyAccountForm());
     setIsAccountDialogOpen(true);
   }
 
@@ -128,24 +205,85 @@ export function AccountingSettingsPage() {
     setAccountForm({
       code: account.code,
       libelle: account.libelle,
-      tvaRate: account.tvaRate || 20,
-      taxCode: account.taxCode || "",
+      classe: account.classe || Number(account.code?.charAt(0) || 4),
+      tvaRate: account.tvaRate != null ? String(account.tvaRate) : "0",
       active: account.active,
+      xCom: account.xCom || "",
+      delai: account.delai != null ? String(account.delai) : "",
+      ville: account.ville || "",
+      adresse: account.adresse || "",
+      activite: account.activite || "",
+      cdClt: account.cdClt != null ? String(account.cdClt) : "",
+      cdFrs: account.cdFrs != null ? String(account.cdFrs) : "",
+      typeCmpt: account.typeCmpt || "",
+      numcat: account.numcat != null ? String(account.numcat) : "",
+      idF: account.idF || "",
+      cod: account.cod || "",
+      cnss: account.cnss || "",
+      tp: account.tp || "",
+      ice: account.ice || "",
+      rc: account.rc || "",
+      rib: account.rib || "",
+      tva: account.tva || "",
+      charge: account.charge || "",
+      createdBy: account.createdBy || "",
+      updatedBy: account.updatedBy || "",
     });
     setIsAccountDialogOpen(true);
   }
 
   async function handleSaveAccount() {
     try {
-      // if (!/^\d{9}$/.test(accountForm.code)) {
-      //   toast.error("Le code compte doit contenir exactement 9 chiffres");
-      //   return;
-      // }
+      if (!accountForm.code.trim()) {
+        toast.error("Le numéro de compte est obligatoire");
+        return;
+      }
+      if (!accountForm.libelle.trim()) {
+        toast.error("Le libellé est obligatoire");
+        return;
+      }
+      if (!accountForm.classe || accountForm.classe < 1 || accountForm.classe > 8) {
+        toast.error("La classe doit être comprise entre 1 et 8");
+        return;
+      }
+      if (accountForm.tvaRate === null || accountForm.tvaRate === undefined || accountForm.tvaRate === "") {
+        toast.error("Le taux de TVA est obligatoire");
+        return;
+      }
+
+      const payload: CreateAccountRequest | UpdateAccountRequest = {
+        code: accountForm.code.trim(),
+        libelle: accountForm.libelle.trim(),
+        classe: accountForm.classe,
+        tvaRate: Number(accountForm.tvaRate),
+        active: accountForm.active,
+        xCom: normalizeOptionalText(accountForm.xCom),
+        delai: normalizeOptionalNumber(accountForm.delai),
+        ville: normalizeOptionalText(accountForm.ville),
+        adresse: normalizeOptionalText(accountForm.adresse),
+        activite: normalizeOptionalText(accountForm.activite),
+        cdClt: normalizeOptionalNumber(accountForm.cdClt),
+        cdFrs: normalizeOptionalNumber(accountForm.cdFrs),
+        typeCmpt: normalizeOptionalText(accountForm.typeCmpt),
+        numcat: normalizeOptionalNumber(accountForm.numcat),
+        idF: normalizeOptionalText(accountForm.idF),
+        cod: normalizeOptionalText(accountForm.cod),
+        cnss: normalizeOptionalText(accountForm.cnss),
+        tp: normalizeOptionalText(accountForm.tp),
+        ice: normalizeOptionalText(accountForm.ice),
+        rc: normalizeOptionalText(accountForm.rc),
+        rib: normalizeOptionalText(accountForm.rib),
+        tva: normalizeOptionalText(accountForm.tva),
+        charge: normalizeOptionalText(accountForm.charge),
+        createdBy: normalizeOptionalText(accountForm.createdBy),
+        updatedBy: normalizeOptionalText(accountForm.updatedBy),
+      };
+
       if (editingAccount) {
-        await updateAccount({ id: editingAccount.id, data: accountForm });
+        await updateAccount({ id: editingAccount.id, data: payload as UpdateAccountRequest });
         toast.success("Compte mis a jour");
       } else {
-        await createAccount(accountForm);
+        await createAccount(payload as CreateAccountRequest);
         toast.success("Compte cree");
       }
       setIsAccountDialogOpen(false);
@@ -196,7 +334,7 @@ export function AccountingSettingsPage() {
       rcNumber: "",
       defaultChargeAccount: "",
       tvaAccount: "",
-      defaultTvaRate: 20,
+      defaultTvaRate: 0,
       taxCode: "",
     });
     if (useAuxDialog) {
@@ -222,7 +360,8 @@ export function AccountingSettingsPage() {
       rcNumber: tier.rcNumber || "",
       defaultChargeAccount: tier.defaultChargeAccount || "",
       tvaAccount: tier.tvaAccount || "",
-      defaultTvaRate: tier.defaultTvaRate || 20,
+      defaultTvaRate:
+        tier.defaultTvaRate ?? getTvaRateForAccount(tier.tvaAccount || "") ?? 0,
       taxCode: tier.taxCode || "",
     });
     setIsTierDialogOpen(true);
@@ -290,11 +429,9 @@ export function AccountingSettingsPage() {
         onValueChange={setActiveTab}
         className="w-full"
       >
-        <TabsList
-          className={`grid w-full ${hasSelectedDossier ? "grid-cols-2 lg:w-[400px]" : "grid-cols-1 lg:w-[200px]"}`}
-        >
+        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
           <TabsTrigger value="accounts">Plan Comptable</TabsTrigger>
-          {hasSelectedDossier && <TabsTrigger value="tiers">Plan Tiers</TabsTrigger>}
+          <TabsTrigger value="tiers">Plan Tiers</TabsTrigger>
         </TabsList>
 
         <TabsContent value="accounts" className="space-y-4 pt-4">
@@ -328,7 +465,7 @@ export function AccountingSettingsPage() {
                 >
                   Tous
                 </Button>
-                {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((c) => (
                   <Button
                     key={c}
                     variant={accountClassFilter === c ? "default" : "outline"}
@@ -344,6 +481,9 @@ export function AccountingSettingsPage() {
                   <TableRow>
                     <TableHead>Compte</TableHead>
                     <TableHead>Libelle</TableHead>
+                    <TableHead>Classe</TableHead>
+                    <TableHead>Taux TVA</TableHead>
+                    <TableHead>Ville</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -355,6 +495,15 @@ export function AccountingSettingsPage() {
                         {account.code}
                       </TableCell>
                       <TableCell>{account.libelle}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {account.classeName || `Classe ${account.classe}`}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono">
+                        {account.tvaRate != null ? `${account.tvaRate}%` : "-"}
+                      </TableCell>
+                      <TableCell>{account.ville || "-"}</TableCell>
                       <TableCell>
                         <Badge
                           variant={account.active ? "secondary" : "outline"}
@@ -379,8 +528,7 @@ export function AccountingSettingsPage() {
           </Card>
         </TabsContent>
 
-        {hasSelectedDossier && (
-          <TabsContent value="tiers" className="space-y-4 pt-4">
+        <TabsContent value="tiers" className="space-y-4 pt-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-xl font-semibold">
@@ -463,37 +611,269 @@ export function AccountingSettingsPage() {
               </CardContent>
             </Card>
           </TabsContent>
-        )}
       </Tabs>
 
       <Dialog open={isAccountDialogOpen} onOpenChange={setIsAccountDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingAccount ? "Modifier le compte" : "Ajouter un compte"}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Compte</Label>
-              <Input
-                className="col-span-3"
-                value={accountForm.code}
-                disabled={!!editingAccount}
-                onChange={(e) =>
-                  setAccountForm({ ...accountForm, code: e.target.value })
-                }
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Compte</Label>
+                <Input
+                  value={accountForm.code}
+                  disabled={!!editingAccount}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, code: e.target.value })
+                  }
+                  placeholder="000000000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Libelle</Label>
+                <Input
+                  value={accountForm.libelle}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, libelle: e.target.value })
+                  }
+                  placeholder="Libellé du compte"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Classe</Label>
+                <Select
+                  value={String(accountForm.classe)}
+                  onValueChange={(value) =>
+                    setAccountForm({ ...accountForm, classe: Number(value) })
+                  }
+                  disabled={!!editingAccount}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choisir une classe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACCOUNT_CLASS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Taux TVA (%)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={accountForm.tvaRate}
+                  onChange={(e) =>
+                    setAccountForm({
+                      ...accountForm,
+                      tvaRate: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div>
+                    <Label className="text-sm font-medium">Compte actif</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Les comptes inactifs restent visibles mais ne sont pas proposés dans les sélections actives.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={accountForm.active}
+                    onCheckedChange={(checked) =>
+                      setAccountForm({ ...accountForm, active: checked })
+                    }
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Libelle</Label>
-              <Input
-                className="col-span-3"
-                value={accountForm.libelle}
-                onChange={(e) =>
-                  setAccountForm({ ...accountForm, libelle: e.target.value })
-                }
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+              <div className="space-y-2">
+                <Label>Ville</Label>
+                <Input
+                  value={accountForm.ville}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, ville: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Adresse</Label>
+                <Input
+                  value={accountForm.adresse}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, adresse: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2 md:col-span-3">
+                <Label>Activité</Label>
+                <Input
+                  value={accountForm.activite}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, activite: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+              <div className="space-y-2">
+                <Label>Compte X_COM</Label>
+                <Input
+                  value={accountForm.xCom}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, xCom: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Délai</Label>
+                <Input
+                  type="number"
+                  value={accountForm.delai}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, delai: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Type compte</Label>
+                <Input
+                  value={accountForm.typeCmpt}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, typeCmpt: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
+              <div className="space-y-2">
+                <Label>CD Client</Label>
+                <Input
+                  type="number"
+                  value={accountForm.cdClt}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, cdClt: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CD Fournisseur</Label>
+                <Input
+                  type="number"
+                  value={accountForm.cdFrs}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, cdFrs: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Numcat</Label>
+                <Input
+                  type="number"
+                  value={accountForm.numcat}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, numcat: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>ID F</Label>
+                <Input
+                  value={accountForm.idF}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, idF: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
+              <div className="space-y-2">
+                <Label>COD</Label>
+                <Input
+                  value={accountForm.cod}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, cod: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CNSS</Label>
+                <Input
+                  value={accountForm.cnss}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, cnss: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>TP</Label>
+                <Input
+                  value={accountForm.tp}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, tp: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>ICE</Label>
+                <Input
+                  value={accountForm.ice}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, ice: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>RC</Label>
+                <Input
+                  value={accountForm.rc}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, rc: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>RIB</Label>
+                <Input
+                  value={accountForm.rib}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, rib: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>TVA</Label>
+                <Input
+                  value={accountForm.tva}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, tva: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Charge</Label>
+                <Input
+                  value={accountForm.charge}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, charge: e.target.value })
+                  }
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -591,12 +971,16 @@ export function AccountingSettingsPage() {
                 <Select
                   value={tierForm.tvaAccount}
                   onValueChange={(v) => {
-                    const updates: any = { tvaAccount: v };
-                    if (v.startsWith("3455") || v.startsWith("4455")) {
-                      updates.defaultTvaRate = tierForm.defaultTvaRate || 20;
-                      updates.taxCode = tierForm.taxCode || "146";
-                    }
-                    setTierForm({ ...tierForm, ...updates });
+                    const selectedRate = getTvaRateForAccount(v);
+                    setTierForm({
+                      ...tierForm,
+                      tvaAccount: v,
+                      defaultTvaRate: selectedRate ?? tierForm.defaultTvaRate,
+                      taxCode:
+                        v.startsWith("3455") || v.startsWith("4455")
+                          ? tierForm.taxCode || "146"
+                          : tierForm.taxCode,
+                    });
                   }}
                 >
                   <SelectTrigger>
@@ -612,10 +996,19 @@ export function AccountingSettingsPage() {
                       .map((a) => (
                         <SelectItem key={a.id} value={a.code}>
                           {a.code} - {a.libelle}
+                          {a.tvaRate != null ? ` (TVA ${a.tvaRate}%)` : ""}
                         </SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
+                {tierForm.tvaAccount ? (
+                  <p className="text-xs text-muted-foreground">
+                    Taux associé au compte TVA:{" "}
+                    {getTvaRateForAccount(tierForm.tvaAccount) != null
+                      ? `${getTvaRateForAccount(tierForm.tvaAccount)}%`
+                      : `${tierForm.defaultTvaRate || 0}%`}
+                  </p>
+                ) : null}
               </div>
               {(tierForm.tvaAccount?.startsWith("3455") ||
                 tierForm.tvaAccount?.startsWith("4455")) && (
@@ -625,12 +1018,14 @@ export function AccountingSettingsPage() {
                     <Input
                       type="number"
                       value={tierForm.defaultTvaRate}
+                      readOnly={Boolean(tierForm.tvaAccount)}
                       onChange={(e) =>
                         setTierForm({
                           ...tierForm,
                           defaultTvaRate: Number(e.target.value),
                         })
                       }
+                      className={tierForm.tvaAccount ? "bg-muted/50" : undefined}
                     />
                   </div>
                   <div className="space-y-2">

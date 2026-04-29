@@ -12,7 +12,7 @@ ARG BACKEND_INTERNAL_URL=http://host.docker.internal:8089
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN npm config set script-shell /bin/sh && node ./node_modules/next/dist/bin/next build --webpack
 
 FROM node:20-alpine AS runner
 WORKDIR /app

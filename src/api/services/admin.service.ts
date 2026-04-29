@@ -19,6 +19,8 @@ type BackendDossier = {
     clientId?: number | null;
     createdAt?: string;
     invoicesCount?: number;
+    bankStatementsCount?: number;
+    centreMonetiqueCount?: number;
     pendingInvoicesCount?: number;
     validatedInvoicesCount?: number;
 };
@@ -53,6 +55,8 @@ export type AdminDossierDto = {
     fournisseurEmail?: string | null;
     createdAt?: string;
     invoicesCount?: number;
+    bankStatementsCount?: number;
+    centreMonetiqueCount?: number;
     pendingInvoicesCount?: number;
     validatedInvoicesCount?: number;
 };
@@ -151,12 +155,19 @@ export class AdminService {
                 fournisseurEmail: dossier.clientId ? userMap.get(dossier.clientId)?.username ?? null : null,
                 ...(dossier.createdAt !== undefined ? { createdAt: dossier.createdAt } : {}),
                 invoicesCount: dossier.invoicesCount ?? 0,
+                bankStatementsCount: dossier.bankStatementsCount ?? 0,
+                centreMonetiqueCount: dossier.centreMonetiqueCount ?? 0,
                 pendingInvoicesCount: dossier.pendingInvoicesCount ?? 0,
                 validatedInvoicesCount: dossier.validatedInvoicesCount ?? 0,
             }));
         } catch {
             return [];
         }
+    }
+
+    static async changeDossierComptable(dossierId: number, comptableId: number): Promise<void> {
+        await apiClient.patch(`/api/dossiers/${dossierId}/comptable`, { comptableId });
+        userCache = null;
     }
 
     static async createFournisseurForComptable(payload: {

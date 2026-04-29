@@ -1,0 +1,19 @@
+
+> my-invoice-project@0.1.0 dev
+> node ./node_modules/next/dist/bin/next dev --webpack
+
+   ▲ Next.js 16.0.10 (webpack)
+   - Local:         http://localhost:3000
+   - Network:       http://172.20.1.6:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Watchpack Error (watcher): Error: UNKNOWN: unknown error, watch
+Watchpack Error (watcher): Error: UNKNOWN: unknown error, watch
+Watchpack Error (watcher): Error: UNKNOWN: unknown error, watch
+Watchpack Error (watcher): Error: UNKNOWN: unknown error, watch
+Watchpack Error (watcher): Error: UNKNOWN: unknown error, watch
+Watchpack Error (watcher): Error: UNKNOWN: unknown error, watch
+Watchpack Error (watcher): Error: UNKNOWN: unknown error, watch
+ ✓ Ready in 25s

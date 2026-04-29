@@ -25,6 +25,12 @@ import {
   AdminDossierDto,
   AdminInvoiceStatsDto,
 } from "@/src/api/services/admin.service";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ComptableAdminDto } from "@/src/types";
 
 type DossierRow = {
@@ -49,6 +55,11 @@ function AdminPageContent() {
   const [stats, setStats] = useState<AdminInvoiceStatsDto | null>(null);
   const [comptables, setComptables] = useState<ComptableAdminDto[]>([]);
   const [dossiers, setDossiers] = useState<DossierRow[]>([]);
+  const [comptableModal, setComptableModal] = useState<{
+    dossierId: number;
+    dossierName: string;
+  } | null>(null);
+  const [savingComptable, setSavingComptable] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -118,6 +129,37 @@ function AdminPageContent() {
   const uniqueFournisseurs = useMemo(() => {
     return new Set(dossiers.map((d) => d.fournisseurName)).size;
   }, [dossiers]);
+
+  const comptableIds = useMemo(
+    () => new Set(comptables.map((c) => c.id)),
+    [comptables],
+  );
+
+  const handleAssignComptable = async (comptableId: number) => {
+    if (!comptableModal) return;
+    setSavingComptable(true);
+    try {
+      await AdminService.changeDossierComptable(
+        comptableModal.dossierId,
+        comptableId,
+      );
+      const dossiersData = await AdminService.listDossiers().catch(() => []);
+      setDossiers(
+        (dossiersData || []).map((d: AdminDossierDto) => ({
+          id: d.id,
+          name: d.name,
+          comptableId: d.comptableId ?? 0,
+          comptableName: d.comptableEmail || "N/A",
+          fournisseurName: d.fournisseurEmail || "N/A",
+          invoicesCount: d.invoicesCount ?? 0,
+          pendingInvoicesCount: d.pendingInvoicesCount ?? 0,
+        })),
+      );
+      setComptableModal(null);
+    } finally {
+      setSavingComptable(false);
+    }
+  };
 
   const openDossier = (id: number, name: string) => {
     if (typeof window !== "undefined") {
@@ -321,6 +363,20 @@ function AdminPageContent() {
                           {dossier.pendingInvoicesCount} en attente
                         </Badge>
                       )}
+                      <button
+                        className="text-xs text-primary underline hover:text-primary/70 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setComptableModal({
+                            dossierId: dossier.id,
+                            dossierName: dossier.name,
+                          });
+                        }}
+                      >
+                        {comptableIds.has(dossier.comptableId)
+                          ? "Modifier comptable"
+                          : "Choisir comptable"}
+                      </button>
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>
@@ -330,6 +386,55 @@ function AdminPageContent() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog
+        open={comptableModal !== null}
+        onOpenChange={(open) => {
+          if (!open) setComptableModal(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sélectionner un comptable</DialogTitle>
+          </DialogHeader>
+          {comptableModal && (
+            <p className="text-sm text-muted-foreground -mt-2 mb-1">
+              Dossier :{" "}
+              <span className="font-medium text-foreground">
+                {comptableModal.dossierName}
+              </span>
+            </p>
+          )}
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {comptables.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Aucun comptable disponible
+              </p>
+            ) : (
+              comptables.map((c) => (
+                <button
+                  key={c.id}
+                  disabled={savingComptable}
+                  className="w-full text-left flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => handleAssignComptable(c.id)}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
+                    {initialsFromEmail(c.email)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {c.email.split("@")[0]}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {c.email}
+                    </p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[

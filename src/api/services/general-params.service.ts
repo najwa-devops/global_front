@@ -20,6 +20,7 @@ export type DossierGeneralParams = {
   subjectToRas?: boolean;
   individualPerson?: boolean;
   hasFiscalRegularityCertificate?: boolean;
+  allowValidatedDocumentDeletion?: boolean;
 };
 
 function getCurrentDossierId(): number | undefined {

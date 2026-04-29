@@ -1,25 +1,81 @@
 services:
+  mariadb:
+    image: mariadb:11
+    container_name: invoice-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-invoice_db}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ../../Invoices/Invoices/db.sql:/docker-entrypoint-initdb.d/db.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../../Invoices/Invoices
+      dockerfile: Dockerfile
+    container_name: invoice-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8089}:8089"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DATABASE_URL: jdbc:mariadb://mariadb:3306/${DB_NAME:-invoice_db}?createDatabaseIfNotExist=true
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-root}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-${DB_ROOT_PASSWORD:-root}}
+      BACKEND_PORT: ${BACKEND_PORT:-8089}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      UPLOAD_BANK_DIR: ${UPLOAD_BANK_DIR:-/app/uploads_banking}
+      TESSERACT_PATH: ${TESSERACT_PATH:-/usr/bin/tesseract}
+      TESSERACT_DATAPATH: ${TESSERACT_DATAPATH:-/usr/share/tesseract-ocr/5/tessdata}
+      TESSERACT_LANGUAGE: ${TESSERACT_LANGUAGE:-eng+fra}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      SHOW_SQL: ${SHOW_SQL:-false}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m}
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_uploads_banking:/app/uploads_banking
+      - ../../Invoices/Invoices/logs:/app/logs
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8089/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   frontend:
-    env_file:
-<<<<<<< HEAD
-      - .env.local
-=======
-      - path: .env.local
-        required: false
->>>>>>> 1f3c3b80a0beedc18c8eae1e4094829593efdfd6
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
-        BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://host.docker.internal:8089}
+        NEXT_PUBLIC_API_URL: /api
+        BACKEND_INTERNAL_URL: http://backend:8089
     container_name: invoices-frontend
     ports:
       - "${FRONTEND_PORT:-3001}:3000"
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
-      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://host.docker.internal:8089}
+      NEXT_PUBLIC_API_URL: /api
+      BACKEND_INTERNAL_URL: http://backend:8089
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  mariadb_data:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_uploads_banking:
+    driver: local

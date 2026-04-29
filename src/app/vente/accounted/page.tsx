@@ -68,7 +68,7 @@ export default function Page() {
   return (
     <AccountedInvoicesPage
       invoices={invoices}
-      filters={{ search: "", supplier: "", status: "all" }}
+      filters={{ search: "", supplier: "", status: "all", invoiceType: "" }}
       onFiltersChange={() => {}}
       suppliers={clients}
       onView={(inv) =>

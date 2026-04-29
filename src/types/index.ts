@@ -115,6 +115,24 @@ export interface Account {
     libelle: string;
     classe: number;
     active: boolean;
+    xCom?: string;
+    delai?: number;
+    ville?: string;
+    adresse?: string;
+    activite?: string;
+    cdClt?: number;
+    cdFrs?: number;
+    typeCmpt?: string;
+    numcat?: number;
+    idF?: string;
+    cod?: string;
+    cnss?: string;
+    tp?: string;
+    ice?: string;
+    rc?: string;
+    rib?: string;
+    tva?: string;
+    charge?: string;
     classeName?: string;
     tvaRate?: number;
     taxCode?: string;
@@ -124,14 +142,37 @@ export interface Account {
     displayWithTva?: string;
     createdAt?: string;
     updatedAt?: string;
+    createdBy?: string;
+    updatedBy?: string;
 }
 
 export interface CreateAccountRequest {
     code: string;
     libelle: string;
+    classe: number;
     active?: boolean;
     tvaRate?: number;
     taxCode?: string;
+    xCom?: string;
+    delai?: number;
+    ville?: string;
+    adresse?: string;
+    activite?: string;
+    cdClt?: number;
+    cdFrs?: number;
+    typeCmpt?: string;
+    numcat?: number;
+    idF?: string;
+    cod?: string;
+    cnss?: string;
+    tp?: string;
+    ice?: string;
+    rc?: string;
+    rib?: string;
+    tva?: string;
+    charge?: string;
+    createdBy?: string;
+    updatedBy?: string;
 }
 
 export interface UpdateAccountRequest {
@@ -139,6 +180,26 @@ export interface UpdateAccountRequest {
     active?: boolean;
     tvaRate?: number;
     taxCode?: string;
+    xCom?: string;
+    delai?: number;
+    ville?: string;
+    adresse?: string;
+    activite?: string;
+    cdClt?: number;
+    cdFrs?: number;
+    typeCmpt?: string;
+    numcat?: number;
+    idF?: string;
+    cod?: string;
+    cnss?: string;
+    tp?: string;
+    ice?: string;
+    rc?: string;
+    rib?: string;
+    tva?: string;
+    charge?: string;
+    createdBy?: string;
+    updatedBy?: string;
 }
 
 export interface Tier {
@@ -240,7 +301,7 @@ export interface InvoiceDto {
     averageConfidence?: number;
     templateId?: number;
     templateName?: string;
-    extractionMethod?: "DYNAMIC_TEMPLATE" | "PATTERNS" | "MANUAL" | "NONE";
+    extractionMethod?: "DYNAMIC_TEMPLATE" | "PATTERNS" | "ALPHA_AGENT" | "MANUAL" | "NONE";
     status?: BackendInvoiceStatus;
     createdAt: string;
     updatedAt?: string;
@@ -283,7 +344,7 @@ export interface DynamicExtractionResponse {
     extractionDurationMs?: number;
     rawOcrText?: string;
     extractedText?: string;
-    extractionMethod?: "DYNAMIC_TEMPLATE" | "PATTERNS" | "MANUAL" | "NONE";
+    extractionMethod?: "DYNAMIC_TEMPLATE" | "PATTERNS" | "ALPHA_AGENT" | "MANUAL" | "NONE";
     status?: string;
     autoFilledFields?: string[];
 }

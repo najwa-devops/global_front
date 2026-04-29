@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { api } from "@/lib/api";
-import { dynamicInvoiceDtoToLocal } from "@/lib/utils";
+import { dynamicInvoiceDtoToLocal, toWorkflowStatus } from "@/lib/utils";
 import { type DynamicInvoice } from "@/lib/types";
 import {
   InvoiceFilters,
@@ -16,8 +16,18 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Clock, CheckCircle, Upload } from "lucide-react";
+import { Clock, CheckCircle, Upload, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -31,7 +41,10 @@ export default function InvoicesPage() {
     status: "",
     invoiceType: "",
   });
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const router = useRouter();
+  const { user } = useAuth();
+  const isClient = user?.role === "CLIENT";
 
   useEffect(() => {
     loadInvoices();
@@ -40,12 +53,15 @@ export default function InvoicesPage() {
   const loadInvoices = async () => {
     try {
       setIsLoading(true);
-      const dtos = await api.getAllInvoices();
+      const dtos = isClient
+        ? await api.getAllInvoices(undefined, undefined, 200)
+        : await api.getAllInvoices();
       const localInvoices = dtos.map(dynamicInvoiceDtoToLocal);
-      const pending = localInvoices.filter(
-        (inv) => !inv.accounted && !inv.accountedAt,
+      setInvoices(
+        isClient
+          ? localInvoices
+          : localInvoices.filter((inv) => !inv.accounted && !inv.accountedAt),
       );
-      setInvoices(pending);
     } catch (err) {
       console.error("Error loading invoices:", err);
     } finally {
@@ -138,7 +154,6 @@ export default function InvoicesPage() {
     }
   };
 
-  const { user } = useAuth();
   const isAccountingRole =
     user?.role === "ADMIN" ||
     user?.role === "COMPTABLE" ||
@@ -185,8 +200,21 @@ export default function InvoicesPage() {
       const message =
         err?.message === "missing_accounting_data"
           ? "Données comptables manquantes pour cette facture."
+          : err?.message === "duplicate_invoice_number"
+            ? "Comptabilisation impossible: facture déjà existe avec même numéro."
           : err?.message || "Erreur lors de la comptabilisation";
       toast.error(message);
+    }
+  };
+
+  const handleClientValidateInvoice = async (invoice: DynamicInvoice) => {
+    try {
+      toast.loading("Validation en cours...", { id: `client-validate-${invoice.id}` });
+      await api.clientValidateInvoice(invoice.id);
+      await loadInvoices();
+      toast.success("Facture validée", { id: `client-validate-${invoice.id}` });
+    } catch (err) {
+      toast.error("Erreur lors de la validation", { id: `client-validate-${invoice.id}` });
     }
   };
 
@@ -197,6 +225,30 @@ export default function InvoicesPage() {
       toast.success("Facture supprimée");
     } catch (err) {
       toast.error("Erreur suppression");
+    }
+  };
+
+  const handleDeleteAllInvoices = async () => {
+    if (invoices.length === 0) {
+      setDeleteAllOpen(false);
+      return;
+    }
+
+    const ids = invoices.map((invoice) => invoice.id);
+    try {
+      toast.loading("Suppression de toutes les factures...", { id: "delete-all-invoices" });
+      const result = await api.bulkDeleteInvoices(ids);
+      setInvoices([]);
+      setDeleteAllOpen(false);
+      toast.success(
+        result?.successCount !== undefined
+          ? `${result.successCount} facture(s) supprimée(s)`
+          : "Toutes les factures ont été supprimées",
+        { id: "delete-all-invoices" },
+      );
+    } catch (err) {
+      setDeleteAllOpen(false);
+      toast.error("Erreur suppression multiple", { id: "delete-all-invoices" });
     }
   };
 
@@ -213,17 +265,33 @@ export default function InvoicesPage() {
     <div className="space-y-6">
       <Card className="border-border/50 bg-card/50">
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
-              <Clock className="h-6 w-6 text-amber-500" />
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
+                <Clock className="h-6 w-6 text-amber-500" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">
+                  {isClient ? "Mes factures d'achat" : "Factures En Attente"}
+                </CardTitle>
+                <CardDescription>
+                  {isClient
+                    ? `${invoices.length} document${invoices.length > 1 ? "s" : ""} dans votre dossier`
+                    : `${invoices.length} facture${invoices.length > 1 ? "s" : ""} à traiter`}
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-2xl">Factures En Attente</CardTitle>
-              <CardDescription>
-                {invoices.length} facture{invoices.length > 1 ? "s" : ""} à
-                traiter
-              </CardDescription>
-            </div>
+            {!isClient && (
+              <Button
+                variant="destructive"
+                className="gap-2 lg:self-start"
+                onClick={() => setDeleteAllOpen(true)}
+                disabled={invoices.length === 0}
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer toutes
+              </Button>
+            )}
           </div>
         </CardHeader>
       </Card>
@@ -237,8 +305,6 @@ export default function InvoicesPage() {
 
       <InvoiceTable
         invoices={applyFilters(invoices)}
-        highlightInvalidTotals={true}
-        highlightCalculatedTotals={true}
         onView={(inv) =>
           router.push(
             inv.dossierId
@@ -252,7 +318,21 @@ export default function InvoicesPage() {
         onConfirm={handleConfirmInvoice}
         onFinalValidate={isAccountingRole ? undefined : handleFinalValidate}
         onAccount={isAccountingRole ? handleAccountInvoice : undefined}
+        onClientValidate={isClient ? handleClientValidateInvoice : undefined}
         userRole={user?.role}
+        checkInvoiceDuplicate={async ({ invoiceNumber, filename, partner }) => {
+          const result = await api.checkDuplicateInvoice({
+            supplier: partner,
+            invoiceNumber,
+            filename,
+          });
+          return {
+            exists: result.exists,
+            duplicate: result.matchedBy
+              ? { matchedBy: result.matchedBy }
+              : null,
+          };
+        }}
       />
 
       {invoices.length === 0 && (
@@ -272,6 +352,24 @@ export default function InvoicesPage() {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer toutes les factures ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera définitivement toutes les factures en attente affichées dans
+              la liste actuelle. Les fichiers liés seront aussi supprimés quand c’est possible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void handleDeleteAllInvoices(); }}>
+              Supprimer tout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

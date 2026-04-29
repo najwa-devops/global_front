@@ -45,6 +45,7 @@ const FIELD_OPTIONS = [
   { value: "amountHT", label: "Montant HT" },
   { value: "tva", label: "TVA" },
   { value: "amountTTC", label: "Montant TTC" },
+  { value: "amountTTCEnLettres", label: "Montant TTC en lettres" },
 ]
 
 const DEMO_PATTERNS: FieldPattern[] = [

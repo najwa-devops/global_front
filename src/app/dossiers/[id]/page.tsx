@@ -57,7 +57,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> =
 function DossierDetailContent() {
   const params = useParams();
   const router = useRouter();
-  const { isComptable, isAdmin } = useAuth();
+  const { isComptable, isAdmin, isClient } = useAuth();
   const dossierId = Number(params.id);
   const [loading, setLoading] = useState(true);
   const [dossier, setDossier] = useState<any>(null);
@@ -66,23 +66,32 @@ function DossierDetailContent() {
 
   const canEdit = isComptable() || isAdmin();
 
+  useEffect(() => {
+    if (isClient()) {
+      router.replace("/client/dashboard");
+    }
+  }, [isClient, router]);
+
+  if (isClient()) {
+    return null;
+  }
+
   const loadData = async () => {
     try {
       setLoading(true);
+      if (typeof window !== "undefined" && Number.isFinite(dossierId) && dossierId > 0) {
+        localStorage.setItem("currentDossierId", String(dossierId));
+      }
       const [allDossiers, allInvoices, allStatements] = await Promise.all([
         api.getDossiers().catch(() => []),
-        api.getAllInvoices(undefined, undefined, 200).catch(() => []),
-        api.getAllBankStatements(undefined, 200).catch(() => []),
+        api.getAllInvoices(undefined, undefined, 200, dossierId).catch(() => []),
+        api.getAllBankStatements({ limit: 200, dossierId }).catch(() => []),
       ]);
 
       const currentDossier =
         (allDossiers || []).find((d: any) => d.id === dossierId) || null;
-      const dossierInvoices = (allInvoices || []).filter(
-        (inv: any) => inv.dossierId === dossierId,
-      );
-      const dossierStatements = (allStatements || []).filter(
-        (s: any) => s.dossierId === dossierId,
-      );
+      const dossierInvoices = (allInvoices || []).filter((inv: any) => inv.dossierId === dossierId);
+      const dossierStatements = (allStatements || []).filter((s: any) => s.dossierId === dossierId);
 
       setDossier(currentDossier);
       setInvoices(dossierInvoices);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext } from 'react';
+import { useCallback, useContext } from 'react';
 import { AuthContext } from '@/src/features/auth/viewmodel/auth-context';
 import { UserRole } from '@/src/types';
 
@@ -13,15 +13,15 @@ export const useAuth = () => {
 
   const { user, loading, authenticated, login, logout, refreshUser } = context;
 
-  const hasRole = (roles: UserRole | UserRole[]) => {
+  const hasRole = useCallback((roles: UserRole | UserRole[]) => {
     if (!user) return false;
     const roleArray = Array.isArray(roles) ? roles : [roles];
     return roleArray.includes(user.role);
-  };
+  }, [user]);
 
-  const isComptable = () => hasRole(['COMPTABLE', 'ADMIN']);
-  const isAdmin = () => hasRole('ADMIN');
-  const isClient = () => hasRole('CLIENT');
+  const isComptable = useCallback(() => hasRole(['COMPTABLE', 'ADMIN']), [hasRole]);
+  const isAdmin = useCallback(() => hasRole('ADMIN'), [hasRole]);
+  const isClient = useCallback(() => hasRole('CLIENT'), [hasRole]);
 
   return {
     user,

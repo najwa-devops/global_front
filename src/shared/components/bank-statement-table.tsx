@@ -6,6 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
     FileText,
     Save,
     Trash2,
@@ -23,9 +33,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { BankStatementV2, BankTransactionV2 } from "@/lib/types"
+import type { BankStatementV2, BankTransactionV2 } from "@/releve-bancaire/types"
 import { formatFileSize, formatDate } from "@/lib/utils"
-import { BankStatementDetailModal } from "@/src/features/bank/view/BankStatementDetailModal"
 
 interface BankStatementTableProps {
     statements: BankStatementV2[]
@@ -35,9 +44,11 @@ interface BankStatementTableProps {
     onMarkAsAccounted?: (statementId: number) => void
     onReprocess?: (statement: BankStatementV2) => void
     onSave?: (statement: BankStatementV2) => void
+    onUpdateStatement?: (statement: BankStatementV2) => void
+    userRole?: string
 }
 
-export function BankStatementTable({ statements, onView, onDelete, onValidate, onMarkAsAccounted, onReprocess, onSave }: BankStatementTableProps) {
+export function BankStatementTable({ statements, onView, onDelete, onValidate, onMarkAsAccounted, onReprocess, onSave, onUpdateStatement, userRole }: BankStatementTableProps) {
     void onView
     void onSave
     // Initialiser les états de "Lier" à partir des données backend si disponibles
@@ -52,8 +63,9 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
     }, [statements]);
 
     const [linkedStatements, setLinkedStatements] = useState<Record<number, boolean>>(initialLinked)
-    const [selectedStatement, setSelectedStatement] = useState<BankStatementV2 | null>(null)
-    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [deleteStatementId, setDeleteStatementId] = useState<number | null>(null)
+    const isClient = userRole === "CLIENT"
+    const showActions = !isClient
 
     // Mettre à jour si les statements changent
     useEffect(() => {
@@ -64,15 +76,15 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
         setLinkedStatements(prev => ({ ...prev, [id]: checked }))
     }
 
-    const handleViewDetails = (statement: BankStatementV2) => {
-        setSelectedStatement(statement)
-        setIsModalOpen(true)
+    const confirmDeleteStatement = () => {
+        if (deleteStatementId == null) return
+        onDelete(deleteStatementId)
+        setDeleteStatementId(null)
     }
 
-    const normalizeStatus = (status?: string) => String(status || "").toUpperCase()
-
     const getStatusBadge = (status: string) => {
-        switch (normalizeStatus(status)) {
+        const normalized = String(status || "").toUpperCase()
+        switch (normalized) {
             case "PENDING":
             case "EN_ATTENTE":
                 return <Badge className="bg-sky-400/10 text-sky-500 border-sky-400/30">En attente</Badge>
@@ -81,7 +93,8 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                 return <Badge className="bg-blue-500/10 text-blue-600 border-blue-400/30 animate-pulse">En cours</Badge>
             case "TREATED":
             case "TRAITE":
-                return <Badge className="bg-blue-700/10 text-blue-800 border-blue-700/30">Traité</Badge>
+            case "A_VERIFIER":
+                return <Badge className="bg-orange-500/10 text-orange-700 border-orange-500/40 animate-pulse">À vérifier</Badge>
             case "READY_TO_VALIDATE":
             case "PRET_A_VALIDER":
                 return <Badge className="bg-emerald-400/10 text-emerald-500 border-emerald-400/30">Prêt à valider</Badge>
@@ -102,16 +115,17 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
             case "DUPLICATE":
                 return <Badge variant="outline" className="text-muted-foreground border-muted">Dupliqué</Badge>
             default:
-                return <Badge className="bg-muted/10 text-muted-foreground border-muted/30">{status}</Badge>
+                return <Badge className="bg-muted/10 text-muted-foreground border-muted/30">{normalized || "INCONNU"}</Badge>
         }
     }
 
     const renderStatusCell = (statement: BankStatementV2) => {
-        if (normalizeStatus(statement.status) === "PROCESSING" && statement.totalPages) {
+        const displayStatus = String(statement.displayStatus || statement.status || "").toUpperCase()
+        if (displayStatus === "PROCESSING" && statement.totalPages) {
             const progress = Math.round(((statement.processedPages || 0) / statement.totalPages) * 100);
             return (
                 <div className="flex flex-col gap-1 w-24">
-                    {getStatusBadge(statement.status)}
+                    {getStatusBadge(displayStatus)}
                     <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                         <div
                             className="bg-sky-400 h-full transition-all duration-300"
@@ -124,7 +138,7 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                 </div>
             );
         }
-        return getStatusBadge(statement.status);
+        return getStatusBadge(displayStatus);
     }
 
     return (
@@ -151,7 +165,7 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                                     <TableHead className="font-bold text-foreground">Total Décaissement</TableHead>
                                     <TableHead className="font-bold text-foreground">Total Encaissement</TableHead>
                                     <TableHead className="font-bold text-foreground">Statut</TableHead>
-                                    <TableHead className="text-right font-bold text-foreground">Action</TableHead>
+                                    {showActions && <TableHead className="text-right font-bold text-foreground">Action</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -177,49 +191,56 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                                                 {statement.totalCredit ? `${statement.totalCredit.toLocaleString()} DH` : "0.00 DH"}
                                             </TableCell>
                                             <TableCell>{renderStatusCell(statement)}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <div className="flex items-center gap-2 mr-2">
-                                                        {/* Checkbox 'Lier' supprimée comme demandé */}
+                                            {showActions && (
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <div className="flex items-center gap-2 mr-2">
+                                                            {/* Checkbox 'Lier' supprimée comme demandé */}
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-primary hover:bg-primary/10"
+                                                            onClick={() => onView(statement)}
+                                                            title="Détails"
+                                                        >
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" className="w-32">
+                                                                {(String(statement.displayStatus || statement.status || "").toUpperCase() === "TREATED"
+                                                                    || String(statement.displayStatus || statement.status || "").toUpperCase() === "TRAITE"
+                                                                    || String(statement.displayStatus || statement.status || "").toUpperCase() === "A_VERIFIER"
+                                                                    || String(statement.displayStatus || statement.status || "").toUpperCase() === "READY_TO_VALIDATE"
+                                                                    || String(statement.displayStatus || statement.status || "").toUpperCase() === "PRET_A_VALIDER") && onValidate && (
+                                                                    <DropdownMenuItem className="text-emerald-600 gap-2" onClick={() => onValidate(statement.id)}>
+                                                                        <CheckCircle2 className="h-4 w-4" /> Valider
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                                {(String(statement.displayStatus || statement.status || "").toUpperCase() === "VALIDATED"
+                                                                    || String(statement.displayStatus || statement.status || "").toUpperCase() === "VALIDE") && onMarkAsAccounted && (
+                                                                    <DropdownMenuItem className="text-violet-700 gap-2" onClick={() => onMarkAsAccounted(statement.id)}>
+                                                                        <CheckCircle2 className="h-4 w-4" /> Comptabiliser
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                                {(statement.canReprocess || String(statement.displayStatus || statement.status || "").toUpperCase() === "ERROR" || String(statement.displayStatus || statement.status || "").toUpperCase() === "ERREUR") && onReprocess && (
+                                                                    <DropdownMenuItem className="text-blue-600 gap-2" onClick={() => onReprocess(statement)}>
+                                                                        <RefreshCw className="h-4 w-4" /> Reprocesser
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                                <DropdownMenuItem className="text-destructive gap-2" onClick={() => setDeleteStatementId(statement.id)}>
+                                                                    <Trash2 className="h-4 w-4" /> Supprimer
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-primary hover:bg-primary/10"
-                                                        onClick={() => handleViewDetails(statement)}
-                                                        title="Détails"
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-32">
-                                                            {(["TREATED", "READY_TO_VALIDATE", "TRAITE", "PRET_A_VALIDER"].includes(normalizeStatus(statement.status))) && onValidate && (
-                                                                <DropdownMenuItem className="text-emerald-600 gap-2" onClick={() => onValidate(statement.id)}>
-                                                                    <CheckCircle2 className="h-4 w-4" /> Valider
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            {(["VALIDATED", "VALIDE"].includes(normalizeStatus(statement.status))) && onMarkAsAccounted && (
-                                                                <DropdownMenuItem className="text-violet-700 gap-2" onClick={() => onMarkAsAccounted(statement.id)}>
-                                                                    <CheckCircle2 className="h-4 w-4" /> Comptabiliser
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            {(statement.canReprocess || ["ERROR", "ERREUR"].includes(normalizeStatus(statement.status))) && onReprocess && (
-                                                                <DropdownMenuItem className="text-blue-600 gap-2" onClick={() => onReprocess(statement)}>
-                                                                    <RefreshCw className="h-4 w-4" /> Reprocesser
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            <DropdownMenuItem className="text-destructive gap-2" onClick={() => onDelete(statement.id)}>
-                                                                <Trash2 className="h-4 w-4" /> Supprimer
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </TableCell>
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     )
                                 })}
@@ -229,11 +250,22 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                 </CardContent>
             </Card>
 
-            <BankStatementDetailModal
-                open={isModalOpen}
-                onOpenChange={setIsModalOpen}
-                statement={selectedStatement}
-            />
+            <AlertDialog open={deleteStatementId !== null} onOpenChange={(open) => { if (!open) setDeleteStatementId(null) }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmation</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Êtes-vous sûr de supprimer ce fichier ?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmDeleteStatement() }}>
+                            Oui
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }

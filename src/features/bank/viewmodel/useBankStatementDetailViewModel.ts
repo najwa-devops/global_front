@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Account, BankStatementV2, BankTransactionV2 } from "@/lib/types";
+import type { CmExpansion } from "@/lib/centre-monetique/types";
 import {
   applyAutoComptePropagation,
   buildLocalTransaction,
@@ -18,6 +19,7 @@ import {
   fetchAccounts,
   fetchBankStatementById,
   fetchBankTransactionsByStatementId,
+  fetchCmExpansionsByStatementId,
   retryBankStatementPages,
   updateBankTransaction,
 } from "@/src/features/bank/model/bank.service";
@@ -40,6 +42,8 @@ export function useBankStatementDetailViewModel({
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [localStatement, setLocalStatement] = useState<BankStatementV2 | null>(null);
+  const [cmExpansions, setCmExpansions] = useState<CmExpansion[]>([]);
+  const [loadingCmExpansions, setLoadingCmExpansions] = useState(false);
   const [newTransaction, setNewTransaction] = useState<NewTransactionForm>(
     EMPTY_NEW_TRANSACTION,
   );
@@ -73,6 +77,16 @@ export function useBankStatementDetailViewModel({
         ...prev,
         transactionIndex: Math.max(sorted.length + 1, 1),
       }));
+
+      setLoadingCmExpansions(true);
+      try {
+        const expansions = await fetchCmExpansionsByStatementId(id);
+        setCmExpansions(Array.isArray(expansions) ? expansions : []);
+      } catch {
+        setCmExpansions([]);
+      } finally {
+        setLoadingCmExpansions(false);
+      }
     } catch (error) {
       console.error("Error loading full data:", error);
       if (!silent) toast.error("Erreur de chargement des donnees");
@@ -107,6 +121,7 @@ export function useBankStatementDetailViewModel({
     } else if (!open) {
       lastLoadedId.current = null;
       setOpenComptePopoverTxId(null);
+      setCmExpansions([]);
     }
   }, [open, statement?.id, statement?.status, statement?.transactionCount]);
 
@@ -260,6 +275,8 @@ export function useBankStatementDetailViewModel({
     accounts,
     loadingAccounts,
     newTransaction,
+    cmExpansions,
+    loadingCmExpansions,
     editingCell,
     openComptePopoverTxId,
     hasChanges,

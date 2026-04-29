@@ -174,6 +174,11 @@ export function UploadedFilesPage({
     return htField?.value ? formatAmount(htField.value) : "-"
   }
 
+  const isComputedAmountField = (invoice: DynamicInvoice, key: string): boolean => {
+    const computed = invoice.fieldsData?.computedAmountFields
+    return Array.isArray(computed) && computed.some((field) => String(field) === key)
+  }
+
   const getTVA = (invoice: DynamicInvoice): string => {
     const tvaField = invoice.fields.find((f: DynamicInvoiceField) => f.key === "tva")
     return tvaField?.value ? formatAmount(tvaField.value) : "-"
@@ -382,9 +387,36 @@ export function UploadedFilesPage({
                       <TableCell className="font-medium">{getInvoiceNumber(invoice)}</TableCell>
                       <TableCell>{getSupplier(invoice)}</TableCell>
                       <TableCell className="text-muted-foreground">{getInvoiceDate(invoice)}</TableCell>
-                      <TableCell className="font-semibold">{getHT(invoice)}</TableCell>
-                      <TableCell className="font-semibold text-muted-foreground">{getTVA(invoice)}</TableCell>
-                      <TableCell className="font-bold text-primary">{getTTC(invoice)}</TableCell>
+                      <TableCell className="font-semibold">
+                        <div className="flex flex-col">
+                          <span>{getHT(invoice)}</span>
+                          {isComputedAmountField(invoice, "amountHT") ? (
+                            <span className="text-[10px] uppercase tracking-wide text-sky-600">
+                              Calculé
+                            </span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold text-muted-foreground">
+                        <div className="flex flex-col">
+                          <span>{getTVA(invoice)}</span>
+                          {isComputedAmountField(invoice, "tva") ? (
+                            <span className="text-[10px] uppercase tracking-wide text-sky-600">
+                              Calculé
+                            </span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-bold text-primary">
+                        <div className="flex flex-col">
+                          <span>{getTTC(invoice)}</span>
+                          {isComputedAmountField(invoice, "amountTTC") ? (
+                            <span className="text-[10px] uppercase tracking-wide text-sky-600">
+                              Calculé
+                            </span>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs font-mono">{getTierAccount(invoice)}</TableCell>
                       <TableCell className="text-xs font-mono">{getChargeAccount(invoice)}</TableCell>
                       <TableCell className="text-xs font-mono">{getTvaAccount(invoice)}</TableCell>

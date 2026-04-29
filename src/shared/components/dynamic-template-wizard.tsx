@@ -55,6 +55,7 @@ const COMMON_FIELDS: Array<{
   { name: "amountHT", type: "CURRENCY", required: true },
   { name: "tva", type: "CURRENCY", required: true },
   { name: "amountTTC", type: "CURRENCY", required: true },
+  { name: "amountTTCEnLettres", type: "TEXT", required: false },
 ];
 
 const FIELD_TYPE_LABELS: Record<DynamicFieldType, string> = {

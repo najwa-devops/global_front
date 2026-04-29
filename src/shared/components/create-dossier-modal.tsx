@@ -11,7 +11,7 @@ import { FolderPlus, Info } from "lucide-react"
 interface CreateDossierModalProps {
     open: boolean
     onClose: () => void
-    onSubmit: (req: CreateDossierRequest) => void
+    onSubmit: (req: CreateDossierRequest) => Promise<void>
 }
 
 export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierModalProps) {
@@ -38,26 +38,27 @@ export function CreateDossierModal({ open, onClose, onSubmit }: CreateDossierMod
         }
         if (fournisseurPassword.trim().length < 6) return
         setIsLoading(true)
-        // Simulate API delay
-        await new Promise(r => setTimeout(r, 800))
-        onSubmit({
-            name: name.trim(),
-            fournisseurName: fournisseurName.trim(),
-            ice: ice.trim(),
-            fournisseurEmail: fournisseurEmail.trim(),
-            fournisseurPassword: fournisseurPassword.trim(),
-            exerciseStartDate,
-            exerciseEndDate
-        })
-        setIsLoading(false)
-        setName("")
-        setFournisseurName("")
-        setIce("")
-        setFournisseurEmail("")
-        setFournisseurPassword("")
-        setExerciseStartDate("")
-        setExerciseEndDate("")
-        setExerciseError("")
+        try {
+            await onSubmit({
+                name: name.trim(),
+                fournisseurName: fournisseurName.trim(),
+                ice: ice.trim(),
+                fournisseurEmail: fournisseurEmail.trim(),
+                fournisseurPassword: fournisseurPassword.trim(),
+                exerciseStartDate,
+                exerciseEndDate
+            })
+            setName("")
+            setFournisseurName("")
+            setIce("")
+            setFournisseurEmail("")
+            setFournisseurPassword("")
+            setExerciseStartDate("")
+            setExerciseEndDate("")
+            setExerciseError("")
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (

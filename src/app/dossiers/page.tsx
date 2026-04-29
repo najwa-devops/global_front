@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { AuthGuard } from "@/components/auth-guard";
 import { api } from "@/lib/api";
 import { Dossier, CreateDossierRequest } from "@/src/types/dossier";
+import { AdminService } from "@/src/api/services/admin.service";
+import { ComptableAdminDto } from "@/src/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,11 +24,9 @@ import {
   Search,
   FileText,
   Building2,
-  CheckCircle2,
-  Clock,
   ChevronRight,
-  Users,
   Trash2,
+  ReceiptText,
 } from "lucide-react";
 import {
   Table,
@@ -39,6 +39,13 @@ import {
 import { CreateDossierModal } from "@/components/create-dossier-modal";
 import { toast } from "sonner";
 import { GeneralParamsService } from "@/src/api/services/general-params.service";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 function mapBackendDossier(raw: any): Dossier {
   return {
@@ -51,8 +58,10 @@ function mapBackendDossier(raw: any): Dossier {
     },
     comptableId: raw.comptableId ?? 0,
     comptableName: raw.comptableEmail ?? "",
+    ice: raw.ice ?? undefined,
     invoicesCount: raw.invoicesCount ?? 0,
     bankStatementsCount: raw.bankStatementsCount ?? 0,
+    centreMonetiqueCount: raw.centreMonetiqueCount ?? 0,
     pendingInvoicesCount: raw.pendingInvoicesCount ?? 0,
     validatedInvoicesCount: raw.validatedInvoicesCount ?? 0,
     status:
@@ -65,6 +74,17 @@ function mapBackendDossier(raw: any): Dossier {
   };
 }
 
+function formatExerciseRange(start?: string, end?: string): string {
+  if (!start && !end) return "-";
+  const startText = start
+    ? new Date(start).toLocaleDateString("fr-FR")
+    : "?";
+  const endText = end
+    ? new Date(end).toLocaleDateString("fr-FR")
+    : "?";
+  return `${startText} → ${endText}`;
+}
+
 function DossiersPageContent() {
   const { user, isComptable, isAdmin } = useAuth();
   const router = useRouter();
@@ -72,6 +92,27 @@ function DossiersPageContent() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
+  const [comptables, setComptables] = useState<ComptableAdminDto[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [comptableModal, setComptableModal] = useState<{
+    dossierId: number;
+    dossierName: string;
+  } | null>(null);
+  const [savingComptable, setSavingComptable] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === "CLIENT") {
+      router.replace("/client/dashboard");
+    }
+  }, [router, user?.role]);
+
+  if (user?.role === "CLIENT") {
+    return null;
+  }
 
   const loadDossiers = async () => {
     try {
@@ -87,16 +128,31 @@ function DossiersPageContent() {
 
   useEffect(() => {
     loadDossiers();
-  }, []);
+    if (isAdmin()) {
+      AdminService.listComptables()
+        .then(setComptables)
+        .catch(() => {});
+    }
+  }, [isAdmin]);
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
     return dossiers.filter(
       (d) =>
         d.name.toLowerCase().includes(term) ||
-        d.fournisseur.name.toLowerCase().includes(term),
+        d.fournisseur.name.toLowerCase().includes(term) ||
+        String(d.ice || "").toLowerCase().includes(term),
     );
   }, [dossiers, search]);
+
+  const comptableIds = useMemo(
+    () => new Set(comptables.map((c) => c.id)),
+    [comptables],
+  );
+
+  const totalInvoices = dossiers.reduce((sum, dossier) => sum + dossier.invoicesCount, 0);
+  const totalBankStatements = dossiers.reduce((sum, dossier) => sum + dossier.bankStatementsCount, 0);
+  const totalCentreMonetique = dossiers.reduce((sum, dossier) => sum + dossier.centreMonetiqueCount, 0);
 
   const handleCreateDossier = async (req: CreateDossierRequest) => {
     try {
@@ -128,10 +184,38 @@ function DossiersPageContent() {
       toast.error(err?.message || "Erreur lors de la création du dossier.");
     }
   };
-  const handleDeleteDossier = async (_id: number, _name: string) => {
-    toast.error(
-      "Suppression de dossier non disponible sur cette version du backend.",
-    );
+  const handleDeleteDossier = (id: number, name: string) => {
+    setDeleteConfirm({ id, name });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleting(true);
+    try {
+      await api.deleteDossier(deleteConfirm.id);
+      toast.success(`Dossier "${deleteConfirm.name}" supprimé.`);
+      setDeleteConfirm(null);
+      await loadDossiers();
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de la suppression.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleAssignComptable = async (comptableId: number) => {
+    if (!comptableModal) return;
+    setSavingComptable(true);
+    try {
+      await api.changeDossierComptable(comptableModal.dossierId, comptableId);
+      toast.success("Comptable assigné.");
+      setComptableModal(null);
+      await loadDossiers();
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de l'assignation.");
+    } finally {
+      setSavingComptable(false);
+    }
   };
 
   const openDossier = (id: number, name: string) => {
@@ -185,14 +269,25 @@ function DossiersPageContent() {
         <Card className="border-border/50">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-500/10">
+                <FileText className="h-4 w-4 text-indigo-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{totalInvoices}</p>
+                <p className="text-xs text-muted-foreground">Factures uploadées</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-amber-500/10">
-                <Clock className="h-4 w-4 text-amber-500" />
+                <Building2 className="h-4 w-4 text-amber-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {dossiers.reduce((s, d) => s + d.pendingInvoicesCount, 0)}
-                </p>
-                <p className="text-xs text-muted-foreground">En attente</p>
+                <p className="text-2xl font-bold">{totalBankStatements}</p>
+                <p className="text-xs text-muted-foreground">Relevés bancaires</p>
               </div>
             </div>
           </CardContent>
@@ -200,29 +295,12 @@ function DossiersPageContent() {
         <Card className="border-border/50">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <div className="p-2 rounded-lg bg-sky-500/10">
+                <ReceiptText className="h-4 w-4 text-sky-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {dossiers.reduce((s, d) => s + d.validatedInvoicesCount, 0)}
-                </p>
-                <p className="text-xs text-muted-foreground">Validées</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <Users className="h-4 w-4 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {new Set(dossiers.map((d) => d.fournisseur.email)).size}
-                </p>
-                <p className="text-xs text-muted-foreground">Fournisseurs</p>
+                <p className="text-2xl font-bold">{totalCentreMonetique}</p>
+                <p className="text-xs text-muted-foreground">Centre monétique</p>
               </div>
             </div>
           </CardContent>
@@ -257,9 +335,12 @@ function DossiersPageContent() {
               <TableRow>
                 <TableHead>Dossier</TableHead>
                 <TableHead>Fournisseur</TableHead>
+                <TableHead>ICE dossier</TableHead>
                 <TableHead>Factures</TableHead>
+                <TableHead>Relevés bancaires</TableHead>
+                <TableHead>Centre monétique</TableHead>
                 <TableHead>En attente</TableHead>
-                <TableHead>Créé le</TableHead>
+                <TableHead>Exercice</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -277,7 +358,12 @@ function DossiersPageContent() {
                     </div>
                   </TableCell>
                   <TableCell>{dossier.fournisseur.name}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {dossier.ice || "-"}
+                  </TableCell>
                   <TableCell>{dossier.invoicesCount}</TableCell>
+                  <TableCell>{dossier.bankStatementsCount}</TableCell>
+                  <TableCell>{dossier.centreMonetiqueCount}</TableCell>
                   <TableCell>
                     {dossier.pendingInvoicesCount > 0 ? (
                       <Badge
@@ -291,13 +377,31 @@ function DossiersPageContent() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {new Date(dossier.createdAt).toLocaleDateString("fr-FR")}
+                    {formatExerciseRange(
+                      dossier.exerciseStartDate,
+                      dossier.exerciseEndDate,
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div
                       className="flex items-center justify-end gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {isAdmin() && (
+                        <button
+                          className="text-xs text-primary underline hover:text-primary/70 transition-colors"
+                          onClick={() =>
+                            setComptableModal({
+                              dossierId: dossier.id,
+                              dossierName: dossier.name,
+                            })
+                          }
+                        >
+                          {comptableIds.has(dossier.comptableId)
+                            ? "Modifier comptable"
+                            : "Choisir comptable"}
+                        </button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -306,7 +410,7 @@ function DossiersPageContent() {
                       >
                         Ouvrir <ChevronRight className="ml-1 h-4 w-4" />
                       </Button>
-                      {(isComptable() || isAdmin()) && (
+                      {isAdmin() && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -361,9 +465,26 @@ function DossiersPageContent() {
                   <Building2 className="h-3 w-3" />
                   {dossier.fournisseur.name}
                 </CardDescription>
+                <CardDescription className="text-xs mt-0.5 font-mono">
+                  ICE: {dossier.ice || "-"}
+                </CardDescription>
                 {isAdmin() && (
-                  <CardDescription className="text-xs mt-0.5">
-                    Comptable : {dossier.comptableName}
+                  <CardDescription className="text-xs mt-0.5 flex items-center gap-2">
+                    <span>Comptable : {dossier.comptableName || "—"}</span>
+                    <button
+                      className="text-primary underline hover:text-primary/70 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setComptableModal({
+                          dossierId: dossier.id,
+                          dossierName: dossier.name,
+                        });
+                      }}
+                    >
+                      {comptableIds.has(dossier.comptableId)
+                        ? "Modifier comptable"
+                        : "Choisir comptable"}
+                    </button>
                   </CardDescription>
                 )}
               </CardHeader>
@@ -377,6 +498,10 @@ function DossiersPageContent() {
                     <span className="flex items-center gap-1">
                       <Building2 className="h-3.5 w-3.5" />
                       {dossier.bankStatementsCount} relevés
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <ReceiptText className="h-3.5 w-3.5" />
+                      {dossier.centreMonetiqueCount} centre monétique
                     </span>
                   </div>
                   <div
@@ -399,14 +524,105 @@ function DossiersPageContent() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Créé le{" "}
-                  {new Date(dossier.createdAt).toLocaleDateString("fr-FR")}
+                  Exercice{" "}
+                  {formatExerciseRange(
+                    dossier.exerciseStartDate,
+                    dossier.exerciseEndDate,
+                  )}
                 </p>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Delete confirmation modal */}
+      <Dialog
+        open={deleteConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteConfirm(null);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Supprimer le dossier</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Êtes-vous sûr de vouloir supprimer le dossier{" "}
+            <span className="font-semibold text-foreground">
+              {deleteConfirm?.name}
+            </span>{" "}
+            ? Cette action est irréversible et supprimera toutes les données
+            associées.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={deleting}
+              onClick={() => setDeleteConfirm(null)}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={handleConfirmDelete}
+            >
+              {deleting ? "Suppression..." : "Oui, supprimer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Comptable selection modal */}
+      <Dialog
+        open={comptableModal !== null}
+        onOpenChange={(open) => {
+          if (!open) setComptableModal(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sélectionner un comptable</DialogTitle>
+          </DialogHeader>
+          {comptableModal && (
+            <p className="text-sm text-muted-foreground -mt-2 mb-1">
+              Dossier :{" "}
+              <span className="font-medium text-foreground">
+                {comptableModal.dossierName}
+              </span>
+            </p>
+          )}
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {comptables.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Aucun comptable disponible
+              </p>
+            ) : (
+              comptables.map((c) => (
+                <button
+                  key={c.id}
+                  disabled={savingComptable}
+                  className="w-full text-left flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => handleAssignComptable(c.id)}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
+                    {c.email.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {c.email.split("@")[0]}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {c.email}
+                    </p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <CreateDossierModal
         open={showCreateModal}

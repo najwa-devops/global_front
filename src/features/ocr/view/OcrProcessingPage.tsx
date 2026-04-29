@@ -42,6 +42,9 @@ import {
   Settings,
   MousePointer2,
   Crosshair,
+  Copy,
+  ChevronUp,
+  Eye,
 } from "lucide-react";
 import {
   Dialog,
@@ -235,13 +238,11 @@ export function OcrProcessingPage({
   ): DynamicInvoiceField[] => {
     let nextFields = currentFields;
 
-    if (tvaValues.length > 1) {
-      const primaryTva = tvaValues[0]?.trim();
-      if (primaryTva) {
-        nextFields = nextFields.map((f) =>
-          f.key === "tva" ? { ...f, value: primaryTva, detected: true } : f,
-        );
-      }
+    const primaryTva = tvaValues[0]?.trim();
+    if (primaryTva) {
+      nextFields = nextFields.map((f) =>
+        f.key === "tva" ? { ...f, value: primaryTva, detected: true } : f,
+      );
     }
 
     return upsertSecondaryTvaField(
@@ -360,7 +361,6 @@ export function OcrProcessingPage({
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isAccounting, setIsAccounting] = useState(false);
-  const [isRebuildingJournal, setIsRebuildingJournal] = useState(false);
   const [isSelectingPosition, setIsSelectingPosition] = useState<string | null>(
     null,
   );
@@ -426,6 +426,12 @@ export function OcrProcessingPage({
   const [isCreateTemplateModalOpen, setIsCreateTemplateModalOpen] =
     useState(false);
   const [isExistingSupplier, setIsExistingSupplier] = useState(false);
+  const [currentIsAvoir, setCurrentIsAvoir] = useState<boolean>(
+    Boolean(invoice.isAvoir),
+  );
+  const [isTogglingAvoir, setIsTogglingAvoir] = useState(false);
+  const isAccountedInvoice =
+    status === "accounted" || Boolean(invoice.accounted || invoice.accountedAt);
 
   // Tracking for failed lookups to avoid console noise
   const lookupCache = useRef<Set<string>>(new Set());
@@ -435,6 +441,14 @@ export function OcrProcessingPage({
   const [tvaAccounts, setTvaAccounts] = useState<Account[]>([]);
   const [fournisseurAccounts, setFournisseurAccounts] = useState<Account[]>([]);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const qualityFlags = invoice.qualityFlags || [];
+  const reviewReasons = invoice.reviewReasons || [];
+  const difficultyTone =
+    invoice.difficultyClass === "TRES_DIFFICILE"
+      ? "destructive"
+      : invoice.difficultyClass === "DIFFICILE"
+        ? "secondary"
+        : "outline";
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -447,11 +461,17 @@ export function OcrProcessingPage({
     if (invoice.headerText) setHeaderText(invoice.headerText);
     if (invoice.footerText) setFooterText(invoice.footerText);
   }, [
+    invoice.id,
+    invoice.isAvoir,
     invoice.rawOcrText,
     invoice.extractedText,
     invoice.headerText,
     invoice.footerText,
   ]);
+
+  useEffect(() => {
+    setCurrentIsAvoir(Boolean(invoice.isAvoir));
+  }, [invoice.id, invoice.isAvoir]);
 
   const isImage = invoice.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i);
   const isPdf = invoice.filename.match(/\.pdf$/i);
@@ -547,11 +567,7 @@ export function OcrProcessingPage({
         if (accountsRes.status === "fulfilled") {
           setTvaAccounts(
             accountsRes.value.filter(
-<<<<<<< HEAD
               (a) => a.code.startsWith("3455") || a.code.startsWith("4455"),
-=======
-              (a) => a.code.startsWith("345") || a.code.startsWith("445"),
->>>>>>> 1f3c3b80a0beedc18c8eae1e4094829593efdfd6
             ),
           );
           hasAnyData = true;
@@ -587,6 +603,11 @@ export function OcrProcessingPage({
 
   // Fonction pour lier un Tier à la facture
   const handleLinkTier = async (selectedTierId: number) => {
+    if (!Number.isFinite(selectedTierId) || selectedTierId <= 0) {
+      toast.error("Impossible de lier le client/fournisseur: identifiant invalide");
+      return;
+    }
+
     setIsTierLinking(true);
     const toastId = toast.loading("Liaison du fournisseur en cours...");
 
@@ -600,7 +621,7 @@ export function OcrProcessingPage({
         const updatedInvoice = isSalesFlow
           ? salesInvoiceDtoToLocal(result.invoice)
           : dynamicInvoiceDtoToLocal(result.invoice);
-        setFields(updatedInvoice.fields);
+        setFields(updatedInvoice.fields || []);
         setTier(updatedInvoice.tier || null);
         setStatus(updatedInvoice.status);
         setMissingFields(updatedInvoice.missingFields || []);
@@ -837,6 +858,12 @@ export function OcrProcessingPage({
               return { ...f, value: "4600.00", detected: true };
             case "amountTTC":
               return { ...f, value: "27600.00", detected: true };
+            case "amountTTCEnLettres":
+              return {
+                ...f,
+                value: "vingt-sept mille six cents dirhams",
+                detected: true,
+              };
             default:
               return f;
           }
@@ -988,9 +1015,12 @@ export function OcrProcessingPage({
           },
         });
       } else {
+        const backendDetail = errorMessage.replace(/^500\s+Internal Server Error\s*-?\s*/i, "");
         toast.error(is500 ? "Erreur Serveur (500)" : "Erreur Extraction", {
           description: is500
-            ? `Échec du traitement pour la facture #${invoice.id}. Le service d'extraction est indisponible.`
+            ? backendDetail && backendDetail !== "500 Internal Server Error"
+              ? `Facture #${invoice.id}: ${backendDetail}`
+              : `Échec du traitement pour la facture #${invoice.id}. Le service d'extraction est indisponible.`
             : errorMessage,
           duration: is500 ? 8000 : 5000,
           action: {
@@ -1104,11 +1134,13 @@ export function OcrProcessingPage({
             updateFieldValue("chargeAccount", foundTier.defaultChargeAccount);
           if (foundTier.tvaAccount)
             updateFieldValue("tvaAccount", foundTier.tvaAccount);
-          if (foundTier.defaultTvaRate)
+          if (foundTier.defaultTvaRate != null)
             updateFieldValue("tvaRate", foundTier.defaultTvaRate);
-          // Activité : depuis le tier, ou à défaut le libellé du compte HT
+          // Activité : utiliser celle du tier si elle existe vraiment,
+          // sinon fallback sur le libellé du compte de charge.
+          const tierActivity = String(foundTier.activity || "").trim();
           const activityValue =
-            foundTier.activity ||
+            tierActivity ||
             chargeAccounts.find(
               (a) => a.code === foundTier.defaultChargeAccount,
             )?.libelle ||
@@ -1332,6 +1364,37 @@ export function OcrProcessingPage({
     }
   };
 
+  const handleToggleAvoir = async () => {
+    if (isDemoMode || isClientUser || isAccountedInvoice || status === "validated") {
+      return;
+    }
+    const nextIsAvoir = !currentIsAvoir;
+    setIsTogglingAvoir(true);
+    try {
+      const updateFn =
+        onUpdateFields ??
+        (isSalesFlow ? api.updateSalesInvoiceFields : api.updateDynamicInvoiceFields);
+      const savedInvoice = await updateFn(invoice.id, {
+        isAvoirOverride: nextIsAvoir,
+        isAvoir: nextIsAvoir,
+      });
+      setCurrentIsAvoir(Boolean(savedInvoice.isAvoir));
+      onSave({
+        ...invoice,
+        ...savedInvoice,
+        isAvoir: Boolean(savedInvoice.isAvoir),
+      } as DynamicInvoice);
+      toast.success(
+        `Type mis à jour: ${nextIsAvoir ? "Avoir" : "Facture"}`,
+      );
+    } catch (err) {
+      console.error("Toggle isAvoir failed:", err);
+      toast.error("Impossible de modifier le type de document");
+    } finally {
+      setIsTogglingAvoir(false);
+    }
+  };
+
   const handleValidate = async () => {
     if (status !== "ready_to_validate") {
       toast.error("Veuillez d'abord enregistrer les données");
@@ -1381,9 +1444,28 @@ export function OcrProcessingPage({
         const updateFn = onUpdateFields ?? api.updateDynamicInvoiceFields;
         await updateFn(invoice.id, fieldsForBackend);
       }
+      if (!isDemoMode && !isSalesFlow) {
+        const supplier = String(fieldsForBackend.supplier || invoice.supplier || "").trim();
+        const invoiceNumber = String(
+          fieldsForBackend.invoiceNumber || invoice.invoiceNumber || "",
+        ).trim();
+        const filename = String(invoice.originalName || invoice.filename || "").trim();
+        if (supplier && (invoiceNumber || filename)) {
+          const duplicate = await api.checkDuplicateInvoice({
+            supplier,
+            invoiceNumber: invoiceNumber || undefined,
+            filename: filename || undefined,
+          });
+          if (duplicate.exists) {
+            throw new Error("duplicate_invoice_number");
+          }
+        }
+      }
       // 2. Comptabiliser ensuite
       if (!isDemoMode) {
-        const result = await api.accountInvoice(invoice.id);
+        const result: any = isSalesFlow
+          ? await api.accountSalesInvoice(invoice.id)
+          : await api.accountInvoice(invoice.id);
         toast.success(result?.message || "Facture enregistrée et comptabilisée avec succès");
       } else {
         toast.success("Facture enregistrée et comptabilisée (Mode Démo)");
@@ -1395,29 +1477,12 @@ export function OcrProcessingPage({
       const message =
         err?.message === "missing_accounting_data"
           ? "Données comptables manquantes. Veuillez configurer les comptes du fournisseur."
+          : err?.message === "duplicate_invoice_number"
+            ? "Comptabilisation impossible: facture déjà existe avec même numéro."
           : err?.message || "Erreur lors de l'enregistrement/comptabilisation";
       toast.error(message);
     } finally {
       setIsAccounting(false);
-    }
-  };
-
-  const handleRebuildJournal = async () => {
-    if (isRebuildingJournal) return;
-    setIsRebuildingJournal(true);
-    const toastId = toast.loading("Reconstruction du journal...");
-    try {
-      await api.rebuildAccountingEntries(invoice.id);
-      toast.success(
-        "Écritures comptables reconstruites. Rafraîchissez le journal.",
-        { id: toastId },
-      );
-    } catch (err: any) {
-      toast.error(err?.message || "Erreur lors de la reconstruction", {
-        id: toastId,
-      });
-    } finally {
-      setIsRebuildingJournal(false);
     }
   };
 
@@ -1537,12 +1602,12 @@ export function OcrProcessingPage({
         key={field.key}
         className="shadow-sm hover:shadow-md transition-shadow"
       >
-        <CardContent className="p-2 space-y-1.5">
+        <CardContent className="pt-0.5 pb-0.5 px-1 space-y-0.5">
           {/* Header avec label et badges */}
           <div className="flex items-center justify-between">
             <Label
               htmlFor={field.key}
-              className={`text-sm font-medium flex items-center gap-2 ${isPending ? "text-amber-500" : ""}`}
+              className={`text-sm font-medium flex items-center gap-1 ${isPending ? "text-amber-500" : ""}`}
             >
               {field.label}
               {isCustom && (
@@ -1565,14 +1630,14 @@ export function OcrProcessingPage({
             </Label>
 
             {/* Boutons d'action */}
-            <div className="flex items-center gap-1">
-              {!isAvoirField && (
+            <div className="flex items-center gap-0.5">
+              {!isAvoirField && !isAccountedInvoice && (
                 <>
                   {isSelectingPosition === field.key ? (
                     <Button
                       size="sm"
                       variant="ghost"
-                      className={`h-7 px-2 text-[10px] animate-pulse ${
+                      className={`h-6 px-1.5 text-[10px] animate-pulse ${
                         selectionMode === "PATTERN"
                           ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
                           : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
@@ -1587,7 +1652,7 @@ export function OcrProcessingPage({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 w-8 p-0 hover:bg-blue-50 text-blue-600"
+                        className="h-7 w-7 p-0 hover:bg-blue-50 text-blue-600"
                         onClick={() => startSelection(field.key, "PATTERN")}
                         title="Détecter pattern (ancrage)"
                       >
@@ -1596,7 +1661,7 @@ export function OcrProcessingPage({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 w-8 p-0 hover:bg-emerald-50 text-emerald-600"
+                        className="h-7 w-7 p-0 hover:bg-emerald-50 text-emerald-600"
                         onClick={() => startSelection(field.key, "VALUE")}
                         title="Détecter valeur"
                       >
@@ -1605,7 +1670,7 @@ export function OcrProcessingPage({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
+                        className="h-7 w-7 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
                         onClick={() => clearFieldValue(field.key)}
                         title="Vider la valeur"
                         disabled={!field.value || String(field.value).trim() === ""}
@@ -1623,8 +1688,13 @@ export function OcrProcessingPage({
           {fieldPatterns[field.key] && (
             <Badge
               variant="outline"
-              className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border-blue-200 cursor-pointer hover:bg-blue-100"
+              className={`text-xs px-2 py-1 bg-blue-50 text-blue-700 border-blue-200 ${
+                isAccountedInvoice
+                  ? ""
+                  : "cursor-pointer hover:bg-blue-100"
+              }`}
               onClick={() => {
+                if (isAccountedInvoice) return;
                 setFieldPatterns((prev) => {
                   const newPatterns = { ...prev };
                   delete newPatterns[field.key];
@@ -1632,7 +1702,11 @@ export function OcrProcessingPage({
                 });
                 toast.info("Pattern supprimé");
               }}
-              title="Cliquer pour supprimer le pattern"
+              title={
+                isAccountedInvoice
+                  ? "Pattern détecté"
+                  : "Cliquer pour supprimer le pattern"
+              }
             >
               Pattern:{" "}
               {fieldPatterns[field.key].length > 20
@@ -1654,24 +1728,34 @@ export function OcrProcessingPage({
               {isAvoirValue ? "Avoir" : "Facture"}
             </Badge>
           ) : (
-            <Input
-              id={field.key}
-              value={String(field.value || "")}
-              onChange={(e) => updateFieldValue(field.key, e.target.value)}
-              className={`bg-white transition-all ${
-                isPending ? "border-amber-500 bg-amber-50/10" : ""
-              } ${hasWarning ? "border-red-500" : ""}`}
-              disabled={status === "validated"}
-              onFocus={() => {
-                setFocusedFieldKey(field.key);
-              }}
-              onBlur={() => {
-                setTimeout(() => {
-                  setFocusedFieldKey(null);
-                }, 200);
-              }}
-              placeholder={field.key === "tva" ? tvaPlaceholder : ""}
-            />
+            isAccountedInvoice ? (
+              <div
+                className={`flex min-h-8 items-center rounded-md border px-3 text-sm bg-slate-50 text-slate-700 ${
+                  isPending ? "border-amber-500 bg-amber-50/10" : ""
+                } ${hasWarning ? "border-red-500" : ""}`}
+              >
+                {String(field.value || "") || "-"}
+              </div>
+            ) : (
+              <Input
+                id={field.key}
+                value={String(field.value || "")}
+                onChange={(e) => updateFieldValue(field.key, e.target.value)}
+                className={`bg-white transition-all ${
+                  isPending ? "border-amber-500 bg-amber-50/10" : ""
+                } ${hasWarning ? "border-red-500" : ""} h-8`}
+                disabled={status === "validated"}
+                onFocus={() => {
+                  setFocusedFieldKey(field.key);
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setFocusedFieldKey(null);
+                  }, 200);
+                }}
+                placeholder={field.key === "tva" ? tvaPlaceholder : ""}
+              />
+            )
           )}
           {field.key === "tva" && tvaPlaceholder ? (
             <p className="text-[11px] text-muted-foreground">{tvaPlaceholder}</p>
@@ -1701,20 +1785,11 @@ export function OcrProcessingPage({
 
     return (
       <Card key={key} className="shadow-sm hover:shadow-md transition-shadow">
-        <CardContent className="p-2 space-y-1.5">
+        <CardContent className="pt-0.5 pb-0.5 px-1 space-y-0.5">
           {/* Header avec label et badges */}
           <div className="flex items-center justify-between">
-            <Label
-              htmlFor={key}
-              className="text-sm font-medium flex items-center gap-2"
-            >
+            <Label htmlFor={key} className="text-sm font-medium">
               {label}
-              <Badge
-                variant="outline"
-                className="text-xs bg-purple-50 text-purple-700 border-purple-200"
-              >
-                Comptable
-              </Badge>
               {autoFilledFields?.includes(key) && (
                 <Badge className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white">
                   <Building2 className="h-2 w-2 mr-1" />
@@ -1724,24 +1799,25 @@ export function OcrProcessingPage({
             </Label>
           </div>
 
-          {/* Label descriptif */}
-          <p className="text-xs text-muted-foreground font-medium">
-            Numéro de compte
-          </p>
-
           {/* Input */}
-          <Input
-            id={`tier_${key}`} // Prefixé pour identification dans handleMouseUpSelection
-            value={displayValue?.toString() || ""}
-            onChange={(e) =>
-              updateTierField(tierFieldName as keyof Tier, e.target.value)
-            }
-            className="bg-white"
-            placeholder={hasValue ? "" : "Ex: 401000"}
-            //disabled={status === "validated" || isAutoFilled}
-            onFocus={() => setFocusedFieldKey(`tier_${key}`)}
-            onBlur={() => setTimeout(() => setFocusedFieldKey(null), 200)}
-          />
+          {isAccountedInvoice ? (
+            <div className="flex min-h-8 items-center rounded-md border px-3 text-sm bg-slate-50 text-slate-700">
+              {displayValue?.toString() || "-"}
+            </div>
+          ) : (
+            <Input
+              id={`tier_${key}`} // Prefixé pour identification dans handleMouseUpSelection
+              value={displayValue?.toString() || ""}
+              onChange={(e) =>
+                updateTierField(tierFieldName as keyof Tier, e.target.value)
+              }
+              className="bg-white h-8"
+              placeholder={hasValue ? "" : "Ex: 401000"}
+              //disabled={status === "validated" || isAutoFilled}
+              onFocus={() => setFocusedFieldKey(`tier_${key}`)}
+              onBlur={() => setTimeout(() => setFocusedFieldKey(null), 200)}
+            />
+          )}
 
           {/* Note explicative */}
         </CardContent>
@@ -1768,13 +1844,28 @@ export function OcrProcessingPage({
               </h1>
               <Badge
                 className={
-                  invoice.isAvoir
+                  currentIsAvoir
                     ? "bg-rose-500 text-white"
                     : "bg-slate-600 text-white"
                 }
               >
-                {invoice.isAvoir ? "Avoir" : "Facture"}
+                {currentIsAvoir ? "Avoir" : "Facture"}
               </Badge>
+              {!isClientUser && !isAccountedInvoice && status !== "validated" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={handleToggleAvoir}
+                  disabled={isTogglingAvoir || isSaving || isAccounting || isValidating}
+                >
+                  {isTogglingAvoir ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    `Basculer vers ${currentIsAvoir ? "Facture" : "Avoir"}`
+                  )}
+                </Button>
+              )}
               {getStatusBadge()}
               {templateDetected ? (
                 <Badge
@@ -1802,7 +1893,7 @@ export function OcrProcessingPage({
         </div>
         <div className="flex items-center gap-3">
           {/* Bouton Reprocesser OCR */}
-          {!isClientUser && (
+          {!isClientUser && !isAccountedInvoice && (
             <Button
               variant="outline"
               className="gap-2 bg-transparent"
@@ -1824,38 +1915,40 @@ export function OcrProcessingPage({
           )}
 
           {/* Bouton Enregistrer */}
-          <Button
-            variant="outline"
-            className="gap-2 bg-transparent"
-            onClick={handleSave}
-            disabled={isSaving || isAccounting || status === "accounted"}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Sauvegarde...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Enregistrer
-              </>
-            )}
-          </Button>
+          {!isAccountedInvoice && (
+            <Button
+              variant="outline"
+              className="gap-2 bg-transparent"
+              onClick={handleSave}
+              disabled={isSaving || isAccounting || isAccountedInvoice}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Sauvegarde...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Enregistrer
+                </>
+              )}
+            </Button>
+          )}
 
           {/* Bouton Enregistrer/Comptabiliser */}
-          {!isClientUser && (
+          {!isClientUser && !isAccountedInvoice && (
             <Button
               className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={handleSaveAndAccount}
-              disabled={isSaving || isAccounting || status === "accounted"}
+              disabled={isSaving || isAccounting || isAccountedInvoice}
             >
               {isSaving || isAccounting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   En cours...
                 </>
-              ) : status === "accounted" ? (
+              ) : isAccountedInvoice ? (
                 <>
                   <CheckCircle className="h-4 w-4" />
                   Comptabilisée
@@ -1923,7 +2016,7 @@ export function OcrProcessingPage({
                 </p>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-1 pb-1">
               <div className="overflow-auto rounded-lg border border-border">
                 {isLoadingDocument && (
                   <div className="flex aspect-[3/4] items-center justify-center bg-muted">
@@ -2126,14 +2219,69 @@ export function OcrProcessingPage({
               </div>
             </CardContent>
           </Card>
+
+          {/* Raw OCR Text */}
+          {(invoice.rawOcrText || invoice.cleanedOcrText || extractedText) && (
+            <>
+              <RawOcrTextPanel
+                rawText={invoice.rawOcrText || extractedText || ""}
+                cleanedText={invoice.cleanedOcrText || ""}
+              />
+              <ExtractionJsonPanel
+                data={{
+                  invoiceId: invoice.id,
+                  status,
+                  extractionMethod,
+                  templateDetected,
+                  missingFields,
+                  lowConfidenceFields: invoice.lowConfidenceFields || [],
+                  autoFilledFields,
+                  fieldsData: invoice.fieldsData || {},
+                  currentFields: fields.map((field) => ({
+                    key: field.key,
+                    label: field.label,
+                    value: field.value,
+                    detected: field.detected,
+                    confidence: field.confidence,
+                    type: field.type,
+                  })),
+                }}
+              />
+            </>
+          )}
         </div>
 
         {/* Extraction Form */}
         <div className="space-y-6">
+          {isAccountedInvoice && (
+            <Card className="border-violet-300 bg-violet-50/60">
+              <CardContent className="py-6">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div
+                    className="select-none border-[6px] border-violet-600 text-violet-600 rounded-xl px-12 py-3 text-5xl font-extrabold tracking-wider uppercase rotate-[-8deg] opacity-90 bg-white/20"
+                    style={{
+                      textShadow: "0 0 1px rgba(124,58,237,0.45)",
+                      boxShadow: "inset 0 0 0 2px rgba(124,58,237,0.45)",
+                    }}
+                  >
+                    Comptabilisé
+                  </div>
+                  {(invoice.accountedAt || invoice.accountedBy) && (
+                    <p className="text-sm text-violet-900">
+                      {invoice.accountedAt
+                        ? `Le ${new Date(invoice.accountedAt).toLocaleString()}`
+                        : "Facture comptabilisée"}
+                      {invoice.accountedBy ? ` • ${invoice.accountedBy}` : ""}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {/* Warnings */}
           {warnings.length > 0 && (
             <Card className="border-amber-500/50 bg-amber-500/10">
-              <CardContent className="pt-4">
+              <CardContent className="pt-1 pb-1">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
                   <div className="flex-1 space-y-2">
@@ -2145,7 +2293,7 @@ export function OcrProcessingPage({
                         <p className="text-sm text-amber-700 dark:text-amber-300">
                           {warning.message}
                         </p>
-                        {warning.suggestion && (
+                        {warning.suggestion && !isAccountedInvoice && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -2167,7 +2315,7 @@ export function OcrProcessingPage({
           {/* Template Detection Banner */}
           {invoice.templateDetected && invoice.templateName && (
             <Card className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
-              <CardContent className="pt-4">
+              <CardContent className="pt-1 pb-1">
                 <div className="flex items-start gap-3">
                   <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
                   <div className="flex-1">
@@ -2195,28 +2343,26 @@ export function OcrProcessingPage({
           )}
 
           {/* Alerte : Fournisseur Non Identifié (Design demandé) */}
-          {!invoice.templateDetected && !tier && !isExistingSupplier && (
+          {!isAccountedInvoice &&
+            !invoice.templateDetected &&
+            !tier &&
+            !isExistingSupplier && (
             <Card className="border-indigo-600/30 bg-indigo-50/50 dark:bg-indigo-950/10 shadow-sm border-2 overflow-hidden">
-              <div className="bg-indigo-600 px-4 py-1.5 flex items-center justify-between">
+              <div className="bg-indigo-600 px-3 py-1 flex items-center justify-between">
                 <p className="text-[10px] font-bold text-white uppercase tracking-widest flex items-center gap-1.5">
                   <AlertTriangle className="h-3 w-3" />
-                  Action Requise
+                  Nouveau fournisseur
                 </p>
                 <Badge
                   variant="outline"
-                  className="text-[9px] border-indigo-400 text-indigo-100 uppercase py-0 px-1.5 font-bold"
+                  className="text-[9px] border-indigo-400 text-indigo-100 uppercase py-0 px-3 font-bold"
                 >
                   Nouveau
                 </Badge>
               </div>
-              <CardContent className="pt-4 pb-5">
-                <div className="space-y-4">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Cette facture provient d'un nouveau fournisseur ou n'est pas
-                    encore reliée à un compte tiers.
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-3 bg-white dark:bg-slate-900/50 p-4 rounded-xl border-2 border-indigo-100 dark:border-indigo-900/30 shadow-sm">
+              <CardContent className="pt-1 pb-1 px-1.5">
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 bg-white dark:bg-slate-900/50 p-1 rounded-lg border border-indigo-100 dark:border-indigo-900/30 shadow-sm">
                     <div className="space-y-1">
                       <p className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400">
                         ICE détecté 🤖
@@ -2226,7 +2372,7 @@ export function OcrProcessingPage({
                           "Non détecté"}
                       </p>
                     </div>
-                    <div className="space-y-1 border-l pl-4 border-slate-100 dark:border-slate-800">
+                    <div className="space-y-1 border-l pl-3 border-slate-100 dark:border-slate-800">
                       <p className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400">
                         Fournisseur (OCR)
                       </p>
@@ -2237,21 +2383,13 @@ export function OcrProcessingPage({
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-1">
+                  <div>
                     <Button
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 h-10 font-bold shadow-md shadow-indigo-200 dark:shadow-none transition-all active:scale-95"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white w-full h-9 font-bold shadow-md shadow-indigo-200 dark:shadow-none transition-all active:scale-95"
                       onClick={() => setIsTierModalOpen(true)}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Créer Nouveau Fournisseur
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 flex-1 h-10 font-bold transition-all active:scale-95"
-                      onClick={() => setIsTierSelectionModalOpen(true)}
-                    >
-                      <Building2 className="h-4 w-4 mr-2" />
-                      Lier à l'existant
                     </Button>
                   </div>
                 </div>
@@ -2271,14 +2409,62 @@ export function OcrProcessingPage({
             </Alert>
           )}
 
+          {(invoice.qualityScore !== undefined ||
+            invoice.reviewRequired ||
+            invoice.validationMessage) && (
+            <Card className="border-amber-200 bg-amber-50/70">
+              <CardContent className="pt-3 pb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">
+                    Qualité: {invoice.qualityScore ?? "-"} / 100
+                  </Badge>
+                  {invoice.difficultyClass && (
+                    <Badge variant={difficultyTone as any}>
+                      {invoice.difficultyClass.replaceAll("_", " ")}
+                    </Badge>
+                  )}
+                  {typeof invoice.scanned === "boolean" && (
+                    <Badge variant="outline">
+                      {invoice.scanned ? "Scan" : "Texte natif"}
+                    </Badge>
+                  )}
+                  {invoice.documentType && (
+                    <Badge variant="outline">{invoice.documentType}</Badge>
+                  )}
+                  {invoice.olmocrUsed && (
+                    <Badge variant="outline">
+                      olmOCR {invoice.olmocrDurationMs ? `(${invoice.olmocrDurationMs} ms)` : ""}
+                    </Badge>
+                  )}
+                  {invoice.reviewRequired && (
+                    <Badge variant="destructive">Revue requise</Badge>
+                  )}
+                </div>
+                {(qualityFlags.length > 0 || reviewReasons.length > 0 || invoice.validationMessage) && (
+                  <div className="mt-3 space-y-2 text-sm text-slate-700">
+                    {qualityFlags.length > 0 && (
+                      <p>Signaux qualité: {qualityFlags.join(", ")}</p>
+                    )}
+                    {reviewReasons.length > 0 && (
+                      <p>Points à revoir: {reviewReasons.join(", ")}</p>
+                    )}
+                    {invoice.validationMessage && (
+                      <p>Validation: {invoice.validationMessage}</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Tier Information Card */}
           {/* {renderTierCard()} */}
 
           {/* Main Form */}
           <Card>
-            <CardContent className="p-6">
+              <CardContent className="pt-1 pb-1 px-4">
               {/* Grid Layout - 2 colonnes */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 {useDynamicFieldLayout ? (
                   /* Dynamic layout: render all fields in order (for vente and other non-achat types) */
                   renderedDynamicFields.map((field) => renderFieldCard(field))
@@ -2363,6 +2549,9 @@ export function OcrProcessingPage({
                       fields.find((f) => f.key === "amountTTC") || fields[5],
                     )}
                     {renderFieldCard(
+                      fields.find((f) => f.key === "amountTTCEnLettres"),
+                    )}
+                    {renderFieldCard(
                       fields.find((f) => f.key === "ice") || fields[7],
                     )}
 
@@ -2380,7 +2569,7 @@ export function OcrProcessingPage({
           </Card>
 
           {/* Nouveau: Selection de Signature pour Template Automatique */}
-          {canCreateTemplate && !templateDetected && (
+          {canCreateTemplate && !templateDetected && !isAccountedInvoice && (
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -2388,7 +2577,7 @@ export function OcrProcessingPage({
                   Créer un Template
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 pb-4 px-4">
+              <CardContent className="space-y-3 pt-1 pb-1 px-4">
                 <p className="text-[11px] text-muted-foreground leading-tight">
                   Un ICE ou IF a été détecté. Choisissez la signature pour créer
                   le template automatiquement lors de l'enregistrement.
@@ -2455,76 +2644,55 @@ export function OcrProcessingPage({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
-            {/* BOUTON ENREGISTRER */}
-            <Button
-              variant="outline"
-              className="flex-1 gap-2 bg-transparent"
-              onClick={handleSave}
-              disabled={isSaving || isAccounting || status === "accounted"}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Sauvegarde...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  Enregistrer
-                </>
-              )}
-            </Button>
-
-            {/* BOUTON ENREGISTRER/COMPTABILISER */}
-            {!isClientUser && (
-              <Button
-                className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={handleSaveAndAccount}
-                disabled={isSaving || isAccounting || status === "accounted"}
-              >
-                {isSaving || isAccounting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    En cours...
-                  </>
-                ) : status === "accounted" ? (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    Comptabilisée
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    Enregistrer/Comptabiliser
-                  </>
-                )}
-              </Button>
-            )}
-
-            {/* BOUTON REBUILD - Pour reconstruire les écritures (multi-TVA) */}
-            {status === "accounted" && (
+          {!isAccountedInvoice && (
+            <div className="flex gap-3">
+              {/* BOUTON ENREGISTRER */}
               <Button
                 variant="outline"
-                className="gap-2 border-amber-600 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-400 dark:text-amber-400 dark:hover:bg-amber-950/30"
-                onClick={handleRebuildJournal}
-                disabled={isRebuildingJournal}
-                title="Reconstruire les écritures comptables (utile pour multi-TVA)"
+                className="flex-1 gap-2 bg-transparent"
+                onClick={handleSave}
+                disabled={isSaving || isAccounting || isAccountedInvoice}
               >
-                {isRebuildingJournal ? (
+                {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Rebuild...
+                    Sauvegarde...
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="h-4 w-4" />
-                    Rebuild
+                    <Save className="h-4 w-4" />
+                    Enregistrer
                   </>
                 )}
               </Button>
-            )}
-          </div>
+
+              {/* BOUTON ENREGISTRER/COMPTABILISER */}
+              {!isClientUser && (
+                <Button
+                  className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={handleSaveAndAccount}
+                  disabled={isSaving || isAccounting || isAccountedInvoice}
+                >
+                  {isSaving || isAccounting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      En cours...
+                    </>
+                  ) : isAccountedInvoice ? (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      Comptabilisée
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      Enregistrer/Comptabiliser
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2549,6 +2717,10 @@ export function OcrProcessingPage({
           setSelectedTierForUpdate(undefined);
         }}
         onCreated={(newTier) => {
+          if (!newTier?.id) {
+            toast.error("Le client/fournisseur a été enregistré mais son identifiant est introuvable");
+            return;
+          }
           setIsTierModalOpen(false);
           setSelectedTierForUpdate(undefined);
           handleLinkTier(newTier.id);
@@ -2599,5 +2771,211 @@ export function OcrProcessingPage({
         }}
       />
     </div>
+  );
+}
+
+// ─── Raw OCR Text Panel ───────────────────────────────────────────────────────
+
+function RawOcrTextPanel({
+  rawText,
+  cleanedText,
+}: {
+  rawText: string;
+  cleanedText?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<"raw" | "cleaned">("raw");
+
+  const activeText = activeTab === "cleaned" && cleanedText ? cleanedText : rawText;
+  const wordCount = activeText.trim() ? activeText.trim().split(/\s+/).length : 0;
+  const charCount = activeText.length;
+  const rawCharCount = rawText.length;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(activeText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const qualityColor =
+    rawCharCount > 500 ? "bg-green-500"
+    : rawCharCount > 100 ? "bg-amber-500"
+    : "bg-red-400";
+
+  const qualityLabel =
+    rawCharCount > 500 ? "Bonne extraction"
+    : rawCharCount > 100 ? "Extraction partielle"
+    : rawCharCount > 0 ? "Extraction faible"
+    : "Aucun texte extrait";
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card>
+        <CardHeader className="pb-2 pt-3">
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center justify-between w-full text-left">
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-base">Texte OCR extrait</CardTitle>
+                <div className="flex items-center gap-1.5 ml-1">
+                  <div className={`h-2 w-2 rounded-full ${qualityColor}`} />
+                  <span className="text-xs text-muted-foreground">{qualityLabel}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  {rawCharCount.toLocaleString()} car.
+                </span>
+                {isOpen ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </button>
+          </CollapsibleTrigger>
+        </CardHeader>
+
+        <CollapsibleContent>
+          <CardContent className="pt-0 pb-4 space-y-3">
+            {/* Tabs: raw vs cleaned */}
+            <div className="flex gap-1 p-1 bg-muted rounded-md">
+              {(["raw", "cleaned"] as const).map((tab) => {
+                const labels = { raw: "Texte brut (rawOcrText)", cleaned: "Texte nettoyé (cleanedOcrText)" };
+                const disabled = tab === "cleaned" && !cleanedText;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => !disabled && setActiveTab(tab)}
+                    disabled={disabled}
+                    className={`flex-1 text-xs px-3 py-1.5 rounded transition-colors font-medium ${
+                      activeTab === tab
+                        ? "bg-background shadow-sm text-foreground"
+                        : disabled
+                        ? "text-muted-foreground/40 cursor-not-allowed"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {labels[tab]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Stats line */}
+            <div className="flex items-center gap-3 text-xs text-muted-foreground px-0.5">
+              <span>{charCount.toLocaleString()} caractères</span>
+              <span>·</span>
+              <span>{wordCount.toLocaleString()} mots</span>
+              {activeTab === "cleaned" && cleanedText && rawText !== cleanedText && (
+                <>
+                  <span>·</span>
+                  <span className="text-emerald-600">
+                    {Math.round((1 - cleanedText.length / rawText.length) * 100)}% nettoyé
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Text area */}
+            <div className="relative">
+              <pre className="w-full min-h-[200px] max-h-[450px] overflow-y-auto rounded-md border border-border bg-muted/30 p-3 pr-10 text-xs font-mono whitespace-pre-wrap break-words leading-relaxed text-foreground">
+                {activeText || (
+                  <span className="text-muted-foreground italic">
+                    Aucun texte OCR disponible pour cette facture.
+                  </span>
+                )}
+              </pre>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 bg-background/80 hover:bg-background border border-border shadow-sm"
+                onClick={handleCopy}
+                title="Copier le texte"
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
+function ExtractionJsonPanel({
+  data,
+}: {
+  data: unknown;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const jsonText = useMemo(
+    () => JSON.stringify(data, null, 2),
+    [data],
+  );
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(jsonText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="mt-4 border-slate-200 bg-slate-50/60">
+        <CardHeader className="pb-2 pt-3">
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center justify-between w-full text-left">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-slate-600" />
+                <CardTitle className="text-base">JSON des champs extraits</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  {jsonText.length.toLocaleString()} car.
+                </span>
+                {isOpen ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </button>
+          </CollapsibleTrigger>
+        </CardHeader>
+
+        <CollapsibleContent>
+          <CardContent className="pt-0 pb-4">
+            <div className="relative">
+              <pre className="w-full min-h-[220px] max-h-[520px] overflow-y-auto rounded-md border border-border bg-background p-3 pr-10 text-xs font-mono whitespace-pre-wrap break-words leading-relaxed text-foreground">
+                {jsonText}
+              </pre>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 bg-background/80 hover:bg-background border border-border shadow-sm"
+                onClick={handleCopy}
+                title="Copier le JSON"
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }

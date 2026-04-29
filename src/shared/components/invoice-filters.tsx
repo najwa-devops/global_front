@@ -105,8 +105,8 @@ export function InvoiceFilters({ filters, onFiltersChange, suppliers, onExport }
             <SelectItem value="all">Tous</SelectItem>
             <SelectItem value="VERIFY">À vérifier</SelectItem>
             <SelectItem value="READY_TO_TREAT">Prêt à traiter</SelectItem>
-            <SelectItem value="READY_TO_VALIDATE">Prêt à valider</SelectItem>
-            <SelectItem value="VALIDATED">Validé</SelectItem>
+            <SelectItem value="READY_TO_VALIDATE">Prêt à comptabiliser</SelectItem>
+            <SelectItem value="VALIDATED">Prêt à comptabiliser</SelectItem>
             <SelectItem value="REJECTED">Rejeté</SelectItem>
           </SelectContent>
         </Select>
@@ -296,8 +296,8 @@ export function InvoiceFilters({ filters, onFiltersChange, suppliers, onExport }
             <SelectItem value="all">Tous</SelectItem>
             <SelectItem value="VERIFY">À vérifier</SelectItem>
             <SelectItem value="READY_TO_TREAT">Prêt à traiter</SelectItem>
-            <SelectItem value="READY_TO_VALIDATE">Prêt à valider</SelectItem>
-            <SelectItem value="VALIDATED">Validé</SelectItem>
+            <SelectItem value="READY_TO_VALIDATE">Prêt à comptabiliser</SelectItem>
+            <SelectItem value="VALIDATED">Prêt à comptabiliser</SelectItem>
             <SelectItem value="REJECTED">Rejeté</SelectItem>
           </SelectContent>
         </Select>

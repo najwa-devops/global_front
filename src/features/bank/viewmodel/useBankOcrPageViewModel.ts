@@ -42,7 +42,7 @@ export function useBankOcrPageViewModel(statementId: number | null) {
   const onSave = async (updatedStatement: LocalBankStatement) => {
     try {
       await validateBankStatement(updatedStatement.id, updatedStatement.fields);
-      router.push("/bank/validated");
+      router.push("/bank/list");
     } catch (error) {
       console.error("Error saving bank statement:", error);
       toast.error("Echec de validation du releve");

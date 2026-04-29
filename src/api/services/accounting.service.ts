@@ -14,10 +14,25 @@ export class AccountingService {
 
     // Accounts
     static async getAccounts(activeOnly = true): Promise<Account[]> {
-        const response = await apiClient.get<{ accounts: Account[] }>('/api/accounting/accounts', {
+        const response = await apiClient.get<{ accounts: Account[] }>('/api/v2/accounting/accounts', {
             params: { activeOnly }
         });
         return response.data.accounts || [];
+    }
+
+    static async getAccountOptions(): Promise<Account[]> {
+        try {
+            const response = await apiClient.get<{ accounts: Array<{ code: string; libelle: string }> }>('/api/v2/accounting/accounts/options');
+            return (response.data.accounts || []).map((account, index) => ({
+                id: index + 1,
+                code: account.code,
+                libelle: account.libelle,
+                classe: Number(account.code?.charAt(0) || 0),
+                active: true,
+            } as Account));
+        } catch {
+            return this.getAccounts(true);
+        }
     }
 
     static async getAccountById(id: number): Promise<Account> {
@@ -105,6 +120,7 @@ export class AccountingService {
         return {
             ...data,
             libelle: normalizeText(data.libelle),
+            activity: normalizeText(data.activity),
             tierNumber: normalizeCode(data.tierNumber),
             collectifAccount: normalizeCode(data.collectifAccount),
             ifNumber: normalizeIdentifier(data.ifNumber),

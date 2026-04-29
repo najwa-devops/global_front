@@ -248,6 +248,22 @@ export function dynamicInvoiceDtoToLocal(
     fileSize: dto.fileSize,
     fileUrl: getFileUrl(dto.filePath || dto.filename, dto.id),
     extractedText: dto.extractedText,
+    rawOcrText: dto.rawOcrText,
+    cleanedOcrText: dto.cleanedOcrText,
+    scanned: dto.scanned,
+    documentType: dto.documentType,
+    amountsValid: dto.amountsValid,
+    validationMessage: dto.validationMessage,
+    qualityScore: dto.qualityScore,
+    difficultyClass: dto.difficultyClass,
+    qualityFlags: dto.qualityFlags,
+    reviewRequired: dto.reviewRequired,
+    reviewReasons: dto.reviewReasons,
+    fieldConfidences: dto.fieldConfidences,
+    fieldSources: dto.fieldSources,
+    olmocrUsed: dto.olmocrUsed,
+    olmocrDurationMs: dto.olmocrDurationMs,
+    olmocrMode: dto.olmocrMode,
     fieldsData: dto.fieldsData,
     headerText: dto.headerRawText || dto.fieldsData?.headerRawText,
     footerText: dto.footerRawText || dto.fieldsData?.footerRawText,
@@ -372,6 +388,22 @@ export function salesInvoiceDtoToLocal(dto: DynamicInvoiceDto): DynamicInvoice {
     fileSize: dto.fileSize,
     fileUrl: getSalesInvoicePdfUrl(dto.id, dto.dossierId),
     extractedText: dto.extractedText,
+    rawOcrText: dto.rawOcrText,
+    cleanedOcrText: dto.cleanedOcrText,
+    scanned: dto.scanned,
+    documentType: dto.documentType,
+    amountsValid: dto.amountsValid,
+    validationMessage: dto.validationMessage,
+    qualityScore: dto.qualityScore,
+    difficultyClass: dto.difficultyClass,
+    qualityFlags: dto.qualityFlags,
+    reviewRequired: dto.reviewRequired,
+    reviewReasons: dto.reviewReasons,
+    fieldConfidences: dto.fieldConfidences,
+    fieldSources: dto.fieldSources,
+    olmocrUsed: dto.olmocrUsed,
+    olmocrDurationMs: dto.olmocrDurationMs,
+    olmocrMode: dto.olmocrMode,
     headerText: dto.headerRawText || dto.fieldsData?.headerRawText,
     footerText: dto.footerRawText || dto.fieldsData?.footerRawText,
     fields,
@@ -672,6 +704,53 @@ export function ParseBackendFieldsData(
 ): DynamicInvoiceField[] {
   console.log("Parsing fieldsData with OCR support:", !!ocrText);
 
+  const amountAliases = {
+    amountHT: ["amountHT", "amountHt", "totalHt"],
+    tva: ["tva", "totalTva"],
+    amountTTC: ["amountTTC", "amountTTc", "totalTtc"],
+  } as const;
+
+  const parseLooseAmount = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === "") {
+      return null;
+    }
+
+    const raw = String(value).trim().replace(/\s+/g, "");
+    if (!raw) return null;
+
+    const cleaned = raw.replace(/[^0-9,.\-]/g, "");
+    if (!cleaned || cleaned === "-") return null;
+
+    let normalized = cleaned;
+    const lastComma = normalized.lastIndexOf(",");
+    const lastDot = normalized.lastIndexOf(".");
+
+    if (lastComma >= 0 && lastDot >= 0) {
+      if (lastComma > lastDot) {
+        normalized = normalized.replace(/\./g, "").replace(",", ".");
+      } else {
+        normalized = normalized.replace(/,/g, "");
+      }
+    } else if (lastComma >= 0) {
+      normalized = normalized.replace(",", ".");
+    }
+
+    let firstDot = normalized.indexOf(".");
+    while (firstDot !== -1 && firstDot !== normalized.lastIndexOf(".")) {
+      normalized = normalized.slice(0, firstDot) + normalized.slice(firstDot + 1);
+      firstDot = normalized.indexOf(".");
+    }
+
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : null;
+  };
+
+  const amountToFieldValue = (amount: number): string =>
+    (Math.round(amount * 100) / 100).toFixed(2);
+
+  const findFieldByKeys = (keys: readonly string[]) =>
+    parsedFields.find((field) => keys.includes(field.key)) || null;
+
   const parsedFields = defaultFields.map((field) => {
     // CORRECTION : Le backend envoie déjà les bonnes clés (tierNumber, chargeAccount, etc.)
     // On supprime le mapping qui cassait la correspondance
@@ -800,6 +879,46 @@ export function ParseBackendFieldsData(
   ) {
     supplierField.value = fieldsData.detectedSupplier;
     supplierField.detected = true;
+  }
+
+  const amountHTField = findFieldByKeys(amountAliases.amountHT);
+  const tvaField = findFieldByKeys(amountAliases.tva);
+  const amountTTCField = findFieldByKeys(amountAliases.amountTTC);
+
+  const currentAmountHT = parseLooseAmount(amountHTField?.value ?? fieldsData.amountHT ?? fieldsData.totalHt);
+  const currentTva = parseLooseAmount(tvaField?.value ?? fieldsData.tva ?? fieldsData.totalTva);
+  const currentAmountTTC = parseLooseAmount(
+    amountTTCField?.value ?? fieldsData.amountTTC ?? fieldsData.totalTtc,
+  );
+
+  if (amountHTField && (amountHTField.value === "" || amountHTField.value === "-")) {
+    if (currentTva !== null && currentAmountTTC !== null) {
+      const computedHT = currentAmountTTC - currentTva;
+      if (computedHT >= 0) {
+        amountHTField.value = amountToFieldValue(computedHT);
+        amountHTField.detected = true;
+      }
+    }
+  }
+
+  if (tvaField && (tvaField.value === "" || tvaField.value === "-")) {
+    if (currentAmountHT !== null && currentAmountTTC !== null) {
+      const computedTva = currentAmountTTC - currentAmountHT;
+      if (computedTva >= 0) {
+        tvaField.value = amountToFieldValue(computedTva);
+        tvaField.detected = true;
+      }
+    }
+  }
+
+  if (amountTTCField && (amountTTCField.value === "" || amountTTCField.value === "-")) {
+    if (currentAmountHT !== null && currentTva !== null) {
+      const computedTtc = currentAmountHT + currentTva;
+      if (computedTtc >= 0) {
+        amountTTCField.value = amountToFieldValue(computedTtc);
+        amountTTCField.detected = true;
+      }
+    }
   }
 
   return parsedFields;

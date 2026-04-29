@@ -1,5 +1,7 @@
 import { api } from "@/lib/api";
+import { getCmExpansionsForStatement } from "@/lib/centre-monetique/api";
 import type { BankTransactionV2 } from "@/lib/types";
+import { getConfiguredBankCodes } from "@/src/core/lib/accounting-config-banks";
 
 export async function fetchBankStatementById(id: number) {
   return api.getBankStatementById(id);
@@ -10,11 +12,12 @@ export async function fetchBankTransactionsByStatementId(statementId: number) {
 }
 
 export async function fetchAccounts() {
-  return api.getAccounts(true);
+  return api.getAccountOptions();
 }
 
 export async function retryBankStatementPages(statementId: number) {
-  return api.retryFailedBankStatementPages(statementId);
+  const allowedBanks = await getConfiguredBankCodes();
+  return api.retryFailedBankStatementPages(statementId, allowedBanks);
 }
 
 export async function updateBankTransaction(
@@ -30,4 +33,8 @@ export async function createBankTransaction(payload: Partial<BankTransactionV2>)
 
 export async function validateBankStatement(statementId: number, fields: unknown[]) {
   return api.validateBankStatement(statementId, fields as any);
+}
+
+export async function fetchCmExpansionsByStatementId(statementId: number) {
+  return getCmExpansionsForStatement(statementId);
 }

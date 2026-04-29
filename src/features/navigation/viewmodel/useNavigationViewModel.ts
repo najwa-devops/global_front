@@ -13,6 +13,7 @@ import {
   detectDossierIdFromPath,
   detectStoredDossierId,
   detectStoredDossierName,
+  isDossierScopedPath,
 } from "@/src/features/navigation/model/navigation.model";
 
 function filterByRole(items: NavItemConfig[], role: string): NavItemConfig[] {
@@ -42,14 +43,17 @@ export function useNavigationViewModel() {
   }
 
   const pathDossierId = detectDossierIdFromPath(pathname);
-  const fallbackDossierId = pathDossierId ?? detectStoredDossierId();
+  const isScopedToDossier = Boolean(pathDossierId) || isDossierScopedPath(pathname);
+  const scopedCurrentDossier = isScopedToDossier ? currentDossier : null;
+  const fallbackDossierId =
+    pathDossierId ?? (isScopedToDossier ? detectStoredDossierId() : null);
 
-  if (currentDossier || fallbackDossierId) {
-    const dossierId = currentDossier?.id ?? fallbackDossierId!;
+  if (scopedCurrentDossier || fallbackDossierId) {
+    const dossierId = scopedCurrentDossier?.id ?? fallbackDossierId!;
     const dossierName =
-      currentDossier?.name ?? detectStoredDossierName() ?? `Dossier #${dossierId}`;
+      scopedCurrentDossier?.name ?? detectStoredDossierName() ?? `Dossier #${dossierId}`;
     const dossierFallback: Dossier =
-      currentDossier ?? {
+      scopedCurrentDossier ?? {
         id: dossierId,
         name: dossierName,
         fournisseur: { id: 0, name: "", email: "" },
@@ -57,6 +61,7 @@ export function useNavigationViewModel() {
         comptableName: "",
         invoicesCount: 0,
         bankStatementsCount: 0,
+        centreMonetiqueCount: 0,
         pendingInvoicesCount: 0,
         validatedInvoicesCount: 0,
         status: "active",

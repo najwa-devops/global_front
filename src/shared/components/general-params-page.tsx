@@ -29,6 +29,7 @@ const defaultForm: DossierGeneralParams = {
   subjectToRas: false,
   individualPerson: false,
   hasFiscalRegularityCertificate: false,
+  allowValidatedDocumentDeletion: false,
 };
 
 export function GeneralParamsPage() {
@@ -295,6 +296,22 @@ export function GeneralParamsPage() {
               />
               <Label htmlFor="hasFiscalRegularityCertificate">
                 Je dispose une attestation de regularite fiscale
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="allowValidatedDocumentDeletion"
+                checked={Boolean(form.allowValidatedDocumentDeletion)}
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    allowValidatedDocumentDeletion: checked === true,
+                  }))
+                }
+                disabled={loading}
+              />
+              <Label htmlFor="allowValidatedDocumentDeletion">
+                Suppression d&apos;un document déjà validé par le client
               </Label>
             </div>
           </div>

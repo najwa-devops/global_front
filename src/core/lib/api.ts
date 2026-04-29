@@ -20,6 +20,7 @@ import {
   CreateUserRequest,
   AccountingEntry,
 } from "./types";
+import type { JournalPeriod, JournalItem, JournalEntryRow } from "@/releve-bancaire/types";
 
 type DynamicInvoiceBulkItemResult = {
   invoiceId: number;
@@ -41,17 +42,36 @@ export type DynamicInvoiceBulkResponse = {
   results: DynamicInvoiceBulkItemResult[];
 };
 
+export type DynamicInvoiceUploadBatchItem = {
+  filename: string;
+  status: "success" | "error";
+  invoice?: DynamicInvoiceDto;
+  error?: string;
+  httpStatus?: number;
+};
+
+export type DynamicInvoiceUploadBatchResponse = {
+  count: number;
+  successCount: number;
+  errorCount: number;
+  results: DynamicInvoiceUploadBatchItem[];
+};
+
 export type BackendDossierDto = {
   id: number;
   name: string;
+  ice?: string;
   status?: string;
   comptableId?: number;
   comptableEmail?: string;
   fournisseurId?: number;
   fournisseurEmail?: string;
   createdAt?: string;
+  exerciseStartDate?: string;
+  exerciseEndDate?: string;
   invoicesCount?: number;
   bankStatementsCount?: number;
+  centreMonetiqueCount?: number;
   pendingInvoicesCount?: number;
   validatedInvoicesCount?: number;
 };
@@ -110,9 +130,14 @@ function getCurrentDossierId(): number | undefined {
     window.localStorage.setItem("currentDossierId", String(fromQuery));
     return fromQuery;
   }
-  const raw = window.localStorage.getItem("currentDossierId");
-  const id = Number(raw);
-  return Number.isFinite(id) && id > 0 ? id : undefined;
+  const storageKeys = ["currentDossierId", "selectedDossierId", "dossierId"];
+  for (const key of storageKeys) {
+    const local = Number(window.localStorage.getItem(key));
+    if (Number.isFinite(local) && local > 0) return local;
+    const session = Number(window.sessionStorage.getItem(key));
+    if (Number.isFinite(session) && session > 0) return session;
+  }
+  return undefined;
 }
 
 function getPathFilename(pathOrName: string): string {
@@ -142,6 +167,7 @@ function normalizeTierPayload<T extends CreateTierRequest | UpdateTierRequest>(
   return {
     ...payload,
     libelle: normalizeText(payload.libelle),
+    activity: normalizeText(payload.activity),
     tierNumber: normalizeCode(payload.tierNumber),
     collectifAccount: normalizeCode(payload.collectifAccount),
     ifNumber: normalizeIdentifier(payload.ifNumber),
@@ -213,8 +239,12 @@ function normalizeInvoiceStatus(
 ): DynamicInvoiceDto["status"] {
   const s = String(status || "").toUpperCase();
   if (s === "VERIFY" || s === "TO_VERIFY") return "VERIFY";
+  if (s === "ACCOUNTED") return "VALIDATED";
   if (s === "READY_TO_TREAT" || s === "PENDING" || s === "PROCESSING")
     return "READY_TO_TREAT";
+  if (s === "RECALCULATED") return "READY_TO_VALIDATE";
+  if (s === "OUT_OF_PERIOD") return "READY_TO_VALIDATE";
+  if (s === "DUPLICATE") return "REJECTED";
   if (s === "READY_TO_VALIDATE" || s === "TREATED" || s === "PROCESSED")
     return "READY_TO_VALIDATE";
   if (s === "VALIDATED") return "VALIDATED";
@@ -227,6 +257,10 @@ export function normalizeStatus(status: any): string {
   if (s === "VERIFY" || s === "TO_VERIFY") return "to_verify";
   if (s === "READY_TO_TREAT" || s === "PENDING") return "pending";
   if (s === "PROCESSING") return "processing";
+  if (s === "RECALCULATED") return "treated";
+  if (s === "OUT_OF_PERIOD") return "treated";
+  if (s === "ACCOUNTED") return "validated";
+  if (s === "DUPLICATE") return "error";
   if (s === "TREATED" || s === "PROCESSED") return "treated";
   if (s === "READY_TO_VALIDATE") return "ready_to_validate";
   if (s === "VALIDATED") return "validated";
@@ -310,23 +344,44 @@ function mapSalesStatusToBackend(status: string | undefined): string {
 }
 
 function mapSalesInvoiceResponse(raw: any): DynamicInvoiceDto {
-  // Build a fieldsData record from the flat response fields
+  // Sales backend mainly returns extracted values inside fieldsData.
+  // Read those first, then keep flat-property fallbacks for older responses.
   const salesFieldKeys = [
     "clientName", "clientIce", "invoiceNumber", "invoiceDate",
     "totalHt", "totalTva", "totalTtc", "tvaRate", "isAvoir",
     "tierNumber", "displayAccount", "chargeAccount", "tvaAccount",
+    "supplier", "ice", "ifNumber", "rcNumber", "amountHT", "tva", "amountTTC",
+    "collectifAccount", "activity",
   ];
-  const fieldsData: Record<string, any> = {};
+  const rawFieldsData =
+    raw.fieldsData && typeof raw.fieldsData === "object" ? raw.fieldsData : {};
+  const fieldsData: Record<string, any> = { ...rawFieldsData };
   for (const key of salesFieldKeys) {
-    if (raw[key] !== undefined && raw[key] !== null) {
+    if (
+      fieldsData[key] === undefined &&
+      raw[key] !== undefined &&
+      raw[key] !== null
+    ) {
       fieldsData[key] = raw[key];
     }
   }
-  // Compatibility aliases for shared UI components (purchase-style keys)
-  fieldsData.supplier = raw.clientName || raw.tierName || "";
-  fieldsData.amountHT = raw.totalHt;
-  fieldsData.tva = raw.totalTva;
-  fieldsData.amountTTC = raw.totalTtc;
+
+  // Compatibility aliases for shared UI components and sales defaults.
+  fieldsData.clientName =
+    fieldsData.clientName ?? fieldsData.supplier ?? raw.clientName ?? raw.tierName ?? "";
+  fieldsData.clientIce =
+    fieldsData.clientIce ?? fieldsData.ice ?? raw.clientIce ?? "";
+  fieldsData.supplier =
+    fieldsData.supplier ?? fieldsData.clientName ?? raw.tierName ?? raw.clientName ?? "";
+  fieldsData.ice =
+    fieldsData.ice ?? fieldsData.clientIce ?? raw.clientIce ?? "";
+  fieldsData.totalHt = fieldsData.totalHt ?? fieldsData.amountHT ?? raw.totalHt;
+  fieldsData.totalTva = fieldsData.totalTva ?? fieldsData.tva ?? raw.totalTva;
+  fieldsData.totalTtc = fieldsData.totalTtc ?? fieldsData.amountTTC ?? raw.totalTtc;
+  fieldsData.amountHT = fieldsData.amountHT ?? fieldsData.totalHt ?? raw.totalHt;
+  fieldsData.tva = fieldsData.tva ?? fieldsData.totalTva ?? raw.totalTva;
+  fieldsData.amountTTC = fieldsData.amountTTC ?? fieldsData.totalTtc ?? raw.totalTtc;
+  fieldsData.tvaRate = fieldsData.tvaRate ?? raw.tvaRate;
 
   return {
     id: raw.id,
@@ -371,18 +426,19 @@ function mapBankStatus(
   status: string | undefined,
 ): LocalBankStatement["status"] {
   const s = String(status || "").toUpperCase();
-  if (s === "READY_TO_VALIDATE") return "treated";
-  if (s.includes("VALID")) return "validated";
-  if (s.includes("PENDING") || s.includes("ATTENTE")) return "pending";
-  if (s.includes("PROCESS") || s.includes("COURS")) return "processing";
+  if (s === "COMPTABILISE" || s === "COMPTABILISÉ") return "COMPTABILISE";
+  if (s === "READY_TO_VALIDATE" || s === "PRET_A_VALIDER") return "READY_TO_VALIDATE";
+  if (s.includes("VALID")) return "VALIDATED";
+  if (s.includes("PENDING") || s.includes("ATTENTE")) return "PENDING";
+  if (s.includes("PROCESS") || s.includes("COURS")) return "PROCESSING";
   if (
     s.includes("ERROR") ||
     s.includes("ERREUR") ||
     s.includes("DUPLIQUE") ||
     s.includes("VIDE")
   )
-    return "error";
-  return "treated";
+    return s.includes("DUPLIQUE") ? "DUPLIQUE" : s.includes("VIDE") ? "VIDE" : "ERROR";
+  return "TREATED";
 }
 
 function mapBankStatement(raw: any): LocalBankStatement {
@@ -435,9 +491,10 @@ function mapBankStatement(raw: any): LocalBankStatement {
     ...(raw || {}),
     id: Number(raw?.id),
     filename,
-    originalName: raw?.originalName,
+    originalName: raw?.originalName || filename,
     filePath: raw?.filePath || filename,
     fileSize: Number(raw?.fileSize || 0),
+    displayStatus: String(raw?.status || raw?.statusCode || "").toUpperCase(),
     fileUrl: url(
       `/api/v2/bank-statements/files/${encodeURIComponent(filename)}`,
     ),
@@ -445,12 +502,22 @@ function mapBankStatement(raw: any): LocalBankStatement {
     status: mapBankStatus(raw?.statusCode || raw?.status),
     createdAt: new Date(raw?.createdAt || Date.now()),
     updatedAt: raw?.updatedAt ? new Date(raw.updatedAt) : undefined,
+    metadata: raw?.metadata,
+    insertedEntries:
+      raw?.insertedEntries != null ? Number(raw.insertedEntries) : undefined,
+    syncedRows: raw?.syncedRows != null ? Number(raw.syncedRows) : undefined,
+    simulationId: raw?.simulationId ?? null,
+    verificationStatus: raw?.verificationStatus ?? null,
+    duplicateOfId:
+      raw?.duplicateOfId != null ? Number(raw.duplicateOfId) : null,
+    isDuplicate: Boolean(raw?.isDuplicate || raw?.duplicateOfId || raw?.alertType === "danger"),
   } as LocalBankStatement;
 }
 
 export async function uploadDynamicInvoice(
   file: File,
   dossierId?: number,
+  engine?: "ALPHA_AGENT" | "DEFAULT",
 ): Promise<DynamicInvoiceDto> {
   const formData = new FormData();
   formData.append("file", file);
@@ -458,11 +525,57 @@ export async function uploadDynamicInvoice(
   if (resolvedDossierId) {
     formData.append("dossierId", String(resolvedDossierId));
   }
+  if (engine && engine !== "DEFAULT") {
+    formData.append("engine", engine);
+    formData.append("ocrMode", "EVOLEO_AI");
+    formData.append("useAlphaAgent", "true");
+  }
   const result = await request<any>("/api/dynamic-invoices/upload", {
     method: "POST",
     body: formData,
   });
   return mapInvoice(result);
+}
+
+export async function uploadDynamicInvoicesBatch(
+  files: File[],
+  dossierId?: number,
+  engine?: "ALPHA_AGENT" | "DEFAULT",
+): Promise<DynamicInvoiceUploadBatchResponse> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+  const resolvedDossierId = dossierId || getCurrentDossierId();
+  if (resolvedDossierId) {
+    formData.append("dossierId", String(resolvedDossierId));
+  }
+  if (engine && engine !== "DEFAULT") {
+    formData.append("engine", engine);
+    formData.append("ocrMode", "EVOLEO_AI");
+    formData.append("useAlphaAgent", "true");
+  }
+
+  const result = await request<any>("/api/dynamic-invoices/upload/batch", {
+    method: "POST",
+    body: formData,
+  });
+
+  const mappedResults: DynamicInvoiceUploadBatchItem[] = Array.isArray(result?.results)
+    ? result.results.map((item: any) => ({
+        filename: String(item?.filename || "unknown"),
+        status: item?.status === "success" ? "success" : "error",
+        invoice: item?.invoice ? mapInvoice(item.invoice) : undefined,
+        error: item?.error ? String(item.error) : undefined,
+        httpStatus:
+          item?.httpStatus != null ? Number(item.httpStatus) : undefined,
+      }))
+    : [];
+
+  return {
+    count: Number(result?.count || mappedResults.length),
+    successCount: Number(result?.successCount || 0),
+    errorCount: Number(result?.errorCount || 0),
+    results: mappedResults,
+  };
 }
 
 export async function processDynamicInvoice(
@@ -515,12 +628,71 @@ export async function updateDynamicInvoiceFields(
   return mapInvoice(result);
 }
 
+export async function extractDynamicInvoiceField(
+  id: number,
+  fieldName: string,
+): Promise<{
+  success: boolean;
+  invoiceId: number;
+  fieldName: string;
+  result: {
+    value: any;
+    confidence?: number;
+    detectionMethod?: string;
+    validated?: boolean;
+    validationError?: string;
+  };
+}> {
+  const dossierId = getCurrentDossierId();
+  return request<{
+    success: boolean;
+    invoiceId: number;
+    fieldName: string;
+    result: {
+      value: any;
+      confidence?: number;
+      detectionMethod?: string;
+      validated?: boolean;
+      validationError?: string;
+    };
+  }>(
+    `/api/dynamic-invoices/${id}/extract-field`,
+    {
+      method: "POST",
+      body: JSON.stringify({ fieldName }),
+    },
+    { dossierId },
+  );
+}
+
+export async function checkDynamicInvoiceDuplicate(params: {
+  supplier: string;
+  invoiceNumber?: string;
+  filename?: string;
+}): Promise<{ exists: boolean; matchedBy?: "invoiceNumber" | "filename" }> {
+  const dossierId = getCurrentDossierId();
+  const payload = await request<{
+    success: boolean;
+    data?: { exists?: boolean; matchedBy?: "invoiceNumber" | "filename" };
+  }>("/api/dynamic-invoices/check-duplicate", undefined, {
+    dossierId,
+    supplier: params.supplier,
+    invoiceNumber: params.invoiceNumber,
+    filename: params.filename,
+  });
+  return {
+    exists: Boolean(payload?.data?.exists),
+    matchedBy: payload?.data?.matchedBy,
+  };
+}
+
 export async function getAllDynamicInvoices(
   status?: string,
   templateId?: number,
   limit: number = 50,
+  dossierIdArg?: number,
 ): Promise<DynamicInvoiceDto[]> {
-  const dossierId = getCurrentDossierId();
+  const dossierId = dossierIdArg || getCurrentDossierId();
   const result = await request<{ invoices?: any[] }>(
     "/api/dynamic-invoices",
     undefined,
@@ -694,19 +866,21 @@ export async function linkTierToSalesInvoice(
   tierId: number,
 ): Promise<{ success: boolean; message: string; invoice: DynamicInvoiceDto }> {
   const dossierId = getCurrentDossierId();
-  const result = await request<any>(
-    `/api/sales/invoices/${invoiceId}/link-tier`,
-    {
-      method: "POST",
-      body: JSON.stringify({ tierId }),
-    },
-    { dossierId },
+  const result = unwrapApiData<any>(
+    await request<any>(
+      `/api/sales/invoices/${invoiceId}/link-tier`,
+      {
+        method: "POST",
+        body: JSON.stringify({ tierId }),
+      },
+      { dossierId },
+    ),
   );
 
   return {
     success: Boolean(result?.success),
     message: result?.message || "Tier linked",
-    invoice: mapInvoice(result?.invoice || {}),
+    invoice: mapSalesInvoiceResponse(result?.invoice || result),
   };
 }
 
@@ -830,30 +1004,47 @@ export async function getAccounts(
   activeOnly: boolean = true,
 ): Promise<Account[]> {
   const result = await request<{ accounts?: Account[] }>(
-    "/api/accounting/accounts",
+    "/api/v2/accounting/accounts",
     undefined,
     { activeOnly },
   );
   return result?.accounts || [];
 }
 
+export async function getAccountOptions(): Promise<Account[]> {
+  try {
+    const result = await request<{ accounts?: Array<{ code: string; libelle: string }> }>(
+      "/api/v2/accounting/accounts/options",
+    );
+    return (result?.accounts || []).map((account, index) => ({
+      id: index + 1,
+      code: account.code,
+      libelle: account.libelle,
+      classe: Number(account.code?.charAt(0) || 0),
+      active: true,
+    }));
+  } catch {
+    return getAccounts(true);
+  }
+}
+
 export async function getAccountById(id: number): Promise<Account> {
   const result = await request<{ account: Account }>(
-    `/api/accounting/accounts/${id}`,
+    `/api/v2/accounting/accounts/${id}`,
   );
   return result.account;
 }
 
 export async function getAccountByCode(code: string): Promise<Account | null> {
   const result = await request<{ account?: Account }>(
-    `/api/accounting/accounts/by-code/${encodeURIComponent(code)}`,
+    `/api/v2/accounting/accounts/by-code/${encodeURIComponent(code)}`,
   );
   return result?.account || null;
 }
 
 export async function searchAccounts(query: string): Promise<Account[]> {
   const result = await request<{ accounts?: Account[] }>(
-    "/api/accounting/accounts/search",
+    "/api/v2/accounting/accounts/search",
     undefined,
     { query },
   );
@@ -862,7 +1053,7 @@ export async function searchAccounts(query: string): Promise<Account[]> {
 
 export async function getAccountsByClasse(classe: number): Promise<Account[]> {
   const result = await request<{ accounts?: Account[] }>(
-    `/api/accounting/accounts/by-classe/${classe}`,
+    `/api/v2/accounting/accounts/by-classe/${classe}`,
   );
   return result?.accounts || [];
 }
@@ -870,7 +1061,7 @@ export async function getAccountsByClasse(classe: number): Promise<Account[]> {
 export async function getChargeAccounts(): Promise<Account[]> {
   const dossierId = getCurrentDossierId();
   const result = await request<{ accounts?: Account[] }>(
-    "/api/accounting/accounts/charges",
+    "/api/v2/accounting/accounts/charges",
     undefined,
     { dossierId },
   );
@@ -880,7 +1071,7 @@ export async function getChargeAccounts(): Promise<Account[]> {
 export async function getTvaAccounts(): Promise<Account[]> {
   const dossierId = getCurrentDossierId();
   const result = await request<{ accounts?: Account[] }>(
-    "/api/accounting/accounts/tva",
+    "/api/v2/accounting/accounts/tva",
     undefined,
     { dossierId },
   );
@@ -890,7 +1081,7 @@ export async function getTvaAccounts(): Promise<Account[]> {
 export async function getFournisseurAccounts(): Promise<Account[]> {
   const dossierId = getCurrentDossierId();
   const result = await request<{ accounts?: Account[] }>(
-    "/api/accounting/accounts/fournisseurs",
+    "/api/v2/accounting/accounts/fournisseurs",
     undefined,
     { dossierId },
   );
@@ -1027,15 +1218,17 @@ export async function createTier(
 ): Promise<Tier> {
   const dossierId = getCurrentDossierId();
   const payload = normalizeTierPayload(requestPayload);
-  const result = await request<{ tier: Tier }>(
-    "/api/accounting/tiers",
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    },
-    { dossierId },
+  const result = unwrapApiData<any>(
+    await request<any>(
+      "/api/accounting/tiers",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      { dossierId },
+    ),
   );
-  return result.tier;
+  return result?.tier || result;
 }
 
 export async function updateTier(
@@ -1044,15 +1237,17 @@ export async function updateTier(
 ): Promise<Tier> {
   const dossierId = getCurrentDossierId();
   const payload = normalizeTierPayload(requestPayload);
-  const result = await request<{ tier: Tier }>(
-    `/api/accounting/tiers/${id}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    },
-    { dossierId },
+  const result = unwrapApiData<any>(
+    await request<any>(
+      `/api/accounting/tiers/${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      },
+      { dossierId },
+    ),
   );
-  return result.tier;
+  return result?.tier || result;
 }
 
 export async function deactivateTier(id: number): Promise<void> {
@@ -1174,6 +1369,9 @@ export async function uploadBankStatement(
   bankType?: string,
   allowedBanks?: string[],
 ): Promise<LocalBankStatement> {
+  if (!(file instanceof File)) {
+    throw new Error("Upload invalide: aucun fichier bancaire valide n'a été transmis.");
+  }
   const formData = new FormData();
   formData.append("file", file);
   const dossierId = getCurrentDossierId();
@@ -1196,6 +1394,7 @@ export async function uploadBankStatement(
 type BankStatementsQuery = {
   status?: string;
   limit?: number;
+  dossierId?: number;
 };
 
 export async function getAllBankStatements(
@@ -1206,10 +1405,14 @@ export async function getAllBankStatements(
     typeof statusOrQuery === "string" ? statusOrQuery : statusOrQuery?.status;
   const limit =
     typeof statusOrQuery === "object" ? (statusOrQuery?.limit ?? 50) : limitArg;
+  const dossierId =
+    typeof statusOrQuery === "object"
+      ? (statusOrQuery?.dossierId || getCurrentDossierId())
+      : getCurrentDossierId();
   const result = await request<{ statements?: any[] }>(
     "/api/v2/bank-statements",
     undefined,
-    { status, limit },
+    { status, limit, dossierId },
   );
   return (result?.statements || []).map(mapBankStatement);
 }
@@ -1217,25 +1420,28 @@ export async function getAllBankStatements(
 export async function getBankStatementById(
   id: number,
 ): Promise<LocalBankStatement> {
-  const result = await request<any>(`/api/v2/bank-statements/${id}`);
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(`/api/v2/bank-statements/${id}`, undefined, { dossierId });
   return mapBankStatement(result);
 }
 
 export async function processBankStatement(
   id: number,
   allowedBanks?: string[],
+  bankType?: string,
 ): Promise<LocalBankStatement> {
+  const dossierId = getCurrentDossierId();
   const query =
     allowedBanks && allowedBanks.length > 0
-      ? { allowedBanks: allowedBanks.join(",") }
-      : undefined;
+      ? { allowedBanks: allowedBanks.join(","), dossierId, ...(bankType && bankType !== "AUTO" ? { bankType } : {}) }
+      : { dossierId, ...(bankType && bankType !== "AUTO" ? { bankType } : {}) };
 
   await request<any>(
     `/api/v2/bank-statements/${id}/process`,
     { method: "POST" },
     query,
   );
-  const refreshed = await request<any>(`/api/v2/bank-statements/${id}`);
+  const refreshed = await request<any>(`/api/v2/bank-statements/${id}`, undefined, { dossierId });
   return mapBankStatement(refreshed);
 }
 
@@ -1243,9 +1449,20 @@ export async function validateBankStatement(
   id: number,
   _fields?: any,
 ): Promise<LocalBankStatement> {
+  const dossierId = getCurrentDossierId();
   const result = await request<any>(`/api/v2/bank-statements/${id}/validate`, {
     method: "POST",
-  });
+  }, { dossierId });
+  return mapBankStatement(result?.statement || result);
+}
+
+export async function clientValidateBankStatement(
+  id: number,
+): Promise<LocalBankStatement> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(`/api/v2/bank-statements/${id}/client-validate`, {
+    method: "POST",
+  }, { dossierId });
   return mapBankStatement(result?.statement || result);
 }
 
@@ -1254,15 +1471,81 @@ export async function updateBankStatementStatus(
   status: string,
   updatedBy?: string,
 ): Promise<LocalBankStatement> {
+  const dossierId = getCurrentDossierId();
   const result = await request<any>(`/api/v2/bank-statements/${id}/status`, {
     method: "PUT",
     body: JSON.stringify({ status, updatedBy }),
-  });
+  }, { dossierId });
+  const statement = mapBankStatement(result?.statement || result);
+  if (result && typeof result === "object") {
+    statement.insertedEntries =
+      result?.insertedEntries != null ? Number(result.insertedEntries) : undefined;
+    statement.syncedRows =
+      result?.syncedRows != null ? Number(result.syncedRows) : undefined;
+    statement.simulationId = result?.simulationId ?? null;
+    statement.metadata = {
+      ...(statement.metadata || {}),
+      message: result?.message,
+    };
+  }
+  return statement;
+}
+
+export async function updateBankStatementTtcRule(
+  id: number,
+  applyTtcRule: boolean,
+  reprocess: boolean = true,
+): Promise<LocalBankStatement> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(`/api/v2/bank-statements/${id}/ttc-rule`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled: applyTtcRule, applyTtcRule, reprocess }),
+  }, { dossierId });
+  return mapBankStatement(result?.statement || result);
+}
+
+export async function updateBankStatementFraisRule(
+  id: number,
+  applyFraisRule: boolean,
+  reprocess: boolean = true,
+): Promise<LocalBankStatement> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(`/api/v2/bank-statements/${id}/frais-rule`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled: applyFraisRule, applyFraisRule, reprocess }),
+  }, { dossierId });
+  return mapBankStatement(result?.statement || result);
+}
+
+export async function updateBankStatementAgiosRule(
+  id: number,
+  applyAgiosRule: boolean,
+  reprocess: boolean = true,
+): Promise<LocalBankStatement> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(`/api/v2/bank-statements/${id}/agios-rule`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled: applyAgiosRule, applyAgiosRule, reprocess }),
+  }, { dossierId });
+  return mapBankStatement(result?.statement || result);
+}
+
+export async function updateBankStatementPackageRule(
+  id: number,
+  applyPackageRule: boolean,
+  reprocess: boolean = true,
+): Promise<LocalBankStatement> {
+  const dossierId = getCurrentDossierId();
+  const result = await request<any>(`/api/v2/bank-statements/${id}/package-rule`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled: applyPackageRule, applyPackageRule, reprocess }),
+  }, { dossierId });
   return mapBankStatement(result?.statement || result);
 }
 
 export async function deleteBankStatement(id: number): Promise<void> {
-  await request<void>(`/api/v2/bank-statements/${id}`, { method: "DELETE" });
+  const dossierId = getCurrentDossierId();
+  await request<void>(`/api/v2/bank-statements/${id}`, { method: "DELETE" }, { dossierId });
 }
 
 export async function deleteAllBankStatements(): Promise<void> {
@@ -1275,10 +1558,28 @@ export async function getBankStatementStats(): Promise<any> {
   });
 }
 
-export async function retryFailedBankStatementPages(id: number): Promise<any> {
-  return request<any>(`/api/v2/bank-statements/${id}/retry-failed`, {
-    method: "POST",
-  });
+export async function retryFailedBankStatementPages(
+  id: number,
+  allowedBanks?: string[],
+  bankType?: string,
+): Promise<any> {
+  const dossierId = getCurrentDossierId();
+  const query =
+    allowedBanks && allowedBanks.length > 0
+      ? {
+          allowedBanks: allowedBanks.join(","),
+          dossierId,
+          ...(bankType && bankType !== "AUTO" ? { bankType } : {}),
+        }
+      : { dossierId, ...(bankType && bankType !== "AUTO" ? { bankType } : {}) };
+
+  return request<any>(
+    `/api/v2/bank-statements/${id}/retry-failed`,
+    {
+      method: "POST",
+    },
+    query,
+  );
 }
 
 export async function getBankOptions(): Promise<{
@@ -1295,8 +1596,11 @@ export async function getBankOptions(): Promise<{
 export async function getTransactionsByStatementId(
   statementId: number,
 ): Promise<BankTransactionV2[]> {
+  const dossierId = getCurrentDossierId();
   const result = await request<any>(
     `/api/v2/bank-transactions/statement/${statementId}`,
+    undefined,
+    { dossierId },
   );
   if (Array.isArray(result)) return result as BankTransactionV2[];
   return (result?.transactions || result || []) as BankTransactionV2[];
@@ -1325,6 +1629,7 @@ export async function createBankTransaction(payload: {
   debit?: number | undefined;
   credit?: number | undefined;
   isLinked?: boolean | undefined;
+  cmApplied?: boolean | undefined;
 }): Promise<BankTransactionV2> {
   const result = await request<any>("/api/v2/bank-transactions", {
     method: "POST",
@@ -1333,12 +1638,40 @@ export async function createBankTransaction(payload: {
   return (result?.transaction || result) as BankTransactionV2;
 }
 
+export async function simulateComptabilisation(statementId: number): Promise<any> {
+  const dossierId = getCurrentDossierId();
+  return request<any>(
+    `/api/v2/bank-statements/${statementId}/accounting/simulate`,
+    {
+      method: "POST",
+    },
+    { dossierId },
+  );
+}
+
+export async function confirmComptabilisation(simulationId: string): Promise<any> {
+  const dossierId = getCurrentDossierId();
+  return request<any>(
+    "/api/v2/bank-statements/accounting/confirm",
+    {
+      method: "POST",
+      body: JSON.stringify({ simulationId }),
+    },
+    { dossierId },
+  );
+}
+
 // ============================================
 // AUTH / UTILISATEURS
 // ============================================
 
 export async function getCurrentUser(): Promise<AuthUser> {
   return request<AuthUser>("/api/auth/me");
+}
+
+export async function getClientDashboard(dossierId?: number): Promise<any> {
+  const resolvedDossierId = dossierId || getCurrentDossierId();
+  return request<any>("/api/client/dashboard", undefined, { dossierId: resolvedDossierId });
 }
 
 export async function listUsers(): Promise<AuthUser[]> {
@@ -1383,16 +1716,18 @@ export async function getDossiers(): Promise<BackendDossierDto[]> {
   return (dossiers || []).map((d) => ({
     id: d.id,
     name: d.name,
+    ice: d.ice,
     status: d.active ? "ACTIVE" : "INACTIVE",
     comptableId: d.comptableId,
     fournisseurId: d.clientId,
-    fournisseurEmail: d.clientUsername,
-    comptableEmail: d.comptableUsername,
+    fournisseurEmail: d.fournisseurEmail ?? d.clientUsername,
+    comptableEmail: d.comptableEmail ?? d.comptableUsername,
     createdAt: d.createdAt,
     exerciseStartDate: d.exerciseStartDate,
     exerciseEndDate: d.exerciseEndDate,
     invoicesCount: d.invoicesCount || 0,
     bankStatementsCount: d.bankStatementsCount || 0,
+    centreMonetiqueCount: d.centreMonetiqueCount || 0,
     pendingInvoicesCount: d.pendingInvoicesCount || 0,
     validatedInvoicesCount: d.validatedInvoicesCount || 0,
   }));
@@ -1474,7 +1809,14 @@ export async function createDossier(payload: {
 }
 
 export async function deleteDossier(id: number): Promise<void> {
-  throw new Error("Suppression de dossier non supportee par le backend actuel");
+  await request<void>(`/api/dossiers/${id}`, { method: "DELETE" });
+}
+
+export async function changeDossierComptable(dossierId: number, comptableId: number): Promise<void> {
+  await request<void>(`/api/dossiers/${dossierId}/comptable`, {
+    method: "PATCH",
+    body: JSON.stringify({ comptableId }),
+  });
 }
 
 export async function getAllPatterns(): Promise<DetectedFieldPattern[]> {
@@ -1538,12 +1880,18 @@ export async function rejectPattern(patternId: number): Promise<void> {
 export async function uploadSalesInvoice(
   file: File,
   dossierId?: number,
+  engine?: "ALPHA_AGENT" | "DEFAULT",
 ): Promise<DynamicInvoiceDto> {
   const formData = new FormData();
   formData.append("file", file);
   const resolvedDossierId = dossierId || getCurrentDossierId();
   if (resolvedDossierId) {
     formData.append("dossierId", String(resolvedDossierId));
+  }
+  if (engine && engine !== "DEFAULT") {
+    formData.append("engine", engine);
+    formData.append("ocrMode", "EVOLEO_AI");
+    formData.append("useAlphaAgent", "true");
   }
   const result = unwrapApiData<any>(
     await request<any>("/api/sales/invoices/upload", {
@@ -1552,6 +1900,49 @@ export async function uploadSalesInvoice(
     }),
   );
   return mapSalesInvoiceResponse(result?.invoice || result);
+}
+
+// ============================================
+// LEGACY MINI COMPATIBILITY (non /api)
+// ============================================
+
+export async function legacyScanInvoice(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/scan`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await parseApiError(response));
+  }
+  return response.json();
+}
+
+export async function legacyAlphaOcr(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/alpha`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await parseApiError(response));
+  }
+  return response.json();
+}
+
+export async function legacyVenteScan(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/vente`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await parseApiError(response));
+  }
+  return response.json();
 }
 
 export async function getSalesInvoicesByDossier(
@@ -1830,12 +2221,50 @@ export async function getSalesInvoiceStats(
   });
 }
 
+// ─── Journal (Relevé Bancaire) ────────────────────────────────────────────────
+
+export async function getJournalPeriods(): Promise<JournalPeriod[]> {
+  const data = await request<any>("/api/v2/journals/periods");
+  return data.periods || data || [];
+}
+
+export async function getJournalList(period?: string): Promise<JournalItem[]> {
+  const data = await request<any>("/api/v2/journals", undefined, period ? { period } : undefined);
+  return data.journals || data || [];
+}
+
+export async function exportJournal(statementId: number): Promise<Response> {
+  const response = await fetch(url(`/api/v2/journals/${statementId}/export`), {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response;
+}
+
+export async function printJournal(statementId: number): Promise<Response> {
+  const response = await fetch(url(`/api/v2/journals/${statementId}/print`), {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response;
+}
+
+export async function getJournalEntries(statementId: number): Promise<JournalEntryRow[]> {
+  const data = await request<any>(`/api/v2/journals/${statementId}/entries`);
+  return data.entries || data || [];
+}
+
 export const api = {
   uploadDynamicInvoice,
+  uploadDynamicInvoicesBatch,
   processDynamicInvoice,
   getDynamicInvoiceById,
   validateDynamicInvoice,
   updateDynamicInvoiceFields,
+  extractDynamicInvoiceField,
+  checkDynamicInvoiceDuplicate,
   getAllDynamicInvoices,
   deleteDynamicInvoice,
   clientValidateInvoice,
@@ -1847,6 +2276,7 @@ export const api = {
   linkTierToDynamicInvoice,
   linkTierToSalesInvoice,
   getCurrentUser,
+  getClientDashboard,
   listUsers,
   createUser,
   deactivateUser,
@@ -1855,6 +2285,7 @@ export const api = {
   getDossiers,
   createDossier,
   deleteDossier,
+  changeDossierComptable,
   getAllTemplates,
   getTemplateById,
   createDynamicTemplate,
@@ -1870,6 +2301,7 @@ export const api = {
   testTemplate,
   detectTemplate,
   getAccounts,
+  getAccountOptions,
   getAccountById,
   getAccountByCode,
   searchAccounts,
@@ -1908,7 +2340,12 @@ export const api = {
   getBankStatementById,
   processBankStatement,
   validateBankStatement,
+  clientValidateBankStatement,
   updateBankStatementStatus,
+  updateBankStatementTtcRule,
+  updateBankStatementFraisRule,
+  updateBankStatementAgiosRule,
+  updateBankStatementPackageRule,
   deleteBankStatement,
   deleteAllBankStatements,
   getBankStatementStats,
@@ -1917,6 +2354,8 @@ export const api = {
   getTransactionsByStatementId,
   updateBankTransaction,
   createBankTransaction,
+  simulateComptabilisation,
+  confirmComptabilisation,
   getAllPatterns,
   getPatternStatistics,
   approvePattern,
@@ -1924,10 +2363,13 @@ export const api = {
   getFileUrl,
   getDynamicInvoicePdfUrl,
   uploadInvoice: uploadDynamicInvoice,
+  uploadInvoicesBatch: uploadDynamicInvoicesBatch,
   processInvoice: processDynamicInvoice,
   getInvoiceById: getDynamicInvoiceById,
   validateInvoice: validateDynamicInvoice,
   updateInvoiceFields: updateDynamicInvoiceFields,
+  extractInvoiceField: extractDynamicInvoiceField,
+  checkDuplicateInvoice: checkDynamicInvoiceDuplicate,
   getAllInvoices: getAllDynamicInvoices,
   deleteInvoice: deleteDynamicInvoice,
   getInvoiceStats: getDynamicInvoiceStats,
@@ -1961,4 +2403,10 @@ export const api = {
   getSalesJournalEntries,
   getSalesInvoiceStats,
   getSalesInvoicePdfUrl,
+  // Journal bancaire
+  getJournalPeriods,
+  getJournalList,
+  exportJournal,
+  printJournal,
+  getJournalEntries,
 };

@@ -3,6 +3,8 @@ import { ApiError } from '../api-client';
 import { LoginRequest, User } from '@/src/types';
 
 const AUTH_USER_KEY = 'auth_user';
+const CURRENT_DOSSIER_ID_KEY = 'currentDossierId';
+const CURRENT_DOSSIER_NAME_KEY = 'currentDossierName';
 
 interface BackendUserPayload {
     id: number;
@@ -45,12 +47,19 @@ function clearStoredUser() {
     localStorage.removeItem(AUTH_USER_KEY);
 }
 
+function clearStoredDossierSelection() {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(CURRENT_DOSSIER_ID_KEY);
+    localStorage.removeItem(CURRENT_DOSSIER_NAME_KEY);
+}
+
 /**
  * Service for Authentication.
  * Handles login, logout, and session management.
  */
 export class AuthService {
     static async login(request: LoginRequest): Promise<User> {
+        clearStoredDossierSelection();
         const response = await apiClient.post<BackendLoginResponse>('/api/auth/login', request);
         const userPayload = response.data.user;
         const mapped = mapBackendUser(userPayload);
@@ -75,6 +84,7 @@ export class AuthService {
 
     static async logout(): Promise<void> {
         clearStoredUser();
+        clearStoredDossierSelection();
         try {
             await apiClient.post('/api/auth/logout');
         } catch {

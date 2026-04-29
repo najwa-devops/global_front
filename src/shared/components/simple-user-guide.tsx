@@ -31,7 +31,7 @@ export function SimpleUserGuide() {
                     <HelpCircle className="mt-0.5 h-5 w-5 text-primary" />
                     <div>
                         <p className="text-sm font-semibold">Mode simple: suivez ces 3 etapes</p>
-                        <p className="text-xs text-muted-foreground mt-1">Pour aller vite: 1) Ajouter, 2) Verifier, 3) Valider.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Pour aller vite: 1) Ajouter, 2) Verifier, 3) Comptabiliser.</p>
                     </div>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={hideGuide}>
@@ -47,7 +47,7 @@ export function SimpleUserGuide() {
                     <Link href="/achat/invoices">2. Verifier</Link>
                 </Button>
                 <Button asChild size="sm" variant="outline">
-                    <Link href="/achat/validated">3. Factures validees</Link>
+                    <Link href="/achat/accounted">3. Factures comptabilisees</Link>
                 </Button>
             </div>
         </div>
