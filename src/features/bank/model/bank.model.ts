@@ -32,11 +32,50 @@ export const EMPTY_NEW_TRANSACTION: NewTransactionForm = {
 };
 
 export function normalizeBankStatus(status?: string): string {
-  return String(status || "")
+  const normalized = String(status || "")
     .normalize("NFD")
     .replace(/\p{M}+/gu, "")
     .toUpperCase()
     .trim();
+
+  if (
+    normalized === "VALIDATED" ||
+    normalized === "VALIDE" ||
+    normalized === "VALIDEE" ||
+    normalized === "VALIDEES"
+  ) {
+    return "VALIDATED";
+  }
+  if (normalized === "COMPTABILISE" || normalized === "ACCOUNTED") {
+    return "COMPTABILISE";
+  }
+  if (normalized === "READY_TO_VALIDATE" || normalized === "PRET_A_VALIDER") {
+    return "READY_TO_VALIDATE";
+  }
+  if (
+    normalized === "TREATED" ||
+    normalized === "TRAITE" ||
+    normalized === "PROCESSED" ||
+    normalized === "EXTRACTED"
+  ) {
+    return "READY_TO_VALIDATE";
+  }
+  if (normalized === "A_VERIFIER" || normalized === "VERIFY") {
+    return "VERIFY";
+  }
+  if (normalized === "PENDING" || normalized === "EN_ATTENTE") {
+    return "PENDING";
+  }
+  if (normalized === "PROCESSING" || normalized === "EN_COURS") {
+    return "PROCESSING";
+  }
+  if (normalized === "ERROR" || normalized === "ERREUR") {
+    return "ERROR";
+  }
+  if (normalized === "DUPLICATE") {
+    return "DUPLIQUE";
+  }
+  return normalized;
 }
 
 export function isValidatedStatus(status?: string): boolean {
@@ -47,6 +86,28 @@ export function isValidatedStatus(status?: string): boolean {
 export function isAccountedStatus(status?: string): boolean {
   const normalized = normalizeBankStatus(status);
   return normalized.includes("COMPTABILIS");
+}
+
+export function isBankStatementOpenStatus(status?: string | null): boolean {
+  const normalized = normalizeBankStatus(status || undefined);
+  return [
+    "PENDING",
+    "PROCESSING",
+    "VERIFY",
+    "A_VERIFIER",
+    "READY_TO_VALIDATE",
+    "PRET_A_VALIDER",
+    "TREATED",
+    "TRAITE",
+    "PROCESSED",
+    "EXTRACTED",
+    "EN_ATTENTE",
+    "EN_COURS",
+  ].includes(normalized);
+}
+
+export function isProcessingStatus(status?: string | null): boolean {
+  return isBankStatementOpenStatus(status);
 }
 
 export function sortByIndex(items: BankTransactionV2[]): BankTransactionV2[] {

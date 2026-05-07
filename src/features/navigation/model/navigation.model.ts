@@ -18,6 +18,7 @@ const DOSSIER_SCOPED_PATHS = [
   "/bank/upload",
   "/bank/list",
   "/bank/accounted",
+  "/journal",
   "/centre-monetique",
   "/settings/general",
   "/settings/bank",

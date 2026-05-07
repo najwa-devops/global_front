@@ -20,7 +20,8 @@ import {
   CreateUserRequest,
   AccountingEntry,
 } from "./types";
-import type { JournalPeriod, JournalItem, JournalEntryRow } from "@/releve-bancaire/types";
+import { normalizeBankStatus } from "@/src/features/bank/model/bank.model";
+import type { JournalPeriod, JournalItem, JournalEntryRow, JournalAllEntriesResponse } from "@/releve-bancaire/types";
 
 type DynamicInvoiceBulkItemResult = {
   invoiceId: number;
@@ -73,7 +74,10 @@ export type BackendDossierDto = {
   bankStatementsCount?: number;
   centreMonetiqueCount?: number;
   pendingInvoicesCount?: number;
+  pendingDocumentsCount?: number;
   validatedInvoicesCount?: number;
+  validatedBankStatementsCount?: number;
+  validatedDocumentsCount?: number;
 };
 
 export type AccountingConfigDto = {
@@ -400,6 +404,9 @@ function mapSalesInvoiceResponse(raw: any): DynamicInvoiceDto {
     accounted: raw.accounted,
     accountedAt: raw.accountedAt,
     accountedBy: raw.accountedBy,
+    clientValidated: raw.clientValidated,
+    clientValidatedAt: raw.clientValidatedAt,
+    clientValidatedBy: raw.clientValidatedBy,
     createdAt: raw.createdAt || new Date().toISOString(),
     updatedAt: raw.updatedAt,
     validatedAt: raw.validatedAt,
@@ -425,20 +432,7 @@ function unwrapApiData<T = any>(payload: any): T {
 function mapBankStatus(
   status: string | undefined,
 ): LocalBankStatement["status"] {
-  const s = String(status || "").toUpperCase();
-  if (s === "COMPTABILISE" || s === "COMPTABILISÉ") return "COMPTABILISE";
-  if (s === "READY_TO_VALIDATE" || s === "PRET_A_VALIDER") return "READY_TO_VALIDATE";
-  if (s.includes("VALID")) return "VALIDATED";
-  if (s.includes("PENDING") || s.includes("ATTENTE")) return "PENDING";
-  if (s.includes("PROCESS") || s.includes("COURS")) return "PROCESSING";
-  if (
-    s.includes("ERROR") ||
-    s.includes("ERREUR") ||
-    s.includes("DUPLIQUE") ||
-    s.includes("VIDE")
-  )
-    return s.includes("DUPLIQUE") ? "DUPLIQUE" : s.includes("VIDE") ? "VIDE" : "ERROR";
-  return "TREATED";
+  return normalizeBankStatus(status) as LocalBankStatement["status"];
 }
 
 function mapBankStatement(raw: any): LocalBankStatement {
@@ -494,7 +488,7 @@ function mapBankStatement(raw: any): LocalBankStatement {
     originalName: raw?.originalName || filename,
     filePath: raw?.filePath || filename,
     fileSize: Number(raw?.fileSize || 0),
-    displayStatus: String(raw?.status || raw?.statusCode || "").toUpperCase(),
+    displayStatus: normalizeBankStatus(raw?.status || raw?.statusCode || ""),
     fileUrl: url(
       `/api/v2/bank-statements/files/${encodeURIComponent(filename)}`,
     ),
@@ -1729,7 +1723,10 @@ export async function getDossiers(): Promise<BackendDossierDto[]> {
     bankStatementsCount: d.bankStatementsCount || 0,
     centreMonetiqueCount: d.centreMonetiqueCount || 0,
     pendingInvoicesCount: d.pendingInvoicesCount || 0,
+    pendingDocumentsCount: d.pendingDocumentsCount || d.pendingInvoicesCount || 0,
     validatedInvoicesCount: d.validatedInvoicesCount || 0,
+    validatedBankStatementsCount: d.validatedBankStatementsCount || 0,
+    validatedDocumentsCount: d.validatedDocumentsCount || d.validatedInvoicesCount || 0,
   }));
 }
 
@@ -2223,13 +2220,17 @@ export async function getSalesInvoiceStats(
 
 // ─── Journal (Relevé Bancaire) ────────────────────────────────────────────────
 
-export async function getJournalPeriods(): Promise<JournalPeriod[]> {
-  const data = await request<any>("/api/v2/journals/periods");
+export async function getJournalPeriods(dossierId?: number): Promise<JournalPeriod[]> {
+  const params = dossierId != null ? { dossierId: String(dossierId) } : undefined;
+  const data = await request<any>("/api/v2/journals/periods", undefined, params);
   return data.periods || data || [];
 }
 
-export async function getJournalList(period?: string): Promise<JournalItem[]> {
-  const data = await request<any>("/api/v2/journals", undefined, period ? { period } : undefined);
+export async function getJournalList(period?: string, dossierId?: number): Promise<JournalItem[]> {
+  const params: Record<string, string> = {};
+  if (period && period !== "all") params.period = period;
+  if (dossierId != null) params.dossierId = String(dossierId);
+  const data = await request<any>("/api/v2/journals", undefined, Object.keys(params).length ? params : undefined);
   return data.journals || data || [];
 }
 
@@ -2254,6 +2255,39 @@ export async function printJournal(statementId: number): Promise<Response> {
 export async function getJournalEntries(statementId: number): Promise<JournalEntryRow[]> {
   const data = await request<any>(`/api/v2/journals/${statementId}/entries`);
   return data.entries || data || [];
+}
+
+export async function getAllJournalEntries(dossierId?: number, year?: number): Promise<JournalAllEntriesResponse> {
+  const params: Record<string, string> = {};
+  if (dossierId != null) params.dossierId = String(dossierId);
+  if (year != null) params.year = String(year);
+  return request<JournalAllEntriesResponse>("/api/v2/journals/all-entries", undefined, Object.keys(params).length ? params : undefined);
+}
+
+export async function exportAllJournal(dossierId?: number, year?: number): Promise<Response> {
+  const params = new URLSearchParams();
+  if (dossierId != null) params.append("dossierId", String(dossierId));
+  if (year != null) params.append("year", String(year));
+  const queryStr = params.toString();
+  const response = await fetch(url(`/api/v2/journals/export-all${queryStr ? "?" + queryStr : ""}`), {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response;
+}
+
+export async function printAllJournal(dossierId?: number, year?: number): Promise<Response> {
+  const params = new URLSearchParams();
+  if (dossierId != null) params.append("dossierId", String(dossierId));
+  if (year != null) params.append("year", String(year));
+  const queryStr = params.toString();
+  const response = await fetch(url(`/api/v2/journals/print-all${queryStr ? "?" + queryStr : ""}`), {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response;
 }
 
 export const api = {
@@ -2409,4 +2443,7 @@ export const api = {
   exportJournal,
   printJournal,
   getJournalEntries,
+  getAllJournalEntries,
+  exportAllJournal,
+  printAllJournal,
 };

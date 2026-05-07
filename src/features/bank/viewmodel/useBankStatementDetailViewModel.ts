@@ -8,6 +8,7 @@ import {
   applyAutoComptePropagation,
   buildLocalTransaction,
   EMPTY_NEW_TRANSACTION,
+  isProcessingStatus,
   mapTransactionCreatePayload,
   mapTransactionUpdatePayload,
   NewTransactionForm,
@@ -128,11 +129,7 @@ export function useBankStatementDetailViewModel({
   useEffect(() => {
     if (!open || !localStatement) return;
 
-    const isProcessing =
-      localStatement.status === "PROCESSING" ||
-      localStatement.status === "PENDING" ||
-      localStatement.status === "EN_COURS" ||
-      localStatement.status === "EN_ATTENTE";
+    const isProcessing = isProcessingStatus(localStatement.status);
 
     if (!isProcessing) return;
 

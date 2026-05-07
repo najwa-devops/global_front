@@ -75,6 +75,13 @@ import { api } from "@/lib/api"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
+import {
+    isAccountedStatus,
+    isProcessingStatus,
+    isValidatedStatus,
+    normalizeBankStatus,
+} from "@/src/features/bank/model/bank.model"
+import { useAuth } from "@/hooks/use-auth"
 
 interface BankStatementDetailModalProps {
     open?: boolean
@@ -109,18 +116,6 @@ const EMPTY_NEW_TRANSACTION: NewTransactionForm = {
 
 const DEFAULT_COMPTE_CODE = "349700000"
 const DEFAULT_COMPTE_CM_CODE = "342100000"
-
-function isValidatedStatus(status: string): boolean {
-    return ["VALIDATED", "VALIDE"].includes(status)
-}
-
-function isAccountedStatus(status: string): boolean {
-    return ["COMPTABILISE", "COMPTABILISÉ"].includes(status)
-}
-
-function isProcessingStatus(status?: string | null): boolean {
-    return status === "PROCESSING" || status === "PENDING" || status === "EN_COURS" || status === "EN_ATTENTE"
-}
 
 function sortByIndex(items: BankTransactionV2[]): BankTransactionV2[] {
     return [...items].sort((a, b) => {
@@ -897,6 +892,8 @@ export function BankStatementDetailModal({
     onBack,
 }: BankStatementDetailModalProps) {
     const router = useRouter()
+    const { isClient } = useAuth()
+    const isClientUser = isClient()
     const [transactions, setTransactions] = useState<BankTransactionV2[]>([])
     const [editableTransactions, setEditableTransactions] = useState<BankTransactionV2[]>([])
     const [baseTransactions, setBaseTransactions] = useState<BankTransactionV2[]>([])
@@ -911,6 +908,7 @@ export function BankStatementDetailModal({
     const [accounts, setAccounts] = useState<Account[]>([])
     const [loadingAccounts, setLoadingAccounts] = useState(false)
     const [localStatement, setLocalStatement] = useState<BankStatementV2 | null>(null)
+    const isClientValidated = isClientUser && Boolean(localStatement?.clientValidated)
     const [ttcUpdating, setTtcUpdating] = useState(false)
     const [fraisUpdating, setFraisUpdating] = useState(false)
     const [agiosUpdating, setAgiosUpdating] = useState(false)
@@ -1056,11 +1054,7 @@ export function BankStatementDetailModal({
 
     useEffect(() => {
         if (!(embedded || open) || !localStatement) return
-        const isProcessing =
-            localStatement.status === "PROCESSING" ||
-            localStatement.status === "PENDING" ||
-            localStatement.status === "EN_COURS" ||
-            localStatement.status === "EN_ATTENTE"
+        const isProcessing = isProcessingStatus(localStatement.status)
         if (!isProcessing) return
         const interval = setInterval(() => {
             loadFullData(localStatement.id, true)
@@ -1157,6 +1151,7 @@ export function BankStatementDetailModal({
                 return <Badge className="bg-blue-500/10 text-blue-600 border-blue-400/30 animate-pulse">En cours</Badge>
             case "TREATED":
             case "TRAITE":
+            case "VERIFY":
             case "A_VERIFIER":
                 return <Badge className="bg-orange-500/10 text-orange-700 border-orange-500/40 animate-pulse shadow-[0_0_0_1px_rgba(249,115,22,0.18)]">À vérifier</Badge>
             case "READY_TO_VALIDATE":
@@ -1363,7 +1358,7 @@ export function BankStatementDetailModal({
         field: "transactionIndex" | "dateOperation" | "dateValeur" | "compte" | "libelle" | "debit" | "credit",
         options?: { type?: "text" | "number" | "date"; step?: string; className?: string; emptyLabel?: string }
     ) => {
-        const readOnly = !!localStatement && isAccountedStatus(localStatement.status)
+        const readOnly = !!localStatement && (isAccountedStatus(localStatement.status) || isClientValidated)
         const isEditing = isEditingCell(tx.id, field)
         const rawValue = (tx[field] ?? "") as string | number
         const value = field === "compte"
@@ -1703,17 +1698,17 @@ export function BankStatementDetailModal({
     const selectedNewTransactionAccount = accounts.find((account) => account.code === newTransaction.compte) || null
     if (!localStatement) return null
     const isAccounted = isAccountedStatus(localStatement.status)
-    const displayStatus = String(localStatement.displayStatus || localStatement.statusCode || localStatement.status || "").toUpperCase()
+    const displayStatus = normalizeBankStatus(localStatement.displayStatus || localStatement.statusCode || localStatement.status)
     const isDuplicateStatement = Boolean(localStatement.isDuplicate)
         || displayStatus === "DUPLIQUE"
         || Boolean(localStatement.duplicateOfId)
         || (typeof localStatement.validationErrors === "string" && localStatement.validationErrors.includes("DUPLIQUE_OF"))
-    const hasVerificationMismatch = displayStatus === "A_VERIFIER"
-        || displayStatus === "TREATED"
+    const hasVerificationMismatch = displayStatus === "VERIFY"
+        || displayStatus === "READY_TO_VALIDATE"
         || localStatement.verificationStatus === "INCOHERENCE"
         || (balanceRule.backendAvailable && !balanceRule.backendIsValid)
         || otherBankCheck.isValid === false
-    const headerStatus = hasVerificationMismatch ? "A_VERIFIER" : displayStatus
+    const headerStatus = hasVerificationMismatch ? "VERIFY" : displayStatus
     const isPageMode = embedded || renderAsPage
 
     const handleClose = () => {
@@ -2148,7 +2143,7 @@ export function BankStatementDetailModal({
                         </div>
                     )}
 
-                    {!isAccounted && (
+                    {!isAccounted && !isClientValidated && (
                         <div className="rounded-md border bg-card shadow-sm p-4 shrink-0">
                             {!showNewTransactionForm ? (
                                 <div className="flex justify-end">
@@ -2542,9 +2537,9 @@ export function BankStatementDetailModal({
                                                     <div className="flex flex-col items-center gap-1">
                                                         <Badge
                                                             variant="secondary"
-                                                            className={cn("font-normal text-xs bg-muted text-muted-foreground", !isAccounted && "cursor-pointer")}
+                                                            className={cn("font-normal text-xs bg-muted text-muted-foreground", !isAccounted && !isClientValidated && "cursor-pointer")}
                                                             onClick={() => {
-                                                                if (!isAccounted) setEditingCell({ id: tx.id, field: "transactionIndex" })
+                                                                if (!isAccounted && !isClientValidated) setEditingCell({ id: tx.id, field: "transactionIndex" })
                                                             }}
                                                         >
                                                             {tx.transactionIndex || tx.id}
@@ -2596,9 +2591,9 @@ export function BankStatementDetailModal({
                                                     renderEditableCell(tx, "compte", { className: "font-mono", emptyLabel: DEFAULT_COMPTE_CODE })
                                                 ) : (
                                                     <Popover
-                                                        open={!isAccounted && openComptePopoverTxId === tx.id}
+                                                        open={!isAccounted && !isClientValidated && openComptePopoverTxId === tx.id}
                                                         onOpenChange={(nextOpen) => {
-                                                            if (isAccounted) return
+                                                            if (isAccounted || isClientValidated) return
                                                             setOpenComptePopoverTxId(nextOpen ? tx.id : null)
                                                         }}
                                                     >
@@ -2606,7 +2601,7 @@ export function BankStatementDetailModal({
                                                             <div
                                                                 className={cn(
                                                                     "group inline-flex min-w-[145px] max-w-[250px] flex-col rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
-                                                                    !isAccounted && "cursor-pointer",
+                                                                    !isAccounted && !isClientValidated && "cursor-pointer",
                                                                     compteIsDefault
                                                                         ? "border-orange-500 bg-orange-100 text-orange-900 hover:bg-orange-200"
                                                                         : tx.isLinked
@@ -2732,14 +2727,18 @@ export function BankStatementDetailModal({
                     ) : null}
                     {!isAccounted && (
                         <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowAccountingModal(true)} disabled={saving || accountingLoading || confirmLoading || isDuplicateStatement}>
-                                <Calculator className="h-4 w-4" />
-                                Comptabiliser
-                            </Button>
-                            <Button size="sm" className="gap-2" onClick={handleSaveAll} disabled={!hasChanges || saving || isDuplicateStatement}>
-                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                Enregistrer
-                            </Button>
+                            {!isClientUser && (
+                                <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowAccountingModal(true)} disabled={saving || accountingLoading || confirmLoading || isDuplicateStatement}>
+                                    <Calculator className="h-4 w-4" />
+                                    Comptabiliser
+                                </Button>
+                            )}
+                            {(!isClientUser || !isClientValidated) && (
+                                <Button size="sm" className="gap-2" onClick={handleSaveAll} disabled={!hasChanges || saving || isDuplicateStatement}>
+                                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                    Enregistrer
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>

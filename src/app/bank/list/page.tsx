@@ -21,6 +21,7 @@ import { api } from "@/lib/api"
 import { BankStatementV2 } from "@/releve-bancaire/types"
 import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
+import { GeneralParamsService } from "@/src/api/services/general-params.service"
 
 function BankListPageContent() {
     const router = useRouter()
@@ -28,8 +29,10 @@ function BankListPageContent() {
     const { user } = useAuth()
     const isClient = user?.role === "CLIENT"
     const [loading, setLoading] = useState(true)
+    const [allowDeleteValidated, setAllowDeleteValidated] = useState(false)
+    const [allowDeleteAccounted, setAllowDeleteAccounted] = useState(false)
     const [statements, setStatements] = useState<BankStatementV2[]>([])
-    const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "validated" | "accounted">("all")
+    const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "accounted">("all")
     const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
     const isAccountedStatus = (status?: string) => {
@@ -39,8 +42,13 @@ function BankListPageContent() {
 
     const loadData = async () => {
         try {
-            const statementsData = await api.getAllBankStatements({ limit: 1000 })
+            const [statementsData, generalParams] = await Promise.all([
+                api.getAllBankStatements({ limit: 1000 }),
+                GeneralParamsService.getParams().catch(() => ({})),
+            ])
             setStatements(Array.isArray(statementsData) ? statementsData : [])
+            setAllowDeleteValidated(Boolean((generalParams as any)?.allowValidatedDocumentDeletion))
+            setAllowDeleteAccounted(Boolean((generalParams as any)?.allowAccountedDocumentDeletion))
         } catch (error) {
             console.error("Error loading bank statements:", error)
             toast.error("Impossible de charger les relevés bancaires")
@@ -55,7 +63,7 @@ function BankListPageContent() {
 
     useEffect(() => {
         const q = (searchParams.get("filter") || "").toLowerCase()
-        if (q === "pending" || q === "validated" || q === "accounted") {
+        if (q === "pending" || q === "accounted") {
             setStatusFilter(q)
         } else {
             setStatusFilter("all")
@@ -76,11 +84,9 @@ function BankListPageContent() {
 
     const filteredStatements = statements.filter((s) => {
         const status = (s.status || "").toUpperCase()
-        const isValidated = status === "VALIDATED" || status === "VALIDE"
         const isAccounted = isAccountedStatus(status)
-        const isPending = !isValidated && !isAccounted
+        const isPending = !isAccounted
 
-        if (statusFilter === "validated") return isValidated
         if (statusFilter === "accounted") return isAccounted
         if (statusFilter === "pending") return isPending
         return true
@@ -255,9 +261,6 @@ function BankListPageContent() {
                 <Button variant={statusFilter === "pending" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("pending")}>
                     À traiter
                 </Button>
-                <Button variant={statusFilter === "validated" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("validated")}>
-                    Validés
-                </Button>
                 <Button variant={statusFilter === "accounted" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("accounted")}>
                     Comptabilisés
                 </Button>
@@ -276,6 +279,8 @@ function BankListPageContent() {
                     )
                 }}
                 userRole={user?.role}
+                allowDeleteValidated={allowDeleteValidated}
+                allowDeleteAccounted={allowDeleteAccounted}
             />
 
             <AlertDialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>

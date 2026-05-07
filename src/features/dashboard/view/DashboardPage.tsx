@@ -16,6 +16,8 @@ export default function DashboardPageView() {
     filters,
     suppliers,
     pendingCount,
+    pendingBankCount,
+    pendingCmCount,
     setFilters,
     openInvoiceOcr,
     handleProcessInline,
@@ -34,16 +36,20 @@ export default function DashboardPageView() {
 
   return (
     <div className="space-y-6">
-      <StatsCards invoices={invoices} />
+      <StatsCards invoices={invoices} pendingBankCount={pendingBankCount} pendingCmCount={pendingCmCount} />
 
-      {pendingCount > 0 && (
+      {(pendingCount + pendingBankCount + pendingCmCount) > 0 && (
         <Card className="border-amber-500/50 bg-amber-500/10">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <AlertCircle className="h-5 w-5 text-amber-500" />
               <div>
                 <p className="font-medium text-amber-700 dark:text-amber-300">
-                  {pendingCount} facture{pendingCount > 1 ? "s" : ""} en attente
+                  {pendingCount + pendingBankCount + pendingCmCount} document{(pendingCount + pendingBankCount + pendingCmCount) > 1 ? "s" : ""} en attente
+                  {" — "}
+                  {pendingCount} facture{pendingCount > 1 ? "s" : ""},&nbsp;
+                  {pendingBankCount} relevé{pendingBankCount > 1 ? "s" : ""},&nbsp;
+                  {pendingCmCount} centre monétique
                 </p>
                 <Button
                   variant="link"

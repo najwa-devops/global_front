@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { GeneralParamsService, DossierGeneralParams } from "@/src/api/services/general-params.service";
+import { useAuth } from "@/hooks/use-auth";
 
 const defaultForm: DossierGeneralParams = {
   companyName: "",
@@ -30,9 +31,11 @@ const defaultForm: DossierGeneralParams = {
   individualPerson: false,
   hasFiscalRegularityCertificate: false,
   allowValidatedDocumentDeletion: false,
+  allowAccountedDocumentDeletion: false,
 };
 
 export function GeneralParamsPage() {
+  const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<DossierGeneralParams>(defaultForm);
@@ -314,6 +317,24 @@ export function GeneralParamsPage() {
                 Suppression d&apos;un document déjà validé par le client
               </Label>
             </div>
+            {isAdmin() && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="allowAccountedDocumentDeletion"
+                  checked={Boolean(form.allowAccountedDocumentDeletion)}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      allowAccountedDocumentDeletion: checked === true,
+                    }))
+                  }
+                  disabled={loading}
+                />
+                <Label htmlFor="allowAccountedDocumentDeletion">
+                  Suppression d&apos;un document déjà comptabilisé
+                </Label>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end">

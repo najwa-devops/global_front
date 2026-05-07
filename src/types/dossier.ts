@@ -17,7 +17,10 @@ export interface Dossier {
     bankStatementsCount: number
     centreMonetiqueCount: number
     pendingInvoicesCount: number
+    pendingDocumentsCount?: number
     validatedInvoicesCount: number
+    validatedBankStatementsCount?: number
+    validatedDocumentsCount?: number
     status: "active" | "inactive"
     createdAt: string
     exerciseStartDate?: string

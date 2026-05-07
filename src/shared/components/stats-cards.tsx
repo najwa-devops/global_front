@@ -7,14 +7,16 @@ import { formatAmount, toWorkflowStatus } from "@/lib/utils"
 
 interface StatsCardsProps {
   invoices: DynamicInvoice[]
+  pendingBankCount?: number
+  pendingCmCount?: number
 }
 
-export function StatsCards({ invoices }: StatsCardsProps) {
+export function StatsCards({ invoices, pendingBankCount = 0, pendingCmCount = 0 }: StatsCardsProps) {
   const stats = {
     total: invoices.length,
     pending: invoices.filter((i) =>
       ["VERIFY", "READY_TO_TREAT", "READY_TO_VALIDATE"].includes(toWorkflowStatus(i.status))
-    ).length,
+    ).length + pendingBankCount + pendingCmCount,
     validated: invoices.filter((i) => toWorkflowStatus(i.status) === "VALIDATED").length,
     errors: invoices.filter((i) => toWorkflowStatus(i.status) === "REJECTED").length,
   }
@@ -37,6 +39,7 @@ export function StatsCards({ invoices }: StatsCardsProps) {
     {
       label: "En attente",
       value: stats.pending,
+      subtitle: `${invoices.filter((i) => ["VERIFY","READY_TO_TREAT","READY_TO_VALIDATE"].includes(toWorkflowStatus(i.status))).length} fact. · ${pendingBankCount} rel. · ${pendingCmCount} CM`,
       icon: Clock,
       color: "text-amber-400",
       bgColor: "bg-amber-400/10",
@@ -91,6 +94,9 @@ export function StatsCards({ invoices }: StatsCardsProps) {
                 {card.value}
               </p>
               <p className="text-sm text-muted-foreground mt-0.5">{card.label}</p>
+              {"subtitle" in card && card.subtitle && (
+                <p className="text-xs text-muted-foreground/70 mt-0.5">{card.subtitle}</p>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -28,7 +28,10 @@ function mapBackendDossier(raw: any): Dossier {
         bankStatementsCount: raw.bankStatementsCount ?? 0,
         centreMonetiqueCount: raw.centreMonetiqueCount ?? 0,
         pendingInvoicesCount: raw.pendingInvoicesCount ?? 0,
+        pendingDocumentsCount: raw.pendingDocumentsCount ?? raw.pendingInvoicesCount ?? 0,
         validatedInvoicesCount: raw.validatedInvoicesCount ?? 0,
+        validatedBankStatementsCount: raw.validatedBankStatementsCount ?? 0,
+        validatedDocumentsCount: raw.validatedDocumentsCount ?? raw.validatedInvoicesCount ?? 0,
         status: String(raw.status || "ACTIVE").toUpperCase() === "ARCHIVED" ? "inactive" : "active",
         createdAt: raw.createdAt ?? new Date().toISOString(),
     };

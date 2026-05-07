@@ -21,6 +21,7 @@ export type DossierGeneralParams = {
   individualPerson?: boolean;
   hasFiscalRegularityCertificate?: boolean;
   allowValidatedDocumentDeletion?: boolean;
+  allowAccountedDocumentDeletion?: boolean;
 };
 
 function getCurrentDossierId(): number | undefined {

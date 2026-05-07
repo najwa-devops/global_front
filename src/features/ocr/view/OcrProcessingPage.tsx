@@ -157,6 +157,7 @@ export function OcrProcessingPage({
 }: OcrProcessingPageProps) {
   const { isClient } = useAuth();
   const isClientUser = isClient();
+  const isClientValidated = isClientUser && Boolean(invoice.clientValidated);
   const parseTvaValues = (raw: unknown): string[] => {
     if (Array.isArray(raw)) {
       return raw.map((v: unknown) => String(v).trim()).filter(Boolean);
@@ -1440,6 +1441,24 @@ export function OcrProcessingPage({
       fields.forEach((field) => {
         fieldsForBackend[field.key] = String(field.value || "");
       });
+      // Pre-validate accounting fields before saving/calling API
+      if (!isDemoMode && !isSalesFlow) {
+        const chargeAcc = (fieldsForBackend.chargeAccount || "").trim();
+        const supplierAcc = (
+          fieldsForBackend.tierNumber ||
+          fieldsForBackend.collectifAccount ||
+          ""
+        ).trim();
+        const missing: string[] = [];
+        if (!chargeAcc) missing.push("Compte HT");
+        if (!supplierAcc) missing.push("Numéro de compte fournisseur");
+        if (missing.length > 0) {
+          throw new Error(
+            `Données comptables manquantes: ${missing.join(", ")}. Veuillez renseigner ces champs avant de comptabiliser.`,
+          );
+        }
+      }
+
       if (!isDemoMode) {
         const updateFn = onUpdateFields ?? api.updateDynamicInvoiceFields;
         await updateFn(invoice.id, fieldsForBackend);
@@ -1631,7 +1650,7 @@ export function OcrProcessingPage({
 
             {/* Boutons d'action */}
             <div className="flex items-center gap-0.5">
-              {!isAvoirField && !isAccountedInvoice && (
+              {!isAvoirField && !isAccountedInvoice && !isClientValidated && (
                 <>
                   {isSelectingPosition === field.key ? (
                     <Button
@@ -1728,7 +1747,7 @@ export function OcrProcessingPage({
               {isAvoirValue ? "Avoir" : "Facture"}
             </Badge>
           ) : (
-            isAccountedInvoice ? (
+            (isAccountedInvoice || isClientValidated) ? (
               <div
                 className={`flex min-h-8 items-center rounded-md border px-3 text-sm bg-slate-50 text-slate-700 ${
                   isPending ? "border-amber-500 bg-amber-50/10" : ""
@@ -1800,7 +1819,7 @@ export function OcrProcessingPage({
           </div>
 
           {/* Input */}
-          {isAccountedInvoice ? (
+          {(isAccountedInvoice || isClientValidated) ? (
             <div className="flex min-h-8 items-center rounded-md border px-3 text-sm bg-slate-50 text-slate-700">
               {displayValue?.toString() || "-"}
             </div>
@@ -1915,7 +1934,7 @@ export function OcrProcessingPage({
           )}
 
           {/* Bouton Enregistrer */}
-          {!isAccountedInvoice && (
+          {!isAccountedInvoice && !isClientValidated && (
             <Button
               variant="outline"
               className="gap-2 bg-transparent"

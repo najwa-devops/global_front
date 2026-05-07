@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { DynamicInvoice } from "@/lib/types";
 import { api } from "@/lib/api";
+import { getCentreMonetiqueBatches } from "@/src/core/lib/centre-monetique/api";
 import { dynamicInvoiceDtoToLocal, toWorkflowStatus } from "@/lib/utils";
+import { isBankStatementOpenStatus } from "@/src/features/bank/model/bank.model";
 import {
   buildSupplierList,
   countPendingInvoices,
@@ -21,6 +23,8 @@ const initialFilters: DashboardFilters = {
 
 export function useDashboardViewModel() {
   const [invoices, setInvoices] = useState<DynamicInvoice[]>([]);
+  const [pendingBankCount, setPendingBankCount] = useState(0);
+  const [pendingCmCount, setPendingCmCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<DashboardFilters>(initialFilters);
   const router = useRouter();
@@ -29,10 +33,32 @@ export function useDashboardViewModel() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const dtos = await api.getAllInvoices(undefined, undefined, 1000);
-        const localInvoices = dtos.map(dynamicInvoiceDtoToLocal);
-        localInvoices.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-        setInvoices(localInvoices);
+        const [dtos, bankStatements, cmBatches] = await Promise.allSettled([
+          api.getAllInvoices(undefined, undefined, 1000),
+          api.getAllBankStatements({ limit: 500 }),
+          getCentreMonetiqueBatches(500),
+        ]);
+
+        if (dtos.status === "fulfilled") {
+          const localInvoices = dtos.value.map(dynamicInvoiceDtoToLocal);
+          localInvoices.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+          setInvoices(localInvoices);
+        }
+
+        if (bankStatements.status === "fulfilled") {
+          const pending = bankStatements.value.filter((s) =>
+            isBankStatementOpenStatus(s.displayStatus || s.status || s.statusCode),
+          ).length;
+          setPendingBankCount(pending);
+        }
+
+        if (cmBatches.status === "fulfilled") {
+          const pending = cmBatches.value.filter((b) => {
+            const s = String(b.status || "").toUpperCase();
+            return s !== "COMPTABILISE" && s !== "COMPTABILISÉ" && s !== "PROCESSED";
+          }).length;
+          setPendingCmCount(pending);
+        }
       } catch (err) {
         console.error("Error loading dashboard data:", err);
       } finally {
@@ -87,6 +113,8 @@ export function useDashboardViewModel() {
     filters,
     suppliers,
     pendingCount,
+    pendingBankCount,
+    pendingCmCount,
     setFilters,
     openInvoiceOcr,
     handleProcessInline,

@@ -34,7 +34,7 @@ services:
       TESSERACT_PATH: ${TESSERACT_PATH:-/usr/bin/tesseract}
       TESSERACT_DATAPATH: ${TESSERACT_DATAPATH:-/usr/share/tesseract-ocr/5/tessdata}
       TESSERACT_LANGUAGE: ${TESSERACT_LANGUAGE:-eng+fra}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
       SHOW_SQL: ${SHOW_SQL:-false}
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m}
     volumes:

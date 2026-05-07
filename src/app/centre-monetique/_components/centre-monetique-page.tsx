@@ -1234,12 +1234,13 @@ export default function CentreMonetiquePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {!isEditing ? (
+                {!isClient && !isEditing && (
                   <Button variant="outline" size="sm" className="h-8 text-xs gap-1 px-2" onClick={() => setIsEditing(true)}>
                     <Pencil className="h-3 w-3" />
                     Modifier
                   </Button>
-                ) : (
+                )}
+                {!isClient && isEditing && (
                   <>
                     <Button variant="outline" size="sm" className="h-8 text-xs gap-1 px-2" onClick={addTransactionRow}>
                       <Plus className="h-3 w-3" />

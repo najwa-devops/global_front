@@ -61,6 +61,7 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
                         { id: "bank-upload", href: "/bank/upload", label: "Importer relevÃ©", icon: Upload },
                         { id: "bank-list", href: "/bank/list", label: "Liste des relevÃ©s", icon: List },
                         { id: "bank-accounted", href: "/bank/accounted", label: "RelevÃ©s comptabilisÃ©s", icon: BookOpenCheck },
+                        { id: "bank-journal", href: "/journal", label: "Journal comptable", icon: BookOpenCheck },
                     ]
                 },
                 { id: "bank-centre-monetique", href: "/centre-monetique", label: "Centre MonÃ©tique", icon: ReceiptText },
@@ -122,6 +123,7 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
                         { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload },
                         { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List },
                         { id: "bank-accounted", href: "/bank/accounted", label: "Relevés comptabilisés", icon: BookOpenCheck },
+                        { id: "bank-journal", href: "/journal", label: "Journal comptable", icon: BookOpenCheck },
                     ]
                 },
                 { id: "bank-centre-monetique", href: "/centre-monetique", label: "Centre Monétique", icon: ReceiptText },
@@ -183,6 +185,7 @@ export const GLOBAL_NAV_CONFIG: Record<UserRole, NavItemConfig[]> = {
                         { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload },
                         { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List },
                         { id: "bank-accounted", href: "/bank/accounted", label: "Relevés comptabilisés", icon: BookOpenCheck },
+                        { id: "bank-journal", href: "/journal", label: "Journal comptable", icon: BookOpenCheck },
                     ]
                 },
                 { id: "bank-centre-monetique", href: "/centre-monetique", label: "Centre Monétique", icon: ReceiptText },
@@ -270,6 +273,7 @@ export const getDossierNavConfig = (dossierId: string | number): NavItemConfig[]
                     { id: "bank-upload", href: "/bank/upload", label: "Importer relevé", icon: Upload, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"] },
                     { id: "bank-list", href: "/bank/list", label: "Liste des relevés", icon: List, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"] },
                     { id: "bank-accounted", href: "/bank/accounted", label: "Relevés comptabilisés", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN"] },
+                    { id: "bank-journal", href: "/journal", label: "Journal comptable", icon: BookOpenCheck, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN"] },
                 ]
             },
             { id: "bank-centre-monetique", href: "/centre-monetique", label: "Centre Monétique", icon: ReceiptText, roles: ["COMPTABLE", "ADMIN", "SUPER_ADMIN", "CLIENT"] },
@@ -304,6 +308,7 @@ export const ROUTE_METADATA: Record<string, { title: string; breadcrumb?: string
     "/bank/list": { title: "Relevés Bancaires", breadcrumb: "Banque" },
     "/bank/upload": { title: "Importer un relevé", breadcrumb: "Import" },
     "/bank/accounted": { title: "Relevés comptabilisés", breadcrumb: "Comptabilisés" },
+    "/journal": { title: "Journal Comptable de Banque", breadcrumb: "Journal Banque" },
     "/centre-monetique": { title: "Centre Monétique", breadcrumb: "Centre Monétique" },
     "/settings/general": { title: "Parametres generaux", breadcrumb: "General" },
     "/settings/bank": { title: "Parametres bancaires", breadcrumb: "Banque" },

@@ -46,6 +46,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 function mapBackendDossier(raw: any): Dossier {
   return {
@@ -63,7 +70,10 @@ function mapBackendDossier(raw: any): Dossier {
     bankStatementsCount: raw.bankStatementsCount ?? 0,
     centreMonetiqueCount: raw.centreMonetiqueCount ?? 0,
     pendingInvoicesCount: raw.pendingInvoicesCount ?? 0,
+    pendingDocumentsCount: raw.pendingDocumentsCount ?? raw.pendingInvoicesCount ?? 0,
     validatedInvoicesCount: raw.validatedInvoicesCount ?? 0,
+    validatedBankStatementsCount: raw.validatedBankStatementsCount ?? 0,
+    validatedDocumentsCount: raw.validatedDocumentsCount ?? raw.validatedInvoicesCount ?? 0,
     status:
       String(raw.status || "ACTIVE").toUpperCase() === "ARCHIVED"
         ? "inactive"
@@ -102,6 +112,7 @@ function DossiersPageContent() {
     dossierId: number;
     dossierName: string;
   } | null>(null);
+  const [comptableSearch, setComptableSearch] = useState("");
   const [savingComptable, setSavingComptable] = useState(false);
 
   useEffect(() => {
@@ -149,6 +160,22 @@ function DossiersPageContent() {
     () => new Set(comptables.map((c) => c.id)),
     [comptables],
   );
+
+  const comptablesById = useMemo(
+    () => new Map(comptables.map((c) => [c.id, c])),
+    [comptables],
+  );
+
+  const filteredAssignComptables = useMemo(() => {
+    const term = comptableSearch.trim().toLowerCase();
+    if (!term) return comptables;
+    return comptables.filter((c) => c.email.toLowerCase().includes(term));
+  }, [comptables, comptableSearch]);
+
+  const getComptableLabel = (dossier: Dossier) =>
+    dossier.comptableName ||
+    comptablesById.get(dossier.comptableId)?.email ||
+    "—";
 
   const totalInvoices = dossiers.reduce((sum, dossier) => sum + dossier.invoicesCount, 0);
   const totalBankStatements = dossiers.reduce((sum, dossier) => sum + dossier.bankStatementsCount, 0);
@@ -209,7 +236,21 @@ function DossiersPageContent() {
     try {
       await api.changeDossierComptable(comptableModal.dossierId, comptableId);
       toast.success("Comptable assigné.");
+      const assignedComptable = comptablesById.get(comptableId);
+      setDossiers((current) =>
+        current.map((dossier) =>
+          dossier.id === comptableModal.dossierId
+            ? {
+                ...dossier,
+                comptableId,
+                comptableName:
+                  dossier.comptableName || assignedComptable?.email || "",
+              }
+            : dossier,
+        ),
+      );
       setComptableModal(null);
+      setComptableSearch("");
       await loadDossiers();
     } catch (err: any) {
       toast.error(err?.message || "Erreur lors de l'assignation.");
@@ -470,7 +511,7 @@ function DossiersPageContent() {
                 </CardDescription>
                 {isAdmin() && (
                   <CardDescription className="text-xs mt-0.5 flex items-center gap-2">
-                    <span>Comptable : {dossier.comptableName || "—"}</span>
+                    <span>Comptable : {getComptableLabel(dossier)}</span>
                     <button
                       className="text-primary underline hover:text-primary/70 transition-colors"
                       onClick={(e) => {
@@ -575,31 +616,54 @@ function DossiersPageContent() {
       </Dialog>
 
       {/* Comptable selection modal */}
-      <Dialog
+      <Sheet
         open={comptableModal !== null}
         onOpenChange={(open) => {
-          if (!open) setComptableModal(null);
+          if (!open) {
+            setComptableModal(null);
+            setComptableSearch("");
+          }
         }}
       >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Sélectionner un comptable</DialogTitle>
-          </DialogHeader>
-          {comptableModal && (
-            <p className="text-sm text-muted-foreground -mt-2 mb-1">
-              Dossier :{" "}
-              <span className="font-medium text-foreground">
-                {comptableModal.dossierName}
-              </span>
-            </p>
-          )}
-          <div className="space-y-2 max-h-80 overflow-y-auto">
+        <SheetContent side="right" className="w-full overflow-hidden p-0 sm:max-w-md">
+          <SheetHeader className="border-b px-6 py-5">
+            <SheetTitle>Sélectionner un comptable</SheetTitle>
+            <SheetDescription>
+              {comptableModal ? (
+                <>
+                  Dossier :{" "}
+                  <span className="font-medium text-foreground">
+                    {comptableModal.dossierName}
+                  </span>
+                </>
+              ) : (
+                "Choisissez le comptable à assigner."
+              )}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={comptableSearch}
+                onChange={(event) => setComptableSearch(event.target.value)}
+                placeholder="Rechercher un comptable..."
+                className="pl-9"
+              />
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {comptables.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">
                 Aucun comptable disponible
               </p>
+            ) : filteredAssignComptables.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Aucun comptable trouvé
+              </p>
             ) : (
-              comptables.map((c) => (
+              filteredAssignComptables.map((c) => (
                 <button
                   key={c.id}
                   disabled={savingComptable}
@@ -620,9 +684,10 @@ function DossiersPageContent() {
                 </button>
               ))
             )}
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <CreateDossierModal
         open={showCreateModal}

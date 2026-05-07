@@ -35,6 +35,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { BankStatementV2, BankTransactionV2 } from "@/releve-bancaire/types"
 import { formatFileSize, formatDate } from "@/lib/utils"
+import {
+    isAccountedStatus,
+    isBankStatementOpenStatus,
+    isProcessingStatus,
+    isValidatedStatus,
+    normalizeBankStatus,
+} from "@/src/features/bank/model/bank.model"
 
 interface BankStatementTableProps {
     statements: BankStatementV2[]
@@ -46,9 +53,11 @@ interface BankStatementTableProps {
     onSave?: (statement: BankStatementV2) => void
     onUpdateStatement?: (statement: BankStatementV2) => void
     userRole?: string
+    allowDeleteValidated?: boolean
+    allowDeleteAccounted?: boolean
 }
 
-export function BankStatementTable({ statements, onView, onDelete, onValidate, onMarkAsAccounted, onReprocess, onSave, onUpdateStatement, userRole }: BankStatementTableProps) {
+export function BankStatementTable({ statements, onView, onDelete, onValidate, onMarkAsAccounted, onReprocess, onSave, onUpdateStatement, userRole, allowDeleteValidated = false, allowDeleteAccounted = false }: BankStatementTableProps) {
     void onView
     void onSave
     // Initialiser les états de "Lier" à partir des données backend si disponibles
@@ -83,7 +92,7 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
     }
 
     const getStatusBadge = (status: string) => {
-        const normalized = String(status || "").toUpperCase()
+        const normalized = normalizeBankStatus(status)
         switch (normalized) {
             case "PENDING":
             case "EN_ATTENTE":
@@ -93,14 +102,14 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                 return <Badge className="bg-blue-500/10 text-blue-600 border-blue-400/30 animate-pulse">En cours</Badge>
             case "TREATED":
             case "TRAITE":
+            case "VERIFY":
             case "A_VERIFIER":
                 return <Badge className="bg-orange-500/10 text-orange-700 border-orange-500/40 animate-pulse">À vérifier</Badge>
             case "READY_TO_VALIDATE":
             case "PRET_A_VALIDER":
-                return <Badge className="bg-emerald-400/10 text-emerald-500 border-emerald-400/30">Prêt à valider</Badge>
             case "VALIDATED":
             case "VALIDE":
-                return <Badge className="bg-emerald-600 text-white border-emerald-700">Validé</Badge>
+                return <Badge className="bg-blue-500/10 text-blue-600 border-blue-400/30">Prêt à comptabiliser</Badge>
             case "COMPTABILISE":
             case "COMPTABILISÉ":
                 return <Badge className="bg-violet-600 text-white border-violet-700">Comptabilisé</Badge>
@@ -120,8 +129,8 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
     }
 
     const renderStatusCell = (statement: BankStatementV2) => {
-        const displayStatus = String(statement.displayStatus || statement.status || "").toUpperCase()
-        if (displayStatus === "PROCESSING" && statement.totalPages) {
+        const displayStatus = normalizeBankStatus(statement.displayStatus || statement.status)
+        if (isProcessingStatus(displayStatus) && statement.totalPages) {
             const progress = Math.round(((statement.processedPages || 0) / statement.totalPages) * 100);
             return (
                 <div className="flex flex-col gap-1 w-24">
@@ -162,10 +171,16 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                   </div>
                 ) : (
                   statements.map((statement) => {
-                    const displayStatus = String(statement.displayStatus || statement.status || "").toUpperCase()
+                    const displayStatus = normalizeBankStatus(statement.displayStatus || statement.status)
                     const isClientValidated = Boolean(statement.clientValidated)
-                    const isValidated = displayStatus === "VALIDATED" || displayStatus === "VALIDE"
-                    const canDelete = statement.canDelete !== false && !isValidated && !isClientValidated
+                    const isValidated = isValidatedStatus(displayStatus)
+                    const isAccounted = isAccountedStatus(displayStatus)
+                    const isAdmin = userRole === "ADMIN"
+                    const canDelete = statement.canDelete !== false && (
+                        (!isValidated && !isAccounted && !isClientValidated) ||
+                        ((isValidated || isClientValidated) && !isAccounted && allowDeleteValidated) ||
+                        (isAccounted && allowDeleteAccounted && isAdmin)
+                    )
 
                     return (
                       <div
@@ -198,7 +213,7 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                             <Eye className="h-4 w-4" />
                           </Button>
 
-                          {onValidate && !isClientValidated && (displayStatus === "READY_TO_VALIDATE" || displayStatus === "PRET_A_VALIDER" || displayStatus === "TREATED" || displayStatus === "TRAITE" || displayStatus === "A_VERIFIER") && (
+                          {onValidate && !isClientValidated && isBankStatementOpenStatus(displayStatus) && (
                             <Button
                               size="sm"
                               className="gap-2"
@@ -286,24 +301,18 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" className="w-32">
-                                                            {(String(statement.displayStatus || statement.status || "").toUpperCase() === "TREATED"
-                                                                || String(statement.displayStatus || statement.status || "").toUpperCase() === "TRAITE"
-                                                                || String(statement.displayStatus || statement.status || "").toUpperCase() === "A_VERIFIER"
-                                                                || String(statement.displayStatus || statement.status || "").toUpperCase() === "READY_TO_VALIDATE"
-                                                                || String(statement.displayStatus || statement.status || "").toUpperCase() === "PRET_A_VALIDER") && onValidate && (
+                                                            {isBankStatementOpenStatus(statement.displayStatus || statement.status) && onValidate && (
                                                                 <DropdownMenuItem className="text-emerald-600 gap-2" onClick={() => onValidate(statement.id)}>
                                                                     <CheckCircle2 className="h-4 w-4" /> Valider
                                                                 </DropdownMenuItem>
                                                             )}
-                                                            {(String(statement.displayStatus || statement.status || "").toUpperCase() === "VALIDATED"
-                                                                || String(statement.displayStatus || statement.status || "").toUpperCase() === "VALIDE") && onMarkAsAccounted && (
+                                                            {(isValidatedStatus(statement.displayStatus || statement.status) || isAccountedStatus(statement.displayStatus || statement.status)) && onMarkAsAccounted && (
                                                                 <DropdownMenuItem className="text-violet-700 gap-2" onClick={() => onMarkAsAccounted(statement.id)}>
                                                                     <CheckCircle2 className="h-4 w-4" /> Comptabiliser
                                                                 </DropdownMenuItem>
                                                             )}
                                                             {(statement.canReprocess
-                                                                || String(statement.displayStatus || statement.status || "").toUpperCase() === "ERROR"
-                                                                || String(statement.displayStatus || statement.status || "").toUpperCase() === "ERREUR") && onReprocess && (
+                                                                || normalizeBankStatus(statement.displayStatus || statement.status) === "ERROR") && onReprocess && (
                                                                 <DropdownMenuItem className="text-blue-600 gap-2" onClick={() => onReprocess(statement)}>
                                                                     <RefreshCw className="h-4 w-4" /> Reprocesser
                                                                 </DropdownMenuItem>

@@ -9,6 +9,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Users,
   FolderOpen,
   FileText,
@@ -25,12 +40,6 @@ import {
   AdminDossierDto,
   AdminInvoiceStatsDto,
 } from "@/src/api/services/admin.service";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { ComptableAdminDto } from "@/src/types";
 
 type DossierRow = {
@@ -59,6 +68,7 @@ function AdminPageContent() {
     dossierId: number;
     dossierName: string;
   } | null>(null);
+  const [comptableSearch, setComptableSearch] = useState("");
   const [savingComptable, setSavingComptable] = useState(false);
 
   useEffect(() => {
@@ -125,6 +135,12 @@ function AdminPageContent() {
         d.comptableName.toLowerCase().includes(term),
     );
   }, [dossiers, search]);
+
+  const filteredAssignComptables = useMemo(() => {
+    const term = comptableSearch.trim().toLowerCase();
+    if (!term) return comptables;
+    return comptables.filter((c) => c.email.toLowerCase().includes(term));
+  }, [comptables, comptableSearch]);
 
   const uniqueFournisseurs = useMemo(() => {
     return new Set(dossiers.map((d) => d.fournisseurName)).size;
@@ -265,71 +281,93 @@ function AdminPageContent() {
         </div>
 
         <TabsContent value="comptables">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredComptables.map((comptable) => {
-              const agg = comptablesById.get(comptable.id) || {
-                dossiers: 0,
-                invoices: 0,
-                pending: 0,
-              };
-              return (
-                <Card
-                  key={comptable.id}
-                  className="border-border/50 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group"
-                  onClick={() =>
-                    router.push(`/admin/comptables/${comptable.id}`)
-                  }
-                >
-                  <CardContent className="py-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
-                          {initialsFromEmail(comptable.email)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">
-                            {comptable.email.split("@")[0]}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {comptable.email}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant={comptable.active ? "default" : "secondary"}
-                        className="text-xs"
-                      >
-                        {comptable.active ? "Actif" : "Inactif"}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-center mt-3">
-                      <div className="rounded-lg bg-muted/50 py-2">
-                        <p className="text-lg font-bold">{agg.dossiers}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Dossiers
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/50 py-2">
-                        <p className="text-lg font-bold">{agg.pending}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          En attente
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/50 py-2">
-                        <p className="text-lg font-bold">{agg.invoices}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Factures
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex justify-end mt-2">
-                      <ChevronRight className="h-4 w-4 group-hover:text-primary transition-colors" />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <Card className="border-border/50">
+            <CardContent className="pt-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Comptables</p>
+                  <p className="text-xs text-muted-foreground">
+                    {filteredComptables.length} résultat(s)
+                  </p>
+                </div>
+                <div className="relative w-full max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Rechercher un comptable..."
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-border/50">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Comptable</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Dossiers</TableHead>
+                      <TableHead>En attente</TableHead>
+                      <TableHead>Factures</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredComptables.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                          Aucun comptable trouvé
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredComptables.map((comptable) => {
+                        const agg = comptablesById.get(comptable.id) || {
+                          dossiers: 0,
+                          invoices: 0,
+                          pending: 0,
+                        };
+                        return (
+                          <TableRow
+                            key={comptable.id}
+                            className="cursor-pointer hover:bg-accent/40"
+                            onClick={() => router.push(`/admin/comptables/${comptable.id}`)}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
+                                  {initialsFromEmail(comptable.email)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold truncate">
+                                    {comptable.email.split("@")[0]}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {comptable.email}
+                                  </p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={comptable.active ? "default" : "secondary"} className="text-xs">
+                                {comptable.active ? "Actif" : "Inactif"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">{agg.dossiers}</TableCell>
+                            <TableCell className="font-medium">{agg.pending}</TableCell>
+                            <TableCell className="font-medium">{agg.invoices}</TableCell>
+                            <TableCell className="text-right">
+                              <ChevronRight className="inline h-4 w-4 text-muted-foreground" />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="dossiers">
@@ -387,31 +425,54 @@ function AdminPageContent() {
         </TabsContent>
       </Tabs>
 
-      <Dialog
+      <Sheet
         open={comptableModal !== null}
         onOpenChange={(open) => {
-          if (!open) setComptableModal(null);
+          if (!open) {
+            setComptableModal(null);
+            setComptableSearch("");
+          }
         }}
       >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Sélectionner un comptable</DialogTitle>
-          </DialogHeader>
-          {comptableModal && (
-            <p className="text-sm text-muted-foreground -mt-2 mb-1">
-              Dossier :{" "}
-              <span className="font-medium text-foreground">
-                {comptableModal.dossierName}
-              </span>
-            </p>
-          )}
-          <div className="space-y-2 max-h-80 overflow-y-auto">
+        <SheetContent side="right" className="w-full overflow-hidden p-0 sm:max-w-md">
+          <SheetHeader className="border-b px-6 py-5">
+            <SheetTitle>Sélectionner un comptable</SheetTitle>
+            <SheetDescription>
+              {comptableModal ? (
+                <>
+                  Dossier :{" "}
+                  <span className="font-medium text-foreground">
+                    {comptableModal.dossierName}
+                  </span>
+                </>
+              ) : (
+                "Choisissez le comptable à assigner."
+              )}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={comptableSearch}
+                onChange={(event) => setComptableSearch(event.target.value)}
+                placeholder="Rechercher un comptable..."
+                className="pl-9"
+              />
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {comptables.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">
                 Aucun comptable disponible
               </p>
+            ) : filteredAssignComptables.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Aucun comptable trouvé
+              </p>
             ) : (
-              comptables.map((c) => (
+              filteredAssignComptables.map((c) => (
                 <button
                   key={c.id}
                   disabled={savingComptable}
@@ -432,9 +493,10 @@ function AdminPageContent() {
                 </button>
               ))
             )}
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[

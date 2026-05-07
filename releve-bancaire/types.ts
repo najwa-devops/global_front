@@ -38,3 +38,14 @@ export interface JournalEntryRow {
   sourceTransactionId?: number | null
   counterpart: boolean
 }
+
+export interface JournalAllEntriesResponse {
+  entries: JournalEntryRow[]
+  totalDebit: string
+  totalCredit: string
+  solde: string
+  balanced: boolean
+  count: number
+  availableYears: number[]
+  availableJournals: string[]
+}

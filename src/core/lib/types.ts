@@ -527,6 +527,7 @@ export interface LocalBankStatement {
     | "error"
     | "PENDING"
     | "PROCESSING"
+    | "VERIFY"
     | "TREATED"
     | "READY_TO_VALIDATE"
     | "VALIDATED"
@@ -586,6 +587,7 @@ export interface LocalBankStatement {
   packageRuleWarningMessage?: string | null;
   canReprocess?: boolean;
   canDelete?: boolean;
+  clientValidated?: boolean;
   validatedAt?: string | null;
   validatedBy?: string | null;
   rawOcrText?: string;

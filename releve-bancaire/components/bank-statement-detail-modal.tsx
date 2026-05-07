@@ -75,6 +75,11 @@ import { api } from "@/lib/api"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
+import {
+    isAccountedStatus,
+    isProcessingStatus,
+    isValidatedStatus,
+} from "@/src/features/bank/model/bank.model"
 
 interface BankStatementDetailModalProps {
     open?: boolean
@@ -107,18 +112,6 @@ const EMPTY_NEW_TRANSACTION: NewTransactionForm = {
 
 const DEFAULT_COMPTE_CODE = "349700000"
 const DEFAULT_COMPTE_CM_CODE = "342100000"
-
-function isValidatedStatus(status: string): boolean {
-    return ["VALIDATED", "VALIDE"].includes(status)
-}
-
-function isAccountedStatus(status: string): boolean {
-    return ["COMPTABILISE", "COMPTABILISÉ"].includes(status)
-}
-
-function isProcessingStatus(status?: string | null): boolean {
-    return status === "PROCESSING" || status === "PENDING" || status === "EN_COURS" || status === "EN_ATTENTE"
-}
 
 function sortByIndex(items: BankTransactionV2[]): BankTransactionV2[] {
     return [...items].sort((a, b) => {
@@ -743,11 +736,7 @@ export function BankStatementDetailModal({
 
     useEffect(() => {
         if (!(embedded || open) || !localStatement) return
-        const isProcessing =
-            localStatement.status === "PROCESSING" ||
-            localStatement.status === "PENDING" ||
-            localStatement.status === "EN_COURS" ||
-            localStatement.status === "EN_ATTENTE"
+        const isProcessing = isProcessingStatus(localStatement.status)
         if (!isProcessing) return
         const interval = setInterval(() => {
             loadFullData(localStatement.id, true)
@@ -821,12 +810,15 @@ export function BankStatementDetailModal({
             case "PROCESSING":
             case "EN_COURS":
                 return <Badge className="bg-blue-500/10 text-blue-600 border-blue-400/30 animate-pulse">En cours</Badge>
-            case "TREATED":
-            case "TRAITE":
-                return <Badge className="bg-blue-700/10 text-blue-800 border-blue-700/30">Traité</Badge>
             case "READY_TO_VALIDATE":
             case "PRET_A_VALIDER":
                 return <Badge className="bg-emerald-400/10 text-emerald-500 border-emerald-400/30">Prêt à valider</Badge>
+            case "TREATED":
+            case "TRAITE":
+                return <Badge className="bg-blue-700/10 text-blue-800 border-blue-700/30">Traité</Badge>
+            case "VERIFY":
+            case "A_VERIFIER":
+                return <Badge className="bg-orange-500/10 text-orange-700 border-orange-500/30">À vérifier</Badge>
             case "VALIDATED":
             case "VALIDE":
                 return <Badge className="bg-emerald-600 text-white border-emerald-700">Validé</Badge>
