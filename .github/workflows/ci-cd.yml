@@ -28,8 +28,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Run tests
+        run: pnpm exec jest --no-coverage
+
       - name: Build Next.js
-        run: pnpm exec next build
+        run: pnpm exec next build --webpack
         env:
           NEXT_PUBLIC_API_URL: /api
           BACKEND_INTERNAL_URL: http://localhost:8089
