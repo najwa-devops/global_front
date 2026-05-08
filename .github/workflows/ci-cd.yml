@@ -33,6 +33,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: /api
           BACKEND_INTERNAL_URL: http://localhost:8089
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Build Docker image
         run: docker build -t invoice-frontend:${{ github.sha }} .
