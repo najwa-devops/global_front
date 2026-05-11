@@ -555,12 +555,29 @@ export default function CentreMonetiquePage() {
     }
   }
 
-  const handleReprocess = async (id: number) => {
+  const refreshHistoryAndSelection = async (batchId?: number) => {
+    await loadHistory()
+    const targetId = batchId ?? selected?.id
+    if (targetId) {
+      try {
+        const refreshed = await centreApi.getCentreMonetiqueBatchById(targetId, true)
+        setSelected(refreshed)
+      } catch {
+        // on garde l'état courant si le refresh detail échoue
+      }
+    }
+  }
+
+  const handleReprocess = async (batch: CentreMonetiqueBatchSummary) => {
     try {
-      const response = await centreApi.reprocessCentreMonetique(id, undefined, selectedStructure)
+      const effectiveStructure = batch.structure && batch.structure !== "AUTO"
+        ? batch.structure
+        : selectedStructure
+      const response = await centreApi.reprocessCentreMonetique(batch.id, undefined, effectiveStructure as any)
+      const refreshedId = response?.batch?.id ?? batch.id
       setSelected(response.batch)
       toast.success("Retraitement terminé")
-      await loadHistory()
+      await refreshHistoryAndSelection(refreshedId)
     } catch (error: any) {
       toast.error(error?.message || "Erreur retraitement")
     }
@@ -977,7 +994,7 @@ export default function CentreMonetiquePage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button variant="outline" onClick={loadHistory}>
+              <Button variant="outline" onClick={() => { void refreshHistoryAndSelection() }}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Rafraîchir
               </Button>
@@ -1168,7 +1185,7 @@ export default function CentreMonetiquePage() {
                                 <FileText className="mr-2 h-4 w-4" />
                                 Fichier
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleReprocess(batch.id)}>
+                              <DropdownMenuItem onClick={() => handleReprocess(batch)}>
                                 <RotateCcw className="mr-2 h-4 w-4" />
                                 Reprocess
                               </DropdownMenuItem>

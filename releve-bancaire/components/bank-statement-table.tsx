@@ -175,11 +175,9 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                     const isClientValidated = Boolean(statement.clientValidated)
                     const isValidated = isValidatedStatus(displayStatus)
                     const isAccounted = isAccountedStatus(displayStatus)
-                    const isAdmin = userRole === "ADMIN"
                     const canDelete = statement.canDelete !== false && (
                         (!isValidated && !isAccounted && !isClientValidated) ||
-                        ((isValidated || isClientValidated) && !isAccounted && allowDeleteValidated) ||
-                        (isAccounted && allowDeleteAccounted && isAdmin)
+                        ((isValidated || isClientValidated) && !isAccounted && allowDeleteValidated)
                     )
 
                     return (

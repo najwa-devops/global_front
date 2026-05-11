@@ -46,9 +46,11 @@ interface BankStatementTableProps {
     onSave?: (statement: BankStatementV2) => void
     onUpdateStatement?: (statement: BankStatementV2) => void
     userRole?: string
+    allowDeleteValidated?: boolean
+    allowDeleteAccounted?: boolean
 }
 
-export function BankStatementTable({ statements, onView, onDelete, onValidate, onMarkAsAccounted, onReprocess, onSave, onUpdateStatement, userRole }: BankStatementTableProps) {
+export function BankStatementTable({ statements, onView, onDelete, onValidate, onMarkAsAccounted, onReprocess, onSave, onUpdateStatement, userRole, allowDeleteValidated, allowDeleteAccounted }: BankStatementTableProps) {
     void onView
     void onSave
     // Initialiser les états de "Lier" à partir des données backend si disponibles
@@ -65,6 +67,7 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
     const [linkedStatements, setLinkedStatements] = useState<Record<number, boolean>>(initialLinked)
     const [deleteStatementId, setDeleteStatementId] = useState<number | null>(null)
     const isClient = userRole === "CLIENT"
+    const isAdmin = userRole === "ADMIN"
     const showActions = !isClient
 
     // Mettre à jour si les statements changent
@@ -80,6 +83,26 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
         if (deleteStatementId == null) return
         onDelete(deleteStatementId)
         setDeleteStatementId(null)
+    }
+
+    const canDeleteStatement = (statement: BankStatementV2) => {
+        if (isClient) {
+            return false
+        }
+
+        const status = String(statement.displayStatus || statement.status || "").toUpperCase()
+        const isAccounted = status === "COMPTABILISE" || status === "COMPTABILISÉ"
+        const isValidated = Boolean(statement.clientValidated)
+            || status === "VALIDATED"
+            || status === "VALIDE"
+
+        if (isAccounted) {
+            return isAdmin && Boolean(allowDeleteAccounted)
+        }
+        if (isValidated) {
+            return Boolean(allowDeleteValidated)
+        }
+        return statement.canDelete !== false
     }
 
     const getStatusBadge = (status: string) => {
@@ -233,9 +256,11 @@ export function BankStatementTable({ statements, onView, onDelete, onValidate, o
                                                                         <RefreshCw className="h-4 w-4" /> Reprocesser
                                                                     </DropdownMenuItem>
                                                                 )}
-                                                                <DropdownMenuItem className="text-destructive gap-2" onClick={() => setDeleteStatementId(statement.id)}>
-                                                                    <Trash2 className="h-4 w-4" /> Supprimer
-                                                                </DropdownMenuItem>
+                                                                {canDeleteStatement(statement) && (
+                                                                    <DropdownMenuItem className="text-destructive gap-2" onClick={() => setDeleteStatementId(statement.id)}>
+                                                                        <Trash2 className="h-4 w-4" /> Supprimer
+                                                                    </DropdownMenuItem>
+                                                                )}
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </div>

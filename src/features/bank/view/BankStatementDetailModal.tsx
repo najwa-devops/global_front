@@ -922,16 +922,119 @@ export function BankStatementDetailModal({
     const [openComptePopoverTxId, setOpenComptePopoverTxId] = useState<number | null>(null)
     const [openNewComptePopover, setOpenNewComptePopover] = useState(false)
     const lastLoadedId = useRef<number | null>(null)
+    const lastCmExpansionsStatementId = useRef<number | null>(null)
     const [cmExpansions, setCmExpansions] = useState<Record<number, CmExpansion>>({})
+    const [cmAppliedOverrides, setCmAppliedOverrides] = useState<Record<number, boolean>>({})
     // bankTransactionIds où l'utilisateur a décoché l'expansion (affiche la ligne originale)
     const [collapsedCmTxIds, setCollapsedCmTxIds] = useState<Set<number>>(new Set())
+
+    const getCmOverridesStorageKey = (statementId: number) => `bank-statement-cm-overrides:${statementId}`
+
+    const readCmOverrides = (statementId: number): Record<number, boolean> => {
+        if (typeof window === "undefined") {
+            return {}
+        }
+        try {
+            const raw = window.localStorage.getItem(getCmOverridesStorageKey(statementId))
+            if (!raw) {
+                return {}
+            }
+            const parsed = JSON.parse(raw) as Record<string, boolean>
+            return Object.fromEntries(
+                Object.entries(parsed).map(([key, value]) => [Number(key), Boolean(value)])
+            )
+        } catch {
+            return {}
+        }
+    }
+
+    const writeCmOverrides = (statementId: number, overrides: Record<number, boolean>) => {
+        if (typeof window === "undefined") {
+            return
+        }
+        const serialized = JSON.stringify(
+            Object.fromEntries(
+                Object.entries(overrides).map(([key, value]) => [String(key), Boolean(value)])
+            )
+        )
+        window.localStorage.setItem(getCmOverridesStorageKey(statementId), serialized)
+    }
+
+    const persistCmAppliedChange = async (txId: number, nextApplied: boolean) => {
+        const previousEditable = editableTransactions
+        const previousTransactions = transactions
+        const previousBase = baseTransactions
+
+        const applyLocal = (rows: BankTransactionV2[]) =>
+            rows.map((row) => (row.id === txId ? { ...row, cmApplied: nextApplied } : row))
+
+        setEditableTransactions((prev) => applyLocal(prev))
+        setTransactions((prev) => applyLocal(prev))
+        setBaseTransactions((prev) => applyLocal(prev))
+
+        try {
+            const updated = await api.updateBankTransaction(txId, { cmApplied: nextApplied })
+            const normalized = { ...updated, cmApplied: nextApplied }
+            setEditableTransactions((prev) => prev.map((row) => (row.id === txId ? normalized : row)))
+            setTransactions((prev) => prev.map((row) => (row.id === txId ? normalized : row)))
+            setBaseTransactions((prev) => prev.map((row) => (row.id === txId ? normalized : row)))
+            if (localStatement?.id) {
+                setCmAppliedOverrides((prev) => {
+                    const next = { ...prev }
+                    if (nextApplied) {
+                        delete next[txId]
+                    } else {
+                        next[txId] = false
+                    }
+                    writeCmOverrides(localStatement.id, next)
+                    return next
+                })
+            }
+            onUpdateTransaction?.(normalized)
+        } catch (error) {
+            setEditableTransactions(previousEditable)
+            setTransactions(previousTransactions)
+            setBaseTransactions(previousBase)
+            toast.error("Impossible d'enregistrer la liaison Centre Monétique")
+        }
+    }
 
     const resolveDisplayCompteForTx = (tx: BankTransactionV2): string => {
         return resolveCompteWithDefaults(tx.compte, tx.libelle, Boolean(cmExpansions[tx.id]))
     }
 
+    const formatCmStructureLabel = (structure?: string | null): string => {
+        const normalized = String(structure || "").trim().toUpperCase()
+        if (!normalized) return "CM"
+        switch (normalized) {
+            case "BARID_BANK":
+                return "BARID BANK"
+            case "AMEX":
+                return "AMEX"
+            case "VPS":
+                return "VPS"
+            case "CMI":
+                return "CMI"
+            case "AUTO":
+                return "AUTO"
+            default:
+                return normalized.replace(/_/g, " ")
+        }
+    }
+
     const isSelectedCompteForTx = (tx: BankTransactionV2): boolean => {
         return resolveDisplayCompteForTx(tx) !== DEFAULT_COMPTE_CODE
+    }
+
+    const isCmAppliedForTx = (tx: BankTransactionV2): boolean => {
+        const override = cmAppliedOverrides[tx.id]
+        if (override !== undefined) {
+            return override
+        }
+        if (cmExpansions[tx.id] != null) {
+            return true
+        }
+        return Boolean(tx.cmApplied)
     }
 
     const cmSummary = useMemo(() => {
@@ -941,10 +1044,10 @@ export function BankStatementDetailModal({
             if (!Number.isNaN(id)) linkedIds.add(id)
         }
         const linkedCount = linkedIds.size
-        const appliedCount = editableTransactions.filter((tx) => linkedIds.has(tx.id) && Boolean(tx.cmApplied)).length
+        const appliedCount = editableTransactions.filter((tx) => linkedIds.has(tx.id) && isCmAppliedForTx(tx)).length
         const skippedCount = Math.max(linkedCount - appliedCount, 0)
         return { linkedCount, appliedCount, skippedCount }
-    }, [cmExpansions, editableTransactions])
+    }, [cmAppliedOverrides, cmExpansions, editableTransactions])
 
     const ttcSummary = useMemo(() => {
         const sourceCount = Number(localStatement?.ttcRuleAppliedCount || 0)
@@ -1046,9 +1149,11 @@ export function BankStatementDetailModal({
             }
         } else if (!open) {
             lastLoadedId.current = null
+            lastCmExpansionsStatementId.current = null
             setOpenComptePopoverTxId(null)
             setOpenNewComptePopover(false)
             setShowNewTransactionForm(false)
+            setCmAppliedOverrides({})
         }
     }, [open, statement?.id, statement?.status, statement?.transactionCount])
 
@@ -1115,8 +1220,15 @@ export function BankStatementDetailModal({
                     map[exp.bankTransactionId] = exp
                 }
                 setCmExpansions(map)
-                // par défaut: détails masqués pour toutes les liaisons CM
-                setCollapsedCmTxIds(new Set(expansions.map((exp) => exp.bankTransactionId)))
+                setCmAppliedOverrides(readCmOverrides(id))
+                const expansionIds = new Set(expansions.map((exp) => exp.bankTransactionId))
+                setCollapsedCmTxIds((prev) => {
+                    if (lastCmExpansionsStatementId.current !== id) {
+                        lastCmExpansionsStatementId.current = id
+                        return new Set()
+                    }
+                    return new Set([...prev].filter((txId) => expansionIds.has(txId)))
+                })
             }).catch(() => {/* silencieux */})
             return data
         } catch (error) {
@@ -1200,18 +1312,6 @@ export function BankStatementDetailModal({
         return { canonical, projectedStatement }
     }
 
-    const syncRuleChangeInBackground = async (statementId: number, successMessage: string) => {
-        for (let attempt = 0; attempt < 30; attempt += 1) {
-            await new Promise((resolve) => setTimeout(resolve, 1200))
-            const refreshed = await api.getBankStatementById(statementId)
-            if (!isProcessingStatus(refreshed.status)) {
-                await loadFullData(statementId, true)
-                toast.success(successMessage)
-                break
-            }
-        }
-    }
-
     const handleToggleTtcRule = async (checked: boolean) => {
         if (!localStatement) return
         const previousStatement = localStatement
@@ -1222,14 +1322,15 @@ export function BankStatementDetailModal({
         setTtcUpdating(true)
         applyRuleProjection(Boolean(localStatement.applyFraisRule), checked, Boolean(localStatement.applyAgiosRule), Boolean(localStatement.applyPackageRule))
         try {
-            await api.updateBankStatementTtcRule(localStatement.id, checked, true)
-            void syncRuleChangeInBackground(localStatement.id, "Mise à jour TTC terminée")
+            const updated = await api.updateBankStatementTtcRule(localStatement.id, checked, true)
+            setLocalStatement(updated)
+            await loadFullData(updated.id, true)
+            toast.success("Mise à jour TTC terminée")
         } catch (error) {
             console.error("Error updating TTC rule:", error)
             const recovered = await loadFullData(localStatement.id, true)
             if (recovered && Boolean(recovered.applyTtcRule) === checked) {
-                void syncRuleChangeInBackground(localStatement.id, "Mise à jour TTC terminée")
-                toast.success("Règle TTC enregistrée, synchronisation en cours")
+                toast.success("Règle TTC enregistrée")
             } else {
                 setLocalStatement(previousStatement)
                 setTransactions(previousTransactions)
@@ -1252,14 +1353,15 @@ export function BankStatementDetailModal({
         setFraisUpdating(true)
         applyRuleProjection(checked, Boolean(localStatement.applyTtcRule), Boolean(localStatement.applyAgiosRule), Boolean(localStatement.applyPackageRule))
         try {
-            await api.updateBankStatementFraisRule(localStatement.id, checked, true)
-            void syncRuleChangeInBackground(localStatement.id, "Mise à jour règle frais terminée")
+            const updated = await api.updateBankStatementFraisRule(localStatement.id, checked, true)
+            setLocalStatement(updated)
+            await loadFullData(updated.id, true)
+            toast.success("Mise à jour règle frais terminée")
         } catch (error) {
             console.error("Error updating frais rule:", error)
             const recovered = await loadFullData(localStatement.id, true)
             if (recovered && Boolean(recovered.applyFraisRule) === checked) {
-                void syncRuleChangeInBackground(localStatement.id, "Mise à jour règle frais terminée")
-                toast.success("Règle frais enregistrée, synchronisation en cours")
+                toast.success("Règle frais enregistrée")
             } else {
                 setLocalStatement(previousStatement)
                 setTransactions(previousTransactions)
@@ -1282,14 +1384,15 @@ export function BankStatementDetailModal({
         setAgiosUpdating(true)
         applyRuleProjection(Boolean(localStatement.applyFraisRule), Boolean(localStatement.applyTtcRule), checked, Boolean(localStatement.applyPackageRule))
         try {
-            await api.updateBankStatementAgiosRule(localStatement.id, checked, true)
-            void syncRuleChangeInBackground(localStatement.id, "Mise à jour règle agios terminée")
+            const updated = await api.updateBankStatementAgiosRule(localStatement.id, checked, true)
+            setLocalStatement(updated)
+            await loadFullData(updated.id, true)
+            toast.success("Mise à jour règle agios terminée")
         } catch (error) {
             console.error("Error updating agios rule:", error)
             const recovered = await loadFullData(localStatement.id, true)
             if (recovered && Boolean(recovered.applyAgiosRule) === checked) {
-                void syncRuleChangeInBackground(localStatement.id, "Mise à jour règle agios terminée")
-                toast.success("Règle agios enregistrée, synchronisation en cours")
+                toast.success("Règle agios enregistrée")
             } else {
                 setLocalStatement(previousStatement)
                 setTransactions(previousTransactions)
@@ -1312,14 +1415,15 @@ export function BankStatementDetailModal({
         setPackageUpdating(true)
         applyRuleProjection(Boolean(localStatement.applyFraisRule), Boolean(localStatement.applyTtcRule), Boolean(localStatement.applyAgiosRule), checked)
         try {
-            await api.updateBankStatementPackageRule(localStatement.id, checked, true)
-            void syncRuleChangeInBackground(localStatement.id, "Mise à jour règle package terminée")
+            const updated = await api.updateBankStatementPackageRule(localStatement.id, checked, true)
+            setLocalStatement(updated)
+            await loadFullData(updated.id, true)
+            toast.success("Mise à jour règle package terminée")
         } catch (error) {
             console.error("Error updating package rule:", error)
             const recovered = await loadFullData(localStatement.id, true)
             if (recovered && Boolean(recovered.applyPackageRule) === checked) {
-                void syncRuleChangeInBackground(localStatement.id, "Mise à jour règle package terminée")
-                toast.success("Règle package enregistrée, synchronisation en cours")
+                toast.success("Règle package enregistrée")
             } else {
                 setLocalStatement(previousStatement)
                 setTransactions(previousTransactions)
@@ -2339,8 +2443,9 @@ export function BankStatementDetailModal({
                                     <TableBody>
                                         {sortByIndex(editableTransactions).map((tx, idx) => {
                                             const cmExp = cmExpansions[tx.id]
-                                            const isExpanded = cmExp != null && !collapsedCmTxIds.has(tx.id)
+                                            const isExpanded = cmExp != null && !collapsedCmTxIds.has(tx.id) && isCmAppliedForTx(tx)
                                             const isCmLinked = cmExp != null
+                                            const isCmApplied = isCmAppliedForTx(tx)
 
                                             // ---- Lignes CM de remplacement ----
                                             if (isExpanded) {
@@ -2355,11 +2460,7 @@ export function BankStatementDetailModal({
                                                                 <Checkbox
                                                                     checked={true}
                                                                     onCheckedChange={() => {
-                                                                        setEditableTransactions((prev) =>
-                                                                            prev.map((row) =>
-                                                                                row.id === tx.id ? { ...row, cmApplied: false } : row
-                                                                            )
-                                                                        )
+                                                                        void persistCmAppliedChange(tx.id, false)
                                                                         setCollapsedCmTxIds((prev) => {
                                                                             const next = new Set(prev)
                                                                             next.add(tx.id)
@@ -2371,10 +2472,20 @@ export function BankStatementDetailModal({
                                                                 />
                                                             </TableCell>
                                                             <TableCell className="text-xs font-semibold text-emerald-800" colSpan={2}>
-                                                                {cmExp.cmBatchOriginalName}
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <span>{cmExp.cmBatchOriginalName}</span>
+                                                                    <span className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                                                                        {formatCmStructureLabel(cmExp.cmBatchStructure)}
+                                                                    </span>
+                                                                </div>
                                                             </TableCell>
                                                             <TableCell className="text-xs font-mono font-semibold text-emerald-700">
-                                                                {cmExp.cmReference}
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <span>{cmExp.cmReference}</span>
+                                                                    <span className="inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                                                                        {formatCmStructureLabel(cmExp.cmBatchStructure)}
+                                                                    </span>
+                                                                </div>
                                                             </TableCell>
                                                             <TableCell className="text-xs font-semibold text-emerald-800">
                                                                 Solde net remise
@@ -2519,7 +2630,7 @@ export function BankStatementDetailModal({
                                             <TableRow
                                                 key={tx.id}
                                                 className={cn(
-                                                    isCmLinked && Boolean(tx.cmApplied)
+                                                    isCmLinked && isCmApplied
                                                         ? "bg-emerald-50/70 hover:bg-emerald-100/70"
                                                         : isCmLinked
                                                             ? "bg-blue-50/70 hover:bg-blue-100/70"
@@ -2547,18 +2658,37 @@ export function BankStatementDetailModal({
                                                         {cmExp != null && (
                                                             <div className="flex items-center gap-1">
                                                                 <Checkbox
-                                                                    checked={Boolean(tx.cmApplied)}
+                                                                    checked={isCmApplied}
                                                                     onCheckedChange={(checked) => {
                                                                         const nextApplied = checked === true
-                                                                        setEditableTransactions((prev) =>
-                                                                            prev.map((row) =>
-                                                                                row.id === tx.id ? { ...row, cmApplied: nextApplied } : row
-                                                                            )
-                                                                        )
+                                                                        void persistCmAppliedChange(tx.id, nextApplied)
+                                                                        if (nextApplied) {
+                                                                            setCollapsedCmTxIds((prev) => {
+                                                                                const next = new Set(prev)
+                                                                                next.delete(tx.id)
+                                                                                return next
+                                                                            })
+                                                                        }
                                                                     }}
                                                                     className="border-emerald-500 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
                                                                     title="Cocher pour appliquer la liaison"
                                                                 />
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                        "h-6 px-2 text-[10px] font-semibold uppercase",
+                                                                        cmExp.cmBatchStructure === "AMEX"
+                                                                            ? "border-sky-300 text-sky-700 bg-sky-50"
+                                                                            : cmExp.cmBatchStructure === "BARID_BANK"
+                                                                                ? "border-amber-300 text-amber-700 bg-amber-50"
+                                                                                : cmExp.cmBatchStructure === "VPS"
+                                                                                    ? "border-violet-300 text-violet-700 bg-violet-50"
+                                                                                    : "border-emerald-300 text-emerald-700 bg-emerald-50"
+                                                                    )}
+                                                                    title={cmExp.cmBatchOriginalName}
+                                                                >
+                                                                    {formatCmStructureLabel(cmExp.cmBatchStructure)}
+                                                                </Badge>
                                                                 <button
                                                                     type="button"
                                                                     className="h-6 w-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/60"

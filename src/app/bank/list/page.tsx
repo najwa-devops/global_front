@@ -92,6 +92,14 @@ function BankListPageContent() {
         return true
     })
 
+    const hasProtectedStatements = statements.some((statement) => {
+        const status = (statement.status || "").toUpperCase()
+        return Boolean(statement.clientValidated)
+            || status === "VALIDATED"
+            || status === "VALIDE"
+            || isAccountedStatus(status)
+    })
+
     const handleUpload = async (file: File, bankType?: string) => {
         const effectiveBankType = bankType || "AUTO"
         const allowedBanks: string[] = []
@@ -159,7 +167,6 @@ function BankListPageContent() {
 
     const handleReprocess = async (statement: BankStatementV2) => {
         try {
-            // Reflect the action immediately in UI while backend starts processing.
             setStatements((prev) =>
                 prev.map((s) =>
                     s.id === statement.id
@@ -169,29 +176,13 @@ function BankListPageContent() {
             )
 
             const allowedBanks: string[] = []
-
             const updatedStatement = await api.processBankStatement(statement.id, allowedBanks)
             setStatements((prev) =>
                 prev.map((s) => (s.id === statement.id ? { ...s, ...updatedStatement } : s))
             )
-            toast.success("Reprocessage lancé")
-
-            // Force short polling on the single statement to keep UI in sync immediately.
-            const maxAttempts = 8
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                await new Promise((resolve) => setTimeout(resolve, 1200))
-                const latest = await api.getBankStatementById(statement.id)
-                setStatements((prev) =>
-                    prev.map((s) => (s.id === statement.id ? { ...s, ...latest } : s))
-                )
-                const isStillProcessing = ["PENDING", "PROCESSING", "EN_ATTENTE", "EN_COURS"].includes(latest.status)
-                if (!isStillProcessing) {
-                    break
-                }
-            }
-            await loadData()
+            toast.success("Reprocess terminé")
         } catch (error) {
-            toast.error("Erreur lors du reprocessage")
+            toast.error("Erreur lors du reprocess")
             await loadData()
         }
     }
@@ -246,7 +237,7 @@ function BankListPageContent() {
                             {filteredStatements.length} relevé{filteredStatements.length > 1 ? "s" : ""} affiché{filteredStatements.length > 1 ? "s" : ""}
                         </CardDescription>
                         {!isClient && (
-                            <Button variant="destructive" size="sm" onClick={handleDeleteAll} disabled={statements.length === 0}>
+                            <Button variant="destructive" size="sm" onClick={handleDeleteAll} disabled={statements.length === 0 || hasProtectedStatements}>
                                 Tout supprimer
                             </Button>
                         )}

@@ -81,6 +81,7 @@ export interface CmExpansion {
   bankTransactionId: number
   cmBatchId: number
   cmBatchOriginalName: string
+  cmBatchStructure: "AUTO" | "CMI" | "BARID_BANK" | "AMEX" | "VPS" | string
   cmReference: string
   cmMontant: string
   cmSubmissionAmount?: string

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { GeneralParamsService, DossierGeneralParams } from "@/src/api/services/general-params.service";
-import { useAuth } from "@/hooks/use-auth";
 
 const defaultForm: DossierGeneralParams = {
   companyName: "",
@@ -35,21 +34,26 @@ const defaultForm: DossierGeneralParams = {
 };
 
 export function GeneralParamsPage() {
-  const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<DossierGeneralParams>(defaultForm);
+  const hasHydrated = useRef(false);
+  const lastSavedSnapshot = useRef<string>("");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
         const params = await GeneralParamsService.getParams();
-        setForm({
+        const nextForm = {
           ...defaultForm,
           ...params,
           cmRate: params.cmRate ?? 0,
           isRate: params.isRate ?? 0,
-        });
+        };
+        setForm(nextForm);
+        lastSavedSnapshot.current = JSON.stringify(nextForm);
+        hasHydrated.current = true;
       } catch {
         toast.error("Erreur lors du chargement des parametres");
       } finally {
@@ -71,13 +75,30 @@ export function GeneralParamsPage() {
       toast.error("Dossier requis: ouvrez un dossier avant la sauvegarde.");
       return;
     }
+    try {
+      await persistParams(true);
+    } catch {
+      toast.error("Erreur lors de l'enregistrement");
+    }
+  };
+
+  const persistParams = async (notify = false) => {
+    if (!hasDossier) return null;
     setSaving(true);
     try {
       const saved = await GeneralParamsService.saveParams(form);
-      setForm((prev) => ({ ...prev, ...saved }));
-      toast.success("Parametres enregistres");
-    } catch {
-      toast.error("Erreur lors de l'enregistrement");
+      const nextForm = {
+        ...defaultForm,
+        ...saved,
+        cmRate: saved.cmRate ?? 0,
+        isRate: saved.isRate ?? 0,
+      };
+      setForm(nextForm);
+      lastSavedSnapshot.current = JSON.stringify(nextForm);
+      if (notify) {
+        toast.success("Parametres enregistres")
+      }
+      return nextForm;
     } finally {
       setSaving(false);
     }
@@ -94,6 +115,35 @@ export function GeneralParamsPage() {
       [key]: normalized === "" ? null : Number(normalized),
     }));
   };
+
+  useEffect(() => {
+    if (loading || !hasDossier || !hasHydrated.current) return;
+
+    const snapshot = JSON.stringify({
+      ...form,
+      cmRate: form.cmRate ?? 0,
+      isRate: form.isRate ?? 0,
+    });
+
+    if (snapshot === lastSavedSnapshot.current) {
+      return;
+    }
+
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+    }
+
+    saveTimer.current = setTimeout(() => {
+      void persistParams(false);
+    }, 600);
+
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+      }
+    };
+  }, [form, loading, hasDossier]);
 
   return (
     <div className="space-y-4 max-w-5xl">
@@ -317,24 +367,22 @@ export function GeneralParamsPage() {
                 Suppression d&apos;un document déjà validé par le client
               </Label>
             </div>
-            {isAdmin() && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="allowAccountedDocumentDeletion"
-                  checked={Boolean(form.allowAccountedDocumentDeletion)}
-                  onCheckedChange={(checked) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      allowAccountedDocumentDeletion: checked === true,
-                    }))
-                  }
-                  disabled={loading}
-                />
-                <Label htmlFor="allowAccountedDocumentDeletion">
-                  Suppression d&apos;un document déjà comptabilisé
-                </Label>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="allowAccountedDocumentDeletion"
+                checked={Boolean(form.allowAccountedDocumentDeletion)}
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    allowAccountedDocumentDeletion: checked === true,
+                  }))
+                }
+                disabled={loading}
+              />
+              <Label htmlFor="allowAccountedDocumentDeletion">
+                Suppression d&apos;un document déjà comptabilisé
+              </Label>
+            </div>
           </div>
 
           <div className="flex justify-end">
