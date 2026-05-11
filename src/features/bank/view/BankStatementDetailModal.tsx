@@ -1244,7 +1244,13 @@ export function BankStatementDetailModal({
         setLoadingAccounts(true)
         try {
             const data = await api.getAccounts(true)
-            setAccounts(data)
+            if (data.length > 0) {
+                setAccounts(data)
+                return
+            }
+
+            const fallback = await api.getAccountOptions()
+            setAccounts(fallback)
         } catch (error) {
             console.error("Error loading accounts:", error)
         } finally {

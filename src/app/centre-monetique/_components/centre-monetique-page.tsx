@@ -999,7 +999,7 @@ export default function CentreMonetiquePage() {
                 Rafraîchir
               </Button>
               {!isClient && (
-                <Button variant="destructive" onClick={handleDeleteAll} disabled={batches.length === 0}>
+                <Button variant="destructive" onClick={handleDeleteAll}>
                   Tout supprimer
                 </Button>
               )}

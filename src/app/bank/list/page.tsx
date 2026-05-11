@@ -237,7 +237,7 @@ function BankListPageContent() {
                             {filteredStatements.length} relevé{filteredStatements.length > 1 ? "s" : ""} affiché{filteredStatements.length > 1 ? "s" : ""}
                         </CardDescription>
                         {!isClient && (
-                            <Button variant="destructive" size="sm" onClick={handleDeleteAll} disabled={statements.length === 0 || hasProtectedStatements}>
+                            <Button variant="destructive" size="sm" onClick={handleDeleteAll}>
                                 Tout supprimer
                             </Button>
                         )}
