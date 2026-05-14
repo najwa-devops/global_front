@@ -67,7 +67,8 @@ export function TierSelectionModal({
         t.libelle.toLowerCase().includes(lower) ||
         (t.ice && t.ice.toLowerCase().includes(lower)) ||
         (t.ifNumber && t.ifNumber.toLowerCase().includes(lower)) ||
-        (t.tierNumber && t.tierNumber.toLowerCase().includes(lower)),
+        (t.tierNumber && t.tierNumber.toLowerCase().includes(lower)) ||
+        (t.codeTier && t.codeTier.toLowerCase().includes(lower)),
     );
   }, [tiers, searchQuery]);
 
@@ -128,6 +129,7 @@ export function TierSelectionModal({
                             : tier.ifNumber
                               ? `IF: ${tier.ifNumber}`
                               : "Non identifié"}
+                          {tier.codeTier ? ` · Code: ${tier.codeTier}` : ""}
                         </div>
                       </TableCell>
                       <TableCell>

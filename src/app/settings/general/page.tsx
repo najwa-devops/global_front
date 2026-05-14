@@ -31,7 +31,7 @@ function PageContent() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full max-w-[760px] grid-cols-3">
                     <TabsTrigger value="global">Parametres globaux</TabsTrigger>
-                    <TabsTrigger value="accounting-config">Configuration comptable</TabsTrigger>
+                    <TabsTrigger value="accounting-config">Journal de trésorerie</TabsTrigger>
                     <TabsTrigger value="params">Parametres dossier</TabsTrigger>
                 </TabsList>
                 <TabsContent value="global" className="pt-2">

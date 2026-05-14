@@ -35,6 +35,42 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function normalizeIce(value: unknown): string {
+  return String(value || "").replace(/\D/g, "").trim();
+}
+
+function collectIceCandidates(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : value !== undefined && value !== null ? [value] : [];
+  const normalized = values
+    .map((item) => normalizeIce(item))
+    .filter(Boolean);
+  return Array.from(new Set(normalized));
+}
+
+function resolveCounterpartyIce(candidates: string[], dossierIce?: string | null): string {
+  const normalizedDossierIce = normalizeIce(dossierIce);
+  const preferred = candidates.filter((candidate) => candidate && candidate !== normalizedDossierIce);
+  if (preferred.length > 0) {
+    return preferred[0];
+  }
+  return candidates[0] || "";
+}
+
+async function fetchDossierIce(dossierId: FormDataEntryValue | null, cookieHeader: string): Promise<string> {
+  if (!dossierId) return "";
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/api/settings/general-params?dossierId=${encodeURIComponent(String(dossierId))}`,
+      { headers: { cookie: cookieHeader } },
+    );
+    if (!response.ok) return "";
+    const payload = await response.json();
+    return normalizeIce(payload?.params?.ice);
+  } catch {
+    return "";
+  }
+}
+
 function resolveAmountsWithPriority(input: {
   amountHT?: unknown;
   tva?: unknown;
@@ -158,17 +194,23 @@ export async function POST(request: NextRequest) {
 
       const normalizedAlpha = alphaResult as Record<string, unknown>;
       const backendFields = (savedInvoice?.fieldsData || {}) as Record<string, unknown>;
-      const invoiceNumber = pickAlphaValue(normalizedAlpha, ["numeroFacture", "invoiceNumber"]) ?? backendFields.invoiceNumber;
-      const supplier = pickAlphaValue(normalizedAlpha, ["fournisseur", "supplier"]) ?? backendFields.supplier;
-      const invoiceDate = pickAlphaValue(normalizedAlpha, ["dateFacture", "invoiceDate"]) ?? backendFields.invoiceDate;
-      const amountHT = pickAlphaValue(normalizedAlpha, ["montantHt", "amountHT"]) ?? backendFields.amountHT;
-      const tva = pickAlphaValue(normalizedAlpha, ["tva"]) ?? backendFields.tva;
-      const amountTTC = pickAlphaValue(normalizedAlpha, ["montantTtc", "amountTTC"]) ?? backendFields.amountTTC;
-      const ice = pickAlphaValue(normalizedAlpha, ["ice", "supplierIce"]);
-      const ifNumber = pickAlphaValue(normalizedAlpha, ["ifNumber", "if"]);
-      const rcNumber = pickAlphaValue(normalizedAlpha, ["rcNumber", "rc"]);
-      const designation = pickAlphaValue(normalizedAlpha, ["designation", "object"]);
-      const tvaRate = pickAlphaValue(normalizedAlpha, ["tvaRate"]);
+      const dossierIce = await fetchDossierIce(dossierId, cookieHeader);
+      const alphaIceCandidates = collectIceCandidates(normalizedAlpha.ice ?? normalizedAlpha.supplierIce);
+      const backendIceCandidates = collectIceCandidates(backendFields.ice);
+      const iceCandidates = Array.from(new Set([...backendIceCandidates, ...alphaIceCandidates]));
+      const resolvedIce = resolveCounterpartyIce(iceCandidates, dossierIce);
+
+      const invoiceNumber = backendFields.invoiceNumber ?? pickAlphaValue(normalizedAlpha, ["numeroFacture", "invoiceNumber"]);
+      const supplier = backendFields.supplier ?? pickAlphaValue(normalizedAlpha, ["fournisseur", "supplier"]);
+      const invoiceDate = backendFields.invoiceDate ?? pickAlphaValue(normalizedAlpha, ["dateFacture", "invoiceDate"]);
+      const amountHT = backendFields.amountHT ?? pickAlphaValue(normalizedAlpha, ["montantHt", "amountHT"]);
+      const tva = backendFields.tva ?? pickAlphaValue(normalizedAlpha, ["tva"]);
+      const amountTTC = backendFields.amountTTC ?? pickAlphaValue(normalizedAlpha, ["montantTtc", "amountTTC"]);
+      const ice = resolvedIce || backendFields.ice || pickAlphaValue(normalizedAlpha, ["ice", "supplierIce"]);
+      const ifNumber = backendFields.ifNumber ?? pickAlphaValue(normalizedAlpha, ["ifNumber", "if"]);
+      const rcNumber = backendFields.rcNumber ?? pickAlphaValue(normalizedAlpha, ["rcNumber", "rc"]);
+      const designation = backendFields.designation ?? pickAlphaValue(normalizedAlpha, ["designation", "object"]);
+      const tvaRate = backendFields.tvaRate ?? pickAlphaValue(normalizedAlpha, ["tvaRate"]);
       const resolvedAmounts = resolveAmountsWithPriority({ amountHT, tva, amountTTC });
 
       if (invoiceNumber != null) fields.invoiceNumber = invoiceNumber;

@@ -41,27 +41,8 @@ type AccountFormState = {
   libelle: string;
   classe: number;
   tvaRate: string;
+  taxCode: string;
   active: boolean;
-  xCom: string;
-  delai: string;
-  ville: string;
-  adresse: string;
-  activite: string;
-  cdClt: string;
-  cdFrs: string;
-  typeCmpt: string;
-  numcat: string;
-  idF: string;
-  cod: string;
-  cnss: string;
-  tp: string;
-  ice: string;
-  rc: string;
-  rib: string;
-  tva: string;
-  charge: string;
-  createdBy: string;
-  updatedBy: string;
 };
 
 const ACCOUNT_CLASS_OPTIONS = [
@@ -80,35 +61,9 @@ const emptyAccountForm = (): AccountFormState => ({
   libelle: "",
   classe: 4,
   tvaRate: "0",
+  taxCode: "",
   active: true,
-  xCom: "",
-  delai: "",
-  ville: "",
-  adresse: "",
-  activite: "",
-  cdClt: "",
-  cdFrs: "",
-  typeCmpt: "",
-  numcat: "",
-  idF: "",
-  cod: "",
-  cnss: "",
-  tp: "",
-  ice: "",
-  rc: "",
-  rib: "",
-  tva: "",
-  charge: "",
-  createdBy: "",
-  updatedBy: "",
 });
-
-const normalizeOptionalNumber = (value: string) => {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : undefined;
-};
 
 const normalizeOptionalText = (value: string) => {
   const trimmed = value.trim();
@@ -139,10 +94,6 @@ export function AccountingSettingsPage() {
     null,
   );
   const [tierFilter] = useState<string>("all");
-  const [isAuxDialogOpen, setIsAuxDialogOpen] = useState(false);
-  const [auxType, setAuxType] = useState<"client" | "fournisseur">("fournisseur");
-  const [auxCollectifAccount, setAuxCollectifAccount] = useState("");
-  const [auxTierCode, setAuxTierCode] = useState("");
   // Dialog states
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -158,13 +109,17 @@ export function AccountingSettingsPage() {
     activity: "",
     auxiliaireMode: false,
     tierNumber: "",
+    codeTier: "",
     collectifAccount: "",
     ifNumber: "",
     ice: "",
     rcNumber: "",
     defaultChargeAccount: "",
+    defaultChargeAccount2: "",
     tvaAccount: "",
+    tvaAccount2: "",
     defaultTvaRate: 0,
+    defaultTvaRate2: 0,
     taxCode: "",
   });
 
@@ -194,6 +149,9 @@ export function AccountingSettingsPage() {
     return account?.tvaRate ?? null;
   };
 
+  const isTvaConfigEnabled = (code: string) =>
+    code.startsWith("3455") || code.startsWith("4455");
+
   function openAddAccount() {
     setEditingAccount(null);
     setAccountForm(emptyAccountForm());
@@ -201,33 +159,15 @@ export function AccountingSettingsPage() {
   }
 
   function openEditAccount(account: Account) {
+    const taxEnabled = isTvaConfigEnabled(account.code);
     setEditingAccount(account);
     setAccountForm({
       code: account.code,
       libelle: account.libelle,
       classe: account.classe || Number(account.code?.charAt(0) || 4),
-      tvaRate: account.tvaRate != null ? String(account.tvaRate) : "0",
+      tvaRate: taxEnabled && account.tvaRate != null ? String(account.tvaRate) : "0",
+      taxCode: taxEnabled ? account.taxCode || "" : "",
       active: account.active,
-      xCom: account.xCom || "",
-      delai: account.delai != null ? String(account.delai) : "",
-      ville: account.ville || "",
-      adresse: account.adresse || "",
-      activite: account.activite || "",
-      cdClt: account.cdClt != null ? String(account.cdClt) : "",
-      cdFrs: account.cdFrs != null ? String(account.cdFrs) : "",
-      typeCmpt: account.typeCmpt || "",
-      numcat: account.numcat != null ? String(account.numcat) : "",
-      idF: account.idF || "",
-      cod: account.cod || "",
-      cnss: account.cnss || "",
-      tp: account.tp || "",
-      ice: account.ice || "",
-      rc: account.rc || "",
-      rib: account.rib || "",
-      tva: account.tva || "",
-      charge: account.charge || "",
-      createdBy: account.createdBy || "",
-      updatedBy: account.updatedBy || "",
     });
     setIsAccountDialogOpen(true);
   }
@@ -246,37 +186,15 @@ export function AccountingSettingsPage() {
         toast.error("La classe doit être comprise entre 1 et 8");
         return;
       }
-      if (accountForm.tvaRate === null || accountForm.tvaRate === undefined || accountForm.tvaRate === "") {
-        toast.error("Le taux de TVA est obligatoire");
-        return;
-      }
+      const taxConfigEnabled = isTvaConfigEnabled(accountForm.code.trim());
 
       const payload: CreateAccountRequest | UpdateAccountRequest = {
         code: accountForm.code.trim(),
         libelle: accountForm.libelle.trim(),
         classe: accountForm.classe,
         tvaRate: Number(accountForm.tvaRate),
+        taxCode: taxConfigEnabled ? normalizeOptionalText(accountForm.taxCode) : undefined,
         active: accountForm.active,
-        xCom: normalizeOptionalText(accountForm.xCom),
-        delai: normalizeOptionalNumber(accountForm.delai),
-        ville: normalizeOptionalText(accountForm.ville),
-        adresse: normalizeOptionalText(accountForm.adresse),
-        activite: normalizeOptionalText(accountForm.activite),
-        cdClt: normalizeOptionalNumber(accountForm.cdClt),
-        cdFrs: normalizeOptionalNumber(accountForm.cdFrs),
-        typeCmpt: normalizeOptionalText(accountForm.typeCmpt),
-        numcat: normalizeOptionalNumber(accountForm.numcat),
-        idF: normalizeOptionalText(accountForm.idF),
-        cod: normalizeOptionalText(accountForm.cod),
-        cnss: normalizeOptionalText(accountForm.cnss),
-        tp: normalizeOptionalText(accountForm.tp),
-        ice: normalizeOptionalText(accountForm.ice),
-        rc: normalizeOptionalText(accountForm.rc),
-        rib: normalizeOptionalText(accountForm.rib),
-        tva: normalizeOptionalText(accountForm.tva),
-        charge: normalizeOptionalText(accountForm.charge),
-        createdBy: normalizeOptionalText(accountForm.createdBy),
-        updatedBy: normalizeOptionalText(accountForm.updatedBy),
       };
 
       if (editingAccount) {
@@ -311,7 +229,8 @@ export function AccountingSettingsPage() {
       (t) =>
         t.libelle.toLowerCase().includes(lower) ||
         (t.ice && t.ice.includes(lower)) ||
-        (t.tierNumber && t.tierNumber.includes(lower)),
+        (t.tierNumber && t.tierNumber.includes(lower)) ||
+        (t.codeTier && t.codeTier.includes(lower)),
     );
   }, [tiers, searchTierQuery, tierFilter]);
 
@@ -328,22 +247,19 @@ export function AccountingSettingsPage() {
       activity: "",
       auxiliaireMode: useAuxDialog,
       tierNumber: "",
-      collectifAccount: "",
+      codeTier: "",
+      collectifAccount: useAuxDialog ? "441100000" : "",
       ifNumber: "",
       ice: "",
       rcNumber: "",
       defaultChargeAccount: "",
+      defaultChargeAccount2: "",
       tvaAccount: "",
+      tvaAccount2: "",
       defaultTvaRate: 0,
+      defaultTvaRate2: 0,
       taxCode: "",
     });
-    if (useAuxDialog) {
-      setAuxType("fournisseur");
-      setAuxCollectifAccount("441100000");
-      setAuxTierCode("");
-      setIsAuxDialogOpen(true);
-      return;
-    }
     setIsTierDialogOpen(true);
   }
 
@@ -354,14 +270,19 @@ export function AccountingSettingsPage() {
       activity: tier.activity || "",
       auxiliaireMode: tier.auxiliaireMode,
       tierNumber: tier.tierNumber,
+      codeTier: tier.codeTier || "",
       collectifAccount: tier.collectifAccount || "",
       ifNumber: tier.ifNumber || "",
       ice: tier.ice || "",
       rcNumber: tier.rcNumber || "",
       defaultChargeAccount: tier.defaultChargeAccount || "",
+      defaultChargeAccount2: tier.defaultChargeAccount2 || "",
       tvaAccount: tier.tvaAccount || "",
+      tvaAccount2: tier.tvaAccount2 || "",
       defaultTvaRate:
         tier.defaultTvaRate ?? getTvaRateForAccount(tier.tvaAccount || "") ?? 0,
+      defaultTvaRate2:
+        tier.defaultTvaRate2 ?? getTvaRateForAccount(tier.tvaAccount2 || "") ?? 0,
       taxCode: tier.taxCode || "",
     });
     setIsTierDialogOpen(true);
@@ -371,6 +292,14 @@ export function AccountingSettingsPage() {
     try {
       if (!tierForm.libelle.trim() || !tierForm.tierNumber.trim()) {
         toast.error("Nom et Numero compte sont obligatoires");
+        return;
+      }
+      if (tierForm.auxiliaireMode && !tierForm.codeTier.trim()) {
+        toast.error("Le code tier est obligatoire en mode auxiliaire");
+        return;
+      }
+      if (tierForm.auxiliaireMode && !tierForm.collectifAccount.trim()) {
+        toast.error("Le compte collectif est obligatoire en mode auxiliaire");
         return;
       }
       if (editingTier) {
@@ -385,18 +314,6 @@ export function AccountingSettingsPage() {
       logger.error("Error saving tier", error);
       toast.error(error?.message || "Erreur lors de l'enregistrement du fournisseur");
     }
-  }
-
-  function handleConfirmAuxDialog() {
-    const defaultCollectif = auxType === "client" ? "342100000" : "441100000";
-    setTierForm((prev) => ({
-      ...prev,
-      auxiliaireMode: true,
-      collectifAccount: auxCollectifAccount || defaultCollectif,
-      tierNumber: auxTierCode,
-    }));
-    setIsAuxDialogOpen(false);
-    setIsTierDialogOpen(true);
   }
 
   const chargeAccounts = accounts.filter(
@@ -614,7 +531,7 @@ export function AccountingSettingsPage() {
       </Tabs>
 
       <Dialog open={isAccountDialogOpen} onOpenChange={setIsAccountDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingAccount ? "Modifier le compte" : "Ajouter un compte"}
@@ -623,13 +540,20 @@ export function AccountingSettingsPage() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Compte</Label>
+                <Label>N° Compte</Label>
                 <Input
                   value={accountForm.code}
                   disabled={!!editingAccount}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, code: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const nextCode = e.target.value;
+                    const nextEnabled = isTvaConfigEnabled(nextCode.trim());
+                    setAccountForm((prev) => ({
+                      ...prev,
+                      code: nextCode,
+                      tvaRate: nextEnabled ? prev.tvaRate || "0" : "0",
+                      taxCode: nextEnabled ? prev.taxCode : "",
+                    }));
+                  }}
                   placeholder="000000000"
                 />
               </div>
@@ -672,11 +596,34 @@ export function AccountingSettingsPage() {
                   max="100"
                   step="0.01"
                   value={accountForm.tvaRate}
+                  disabled={!isTvaConfigEnabled(accountForm.code.trim())}
                   onChange={(e) =>
                     setAccountForm({
                       ...accountForm,
                       tvaRate: e.target.value,
                     })
+                  }
+                  className={
+                    !isTvaConfigEnabled(accountForm.code.trim())
+                      ? "bg-muted/60"
+                      : undefined
+                  }
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Code Taxe</Label>
+                <Input
+                  value={accountForm.taxCode}
+                  disabled={!isTvaConfigEnabled(accountForm.code.trim())}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, taxCode: e.target.value })
+                  }
+                  placeholder="Code taxe"
+                  className={
+                    !isTvaConfigEnabled(accountForm.code.trim())
+                      ? "bg-muted/60"
+                      : undefined
                   }
                 />
               </div>
@@ -697,184 +644,6 @@ export function AccountingSettingsPage() {
                 </div>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
-              <div className="space-y-2">
-                <Label>Ville</Label>
-                <Input
-                  value={accountForm.ville}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, ville: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>Adresse</Label>
-                <Input
-                  value={accountForm.adresse}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, adresse: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2 md:col-span-3">
-                <Label>Activité</Label>
-                <Input
-                  value={accountForm.activite}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, activite: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
-              <div className="space-y-2">
-                <Label>Compte X_COM</Label>
-                <Input
-                  value={accountForm.xCom}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, xCom: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Délai</Label>
-                <Input
-                  type="number"
-                  value={accountForm.delai}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, delai: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Type compte</Label>
-                <Input
-                  value={accountForm.typeCmpt}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, typeCmpt: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
-              <div className="space-y-2">
-                <Label>CD Client</Label>
-                <Input
-                  type="number"
-                  value={accountForm.cdClt}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, cdClt: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>CD Fournisseur</Label>
-                <Input
-                  type="number"
-                  value={accountForm.cdFrs}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, cdFrs: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Numcat</Label>
-                <Input
-                  type="number"
-                  value={accountForm.numcat}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, numcat: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>ID F</Label>
-                <Input
-                  value={accountForm.idF}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, idF: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
-              <div className="space-y-2">
-                <Label>COD</Label>
-                <Input
-                  value={accountForm.cod}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, cod: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>CNSS</Label>
-                <Input
-                  value={accountForm.cnss}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, cnss: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>TP</Label>
-                <Input
-                  value={accountForm.tp}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, tp: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>ICE</Label>
-                <Input
-                  value={accountForm.ice}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, ice: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>RC</Label>
-                <Input
-                  value={accountForm.rc}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, rc: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>RIB</Label>
-                <Input
-                  value={accountForm.rib}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, rib: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>TVA</Label>
-                <Input
-                  value={accountForm.tva}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, tva: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Charge</Label>
-                <Input
-                  value={accountForm.charge}
-                  onChange={(e) =>
-                    setAccountForm({ ...accountForm, charge: e.target.value })
-                  }
-                />
-              </div>
-            </div>
           </div>
           <DialogFooter>
             <Button onClick={handleSaveAccount}>Enregistrer</Button>
@@ -887,21 +656,72 @@ export function AccountingSettingsPage() {
             <DialogTitle>
               {editingTier
                 ? "Modifier le Fournisseur"
-                : "Ajouter un Fournisseur"}
+                : tierForm.auxiliaireMode
+                  ? "Création du compte"
+                  : "Ajouter un Fournisseur"}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Numero Compte (ex: 44111234)</Label>
-                <Input
-                  className="font-mono"
-                  value={tierForm.tierNumber}
-                  onChange={(e) =>
-                    setTierForm({ ...tierForm, tierNumber: e.target.value })
-                  }
-                />
+            {tierForm.auxiliaireMode && (
+              <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Création du compte</Label>
+                  <Badge variant="outline">Mode auxiliaire</Badge>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Compte collectif</Label>
+                    <Select
+                      value={tierForm.collectifAccount}
+                      onValueChange={(value) =>
+                        setTierForm({ ...tierForm, collectifAccount: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choisir un compte" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="441100000">441100000</SelectItem>
+                        <SelectItem value="342100000">342100000</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Code tier</Label>
+                    <Input
+                      value={tierForm.codeTier}
+                      onChange={(e) =>
+                        setTierForm({ ...tierForm, codeTier: e.target.value })
+                      }
+                      placeholder="Code tier"
+                    />
+                  </div>
+                </div>
               </div>
+            )}
+            {!tierForm.auxiliaireMode ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Compte tier (ex: 44111234)</Label>
+                  <Input
+                    className="font-mono"
+                    value={tierForm.tierNumber}
+                    onChange={(e) =>
+                      setTierForm({ ...tierForm, tierNumber: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nom / Libelle</Label>
+                  <Input
+                    value={tierForm.libelle}
+                    onChange={(e) =>
+                      setTierForm({ ...tierForm, libelle: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            ) : (
               <div className="space-y-2">
                 <Label>Nom / Libelle</Label>
                 <Input
@@ -911,7 +731,7 @@ export function AccountingSettingsPage() {
                   }
                 />
               </div>
-            </div>
+            )}
 
             <div className="space-y-2 border-t pt-4">
               <Label>Activite</Label>
@@ -943,102 +763,176 @@ export function AccountingSettingsPage() {
                   }
                 />
               </div>
+              <div className="space-y-2">
+                <Label>RC</Label>
+                <Input
+                  value={tierForm.rcNumber}
+                  onChange={(e) =>
+                    setTierForm({ ...tierForm, rcNumber: e.target.value })
+                  }
+                />
+              </div>
             </div>
 
             <div className="space-y-4 border-t pt-4">
-              <div className="space-y-2">
-                <Label>Compte HT</Label>
-                <Select
-                  value={tierForm.defaultChargeAccount}
-                  onValueChange={(v) =>
-                    setTierForm({ ...tierForm, defaultChargeAccount: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choisir un compte" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {chargeAccounts.map((a) => (
-                      <SelectItem key={a.id} value={a.code}>
-                        {a.code} - {a.libelle}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Compte TVA</Label>
-                <Select
-                  value={tierForm.tvaAccount}
-                  onValueChange={(v) => {
-                    const selectedRate = getTvaRateForAccount(v);
-                    setTierForm({
-                      ...tierForm,
-                      tvaAccount: v,
-                      defaultTvaRate: selectedRate ?? tierForm.defaultTvaRate,
-                      taxCode:
-                        v.startsWith("3455") || v.startsWith("4455")
-                          ? tierForm.taxCode || "146"
-                          : tierForm.taxCode,
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choisir un compte" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tvaAccounts
-                      .filter(
-                        (a) =>
-                          a.code.startsWith("345") ||
-                          a.code.startsWith("445"),
-                      )
-                      .map((a) => (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Compte HT 1</Label>
+                  <Select
+                    value={tierForm.defaultChargeAccount}
+                    onValueChange={(v) =>
+                      setTierForm({ ...tierForm, defaultChargeAccount: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un compte" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {chargeAccounts.map((a) => (
                         <SelectItem key={a.id} value={a.code}>
                           {a.code} - {a.libelle}
-                          {a.tvaRate != null ? ` (TVA ${a.tvaRate}%)` : ""}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-                {tierForm.tvaAccount ? (
-                  <p className="text-xs text-muted-foreground">
-                    Taux associé au compte TVA:{" "}
-                    {getTvaRateForAccount(tierForm.tvaAccount) != null
-                      ? `${getTvaRateForAccount(tierForm.tvaAccount)}%`
-                      : `${tierForm.defaultTvaRate || 0}%`}
-                  </p>
-                ) : null}
-              </div>
-              {(tierForm.tvaAccount?.startsWith("3455") ||
-                tierForm.tvaAccount?.startsWith("4455")) && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Taux TVA</Label>
-                    <Input
-                      type="number"
-                      value={tierForm.defaultTvaRate}
-                      readOnly={Boolean(tierForm.tvaAccount)}
-                      onChange={(e) =>
-                        setTierForm({
-                          ...tierForm,
-                          defaultTvaRate: Number(e.target.value),
-                        })
-                      }
-                      className={tierForm.tvaAccount ? "bg-muted/50" : undefined}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Code Taux</Label>
-                    <Input
-                      value={tierForm.taxCode}
-                      onChange={(e) =>
-                        setTierForm({ ...tierForm, taxCode: e.target.value })
-                      }
-                    />
-                  </div>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                <div className="space-y-2">
+                  <Label>Compte HT 2</Label>
+                  <Select
+                    value={tierForm.defaultChargeAccount2}
+                    onValueChange={(v) =>
+                      setTierForm({ ...tierForm, defaultChargeAccount2: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un compte" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {chargeAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.code}>
+                          {a.code} - {a.libelle}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Compte TVA 1</Label>
+                  <Select
+                    value={tierForm.tvaAccount}
+                    onValueChange={(v) => {
+                      const selectedRate = getTvaRateForAccount(v);
+                      setTierForm({
+                        ...tierForm,
+                        tvaAccount: v,
+                        defaultTvaRate: selectedRate ?? tierForm.defaultTvaRate,
+                        taxCode:
+                          v.startsWith("3455") || v.startsWith("4455")
+                            ? tierForm.taxCode || "146"
+                            : tierForm.taxCode,
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un compte" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tvaAccounts
+                        .filter(
+                          (a) =>
+                            a.code.startsWith("3455") ||
+                            a.code.startsWith("4455"),
+                        )
+                        .map((a) => (
+                          <SelectItem key={a.id} value={a.code}>
+                            {a.code} - {a.libelle}
+                            {a.tvaRate != null ? ` (TVA ${a.tvaRate}%)` : ""}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {tierForm.tvaAccount ? (
+                    <p className="text-xs text-muted-foreground">
+                      Taux associé au compte TVA:{" "}
+                      {getTvaRateForAccount(tierForm.tvaAccount) != null
+                        ? `${getTvaRateForAccount(tierForm.tvaAccount)}%`
+                        : `${tierForm.defaultTvaRate || 0}%`}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Compte TVA 2</Label>
+                  <Select
+                    value={tierForm.tvaAccount2}
+                    onValueChange={(v) => {
+                      const selectedRate = getTvaRateForAccount(v);
+                      setTierForm({
+                        ...tierForm,
+                        tvaAccount2: v,
+                        defaultTvaRate2: selectedRate ?? tierForm.defaultTvaRate2,
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un compte" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tvaAccounts
+                        .filter(
+                          (a) =>
+                            a.code.startsWith("3455") ||
+                            a.code.startsWith("4455"),
+                        )
+                        .map((a) => (
+                          <SelectItem key={a.id} value={a.code}>
+                            {a.code} - {a.libelle}
+                            {a.tvaRate != null ? ` (TVA ${a.tvaRate}%)` : ""}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {tierForm.tvaAccount2 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Taux associé au compte TVA:{" "}
+                      {getTvaRateForAccount(tierForm.tvaAccount2) != null
+                        ? `${getTvaRateForAccount(tierForm.tvaAccount2)}%`
+                        : `${tierForm.defaultTvaRate2 || 0}%`}
+                    </p>
+                  ) : null}
+                </div>
+
+                {(tierForm.tvaAccount?.startsWith("3455") ||
+                  tierForm.tvaAccount?.startsWith("4455")) && (
+                  <div className="grid grid-cols-2 gap-4 md:col-span-2">
+                    <div className="space-y-2">
+                      <Label>Taux TVA</Label>
+                      <Input
+                        type="number"
+                        value={tierForm.defaultTvaRate}
+                        readOnly={Boolean(tierForm.tvaAccount)}
+                        onChange={(e) =>
+                          setTierForm({
+                            ...tierForm,
+                            defaultTvaRate: Number(e.target.value),
+                          })
+                        }
+                        className={tierForm.tvaAccount ? "bg-muted/50" : undefined}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Code Taux</Label>
+                      <Input
+                        value={tierForm.taxCode}
+                        onChange={(e) =>
+                          setTierForm({ ...tierForm, taxCode: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -1049,52 +943,6 @@ export function AccountingSettingsPage() {
               Annuler
             </Button>
             <Button onClick={handleSaveTier}>Enregistrer</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={isAuxDialogOpen} onOpenChange={setIsAuxDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Configuration auxiliaire</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select
-                value={auxType}
-                onValueChange={(value: "client" | "fournisseur") => setAuxType(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choisir un type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="client">client</SelectItem>
-                  <SelectItem value="fournisseur">fournisseur</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Compt collectife</Label>
-              <Input
-                value={auxCollectifAccount}
-                onChange={(e) => setAuxCollectifAccount(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Code tier</Label>
-              <Input
-                value={auxTierCode}
-                onChange={(e) => setAuxTierCode(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAuxDialogOpen(false)}>
-              Annuler
-            </Button>
-            <Button onClick={handleConfirmAuxDialog}>
-              Confirmer
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -181,6 +181,11 @@ export function dynamicInvoiceDtoToLocal(
     "detectedIce",
     "detectedIf",
     "detectedSupplier",
+    "iceRuleStatus",
+    "resolvedCounterpartyIce",
+    "detectedIceCandidates",
+    "taxCode",
+    "accountCode",
     "fileType",
     "processed",
     "processingDate",
@@ -193,6 +198,12 @@ export function dynamicInvoiceDtoToLocal(
     "averageConfidence",
     "allFieldsFound",
     "templateDetected",
+    "fixedSupplierData",
+    "detectedIceCandidates",
+    "resolvedCounterpartyIce",
+    "iceRuleStatus",
+    "taxCode",
+    "accountCode",
     "tvaValues",
   ];
 
@@ -343,6 +354,8 @@ export function salesInvoiceDtoToLocal(dto: DynamicInvoiceDto): DynamicInvoice {
     "processingDate", "extractionTimestamp", "extractionVersion",
     "extractionMethod", "missingFields", "lowConfidenceFields",
     "overallConfidence", "averageConfidence", "allFieldsFound", "templateDetected",
+    "fixedSupplierData", "detectedIceCandidates", "resolvedCounterpartyIce",
+    "iceRuleStatus", "taxCode", "accountCode",
   ];
 
   if (dto.fieldsData) {
@@ -762,10 +775,20 @@ export function ParseBackendFieldsData(
 
     // Priority 1: SI Tier trouvé -> Utiliser Tier.libelle pour le champ supplier
     if (field.key === "supplier") {
-      if (invoice?.tierName) {
+      if (fieldsData.fixedSupplierData?.supplier) {
+        backendValue = fieldsData.fixedSupplierData.supplier;
+      } else if (invoice?.tierName) {
         backendValue = invoice.tierName;
       } else if (invoice?.fixedSupplierData?.supplier) {
         backendValue = invoice.fixedSupplierData.supplier;
+      }
+    } else if (field.key === "ice") {
+      if (fieldsData.resolvedCounterpartyIce) {
+        backendValue = fieldsData.resolvedCounterpartyIce;
+      } else if (fieldsData.fixedSupplierData?.ice) {
+        backendValue = fieldsData.fixedSupplierData.ice;
+      } else if (invoice?.fixedSupplierData?.ice) {
+        backendValue = invoice.fixedSupplierData.ice;
       }
     }
 
@@ -853,9 +876,49 @@ export function ParseBackendFieldsData(
       supplierField.value = fixed.supplier;
       supplierField.detected = true;
     }
+
+    const activityField = parsedFields.find((f) => f.key === "activity");
+    const chargeAccountField = parsedFields.find((f) => f.key === "chargeAccount");
+    const tvaAccountField = parsedFields.find((f) => f.key === "tvaAccount");
+    const tvaRateField = parsedFields.find((f) => f.key === "tvaRate");
+
+    if (activityField && (!activityField.value || activityField.value === "") && fixed.activity) {
+      activityField.value = fixed.activity;
+      activityField.detected = true;
+    }
+    if (chargeAccountField && (!chargeAccountField.value || chargeAccountField.value === "") && fixed.chargeAccount) {
+      chargeAccountField.value = fixed.chargeAccount;
+      chargeAccountField.detected = true;
+    }
+    if (tvaAccountField && (!tvaAccountField.value || tvaAccountField.value === "") && fixed.tvaAccount) {
+      tvaAccountField.value = fixed.tvaAccount;
+      tvaAccountField.detected = true;
+    }
+    if (tvaRateField && (tvaRateField.value === "" || tvaRateField.value === null || tvaRateField.value === undefined) && fixed.tvaRate !== undefined) {
+      tvaRateField.value = fixed.tvaRate;
+      tvaRateField.detected = true;
+    }
   }
 
   // Fallback ICE/IF si détectés
+  if (
+    iceField &&
+    (!iceField.value || iceField.value === "") &&
+    fieldsData.resolvedCounterpartyIce
+  ) {
+    iceField.value = fieldsData.resolvedCounterpartyIce;
+    iceField.detected = true;
+  }
+
+  if (
+    iceField &&
+    (!iceField.value || iceField.value === "") &&
+    fieldsData.fixedSupplierData?.ice
+  ) {
+    iceField.value = fieldsData.fixedSupplierData.ice;
+    iceField.detected = true;
+  }
+
   if (
     iceField &&
     (!iceField.value || iceField.value === "") &&

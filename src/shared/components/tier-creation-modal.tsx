@@ -65,9 +65,13 @@ export function TierCreationModal({
     auxiliaireMode: true,
     collectifAccount: "441100000",
     tierNumber: "",
+    codeTier: "",
     defaultChargeAccount: "611100000",
+    defaultChargeAccount2: "",
     tvaAccount: "",
+    tvaAccount2: "",
     defaultTvaRate: 0,
+    defaultTvaRate2: 0,
     taxCode: "",
   });
 
@@ -90,11 +94,18 @@ export function TierCreationModal({
             : true),
         collectifAccount: existingTier?.collectifAccount || "441100000",
         tierNumber: existingTier?.tierNumber || "",
+        codeTier: existingTier?.codeTier || "",
         defaultChargeAccount: existingTier?.defaultChargeAccount || "611100000",
+        defaultChargeAccount2: existingTier?.defaultChargeAccount2 || "",
         tvaAccount: existingTier?.tvaAccount || "",
+        tvaAccount2: existingTier?.tvaAccount2 || "",
         defaultTvaRate:
           existingTier?.defaultTvaRate ??
           getTvaRateForAccount(existingTier?.tvaAccount || "") ??
+          0,
+        defaultTvaRate2:
+          existingTier?.defaultTvaRate2 ??
+          getTvaRateForAccount(existingTier?.tvaAccount2 || "") ??
           0,
         taxCode:
           existingTier?.taxCode ||
@@ -129,6 +140,9 @@ export function TierCreationModal({
         }
         if (!formData.tierNumber)
           throw new Error("Le numero compte est obligatoire");
+        if (!formData.codeTier || !String(formData.codeTier).trim()) {
+          throw new Error("Le code tier est obligatoire en mode auxiliaire");
+        }
       } else {
         if (!formData.tierNumber)
           throw new Error("Le numero compte est obligatoire");
@@ -157,8 +171,19 @@ export function TierCreationModal({
           "Le compte de charge doit contenir exactement 9 chiffres",
         );
       }
+      if (
+        formData.defaultChargeAccount2 &&
+        !/^\d{9}$/.test(formData.defaultChargeAccount2)
+      ) {
+        throw new Error(
+          "Le compte de charge 2 doit contenir exactement 9 chiffres",
+        );
+      }
       if (formData.tvaAccount && !/^\d{9}$/.test(formData.tvaAccount)) {
         throw new Error("Le compte TVA doit contenir exactement 9 chiffres");
+      }
+      if (formData.tvaAccount2 && !/^\d{9}$/.test(formData.tvaAccount2)) {
+        throw new Error("Le compte TVA 2 doit contenir exactement 9 chiffres");
       }
 
       const payload: any = {
@@ -168,6 +193,9 @@ export function TierCreationModal({
         defaultTvaRate: formData.defaultTvaRate
           ? Number(formData.defaultTvaRate)
           : null,
+        defaultTvaRate2: formData.defaultTvaRate2
+          ? Number(formData.defaultTvaRate2)
+          : null,
         active: true,
         createdBy: "user", // TODO: Get actual user via context if available
       };
@@ -175,6 +203,8 @@ export function TierCreationModal({
       // Cleanup headers specific to mode
       if (!formData.auxiliaireMode) {
         payload.collectifAccount = null;
+      } else {
+        payload.tierNumber = formData.tierNumber;
       }
 
       let result: Tier;
@@ -228,61 +258,59 @@ export function TierCreationModal({
               </h4>
 
               <div className="space-y-4">
-                {formData.auxiliaireMode && (
-                  <div className="space-y-2">
-                    <Label>Compte Collectif</Label>
-                    <Select
-                      value={formData.collectifAccount}
-                      onValueChange={(v) =>
-                        setFormData({ ...formData, collectifAccount: v })
-                      }
-                      disabled={isEditMode}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fournisseurAccounts.map((c) => (
-                          <SelectItem key={c.code} value={c.code}>
-                            {c.code}
-                          </SelectItem>
-                        ))}
-                        {fournisseurAccounts.length === 0 && (
-                          <SelectItem value="441100000">441100000</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                {formData.auxiliaireMode ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Code tier</Label>
+                      <Input
+                        value={formData.codeTier || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, codeTier: e.target.value })
+                        }
+                        placeholder="Code interne"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nom / Libelle</Label>
+                      <Input
+                        value={formData.libelle}
+                        onChange={(e) =>
+                          setFormData({ ...formData, libelle: e.target.value })
+                        }
+                        placeholder="ex: IAM"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Compte tier</Label>
+                      <Input
+                        value={formData.tierNumber}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            tierNumber: e.target.value
+                              .toUpperCase()
+                              .replace(/[^A-Z0-9-]/g, "")
+                              .slice(0, 31),
+                          })
+                        }
+                        placeholder="ex: 441100001"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nom / Libelle</Label>
+                      <Input
+                        value={formData.libelle}
+                        onChange={(e) =>
+                          setFormData({ ...formData, libelle: e.target.value })
+                        }
+                        placeholder="ex: IAM"
+                      />
+                    </div>
                   </div>
                 )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Numero Compte</Label>
-                    <Input
-                      value={formData.tierNumber}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          tierNumber: e.target.value
-                            .toUpperCase()
-                            .replace(/[^A-Z0-9-]/g, "")
-                            .slice(0, 31),
-                        })
-                      }
-                      placeholder="ex: 441100001"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Nom / Libelle</Label>
-                    <Input
-                      value={formData.libelle}
-                      onChange={(e) =>
-                        setFormData({ ...formData, libelle: e.target.value })
-                      }
-                      placeholder="ex: IAM"
-                    />
-                  </div>
-                </div>
 
                 <div className="space-y-2">
                   <Label>Activite</Label>
@@ -343,7 +371,7 @@ export function TierCreationModal({
               <h4 className="text-sm font-semibold">Configuration Comptable</h4>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Compte HT</Label>
+                  <Label>Compte HT 1</Label>
                   <Select
                     value={formData.defaultChargeAccount}
                     onValueChange={(v) =>
@@ -362,9 +390,29 @@ export function TierCreationModal({
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Compte HT 2</Label>
+                  <Select
+                    value={formData.defaultChargeAccount2}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, defaultChargeAccount2: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {chargeAccounts.map((a) => (
+                        <SelectItem key={a.code} value={a.code}>
+                          {a.code} - {a.libelle}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 <div className="space-y-2">
-                  <Label>Compte TVA</Label>
+                  <Label>Compte TVA 1</Label>
                   <Select
                     value={formData.tvaAccount}
                     onValueChange={(v) => {
@@ -404,6 +452,47 @@ export function TierCreationModal({
                       {getTvaRateForAccount(formData.tvaAccount) != null
                         ? `${getTvaRateForAccount(formData.tvaAccount)}%`
                         : `${formData.defaultTvaRate || 0}%`}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Compte TVA 2</Label>
+                  <Select
+                    value={formData.tvaAccount2}
+                    onValueChange={(v) => {
+                      const selectedRate = getTvaRateForAccount(v);
+                      setFormData({
+                        ...formData,
+                        tvaAccount2: v,
+                        defaultTvaRate2: selectedRate ?? formData.defaultTvaRate2,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Sélectionner..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tvaAccounts
+                        .filter(
+                          (a) =>
+                            a.code.startsWith("3455") ||
+                            a.code.startsWith("4455"),
+                        )
+                        .map((a) => (
+                          <SelectItem key={a.code} value={a.code}>
+                            {a.code} - {a.libelle}
+                            {a.tvaRate != null ? ` (TVA ${a.tvaRate}%)` : ""}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.tvaAccount2 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Taux TVA du compte:{" "}
+                      {getTvaRateForAccount(formData.tvaAccount2) != null
+                        ? `${getTvaRateForAccount(formData.tvaAccount2)}%`
+                        : `${formData.defaultTvaRate2 || 0}%`}
                     </p>
                   ) : null}
                 </div>

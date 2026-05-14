@@ -208,14 +208,18 @@ export interface Tier {
     activity?: string;
     auxiliaireMode: boolean;
     tierNumber: string;
+    codeTier?: string;
     collectifAccount?: string;
     displayAccount?: string;
     ifNumber?: string;
     ice?: string;
     rcNumber?: string;
     defaultChargeAccount?: string;
+    defaultChargeAccount2?: string;
     tvaAccount?: string;
+    tvaAccount2?: string;
     defaultTvaRate?: number;
+    defaultTvaRate2?: number;
     active: boolean;
     hasAccountingConfig?: boolean;
     hasTvaConfiguration?: boolean;
@@ -229,13 +233,17 @@ export interface CreateTierRequest {
     activity?: string;
     auxiliaireMode: boolean;
     tierNumber: string;
+    codeTier?: string;
     collectifAccount?: string;
     ifNumber?: string;
     ice?: string;
     rcNumber?: string;
     defaultChargeAccount?: string;
+    defaultChargeAccount2?: string;
     tvaAccount?: string;
+    tvaAccount2?: string;
     defaultTvaRate?: number;
+    defaultTvaRate2?: number;
     active?: boolean;
 }
 
@@ -243,13 +251,17 @@ export interface UpdateTierRequest {
     libelle?: string;
     activity?: string;
     tierNumber?: string;
+    codeTier?: string;
     collectifAccount?: string;
     ifNumber?: string;
     ice?: string;
     rcNumber?: string;
     defaultChargeAccount?: string;
+    defaultChargeAccount2?: string;
     tvaAccount?: string;
+    tvaAccount2?: string;
     defaultTvaRate?: number;
+    defaultTvaRate2?: number;
     taxCode?: string;
     active?: boolean;
 }

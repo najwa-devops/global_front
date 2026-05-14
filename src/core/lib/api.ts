@@ -173,6 +173,7 @@ function normalizeTierPayload<T extends CreateTierRequest | UpdateTierRequest>(
     libelle: normalizeText(payload.libelle),
     activity: normalizeText(payload.activity),
     tierNumber: normalizeCode(payload.tierNumber),
+    codeTier: normalizeText((payload as any).codeTier),
     collectifAccount: normalizeCode(payload.collectifAccount),
     ifNumber: normalizeIdentifier(payload.ifNumber),
     ice: normalizeIdentifier(payload.ice),
@@ -1034,6 +1035,20 @@ export async function getAccountByCode(code: string): Promise<Account | null> {
     `/api/v2/accounting/accounts/by-code/${encodeURIComponent(code)}`,
   );
   return result?.account || null;
+}
+
+export async function getAccountByIce(ice: string): Promise<Account | null> {
+  const normalizedIce = ice?.trim().replace(/\s+/g, "");
+  if (!normalizedIce) return null;
+  try {
+    const result = await request<{ account?: Account }>(
+      `/api/v2/accounting/accounts/by-ice/${encodeURIComponent(normalizedIce)}`,
+    );
+    return result?.account || null;
+  } catch (error: any) {
+    if (error?.status === 404) return null;
+    throw error;
+  }
 }
 
 export async function searchAccounts(query: string): Promise<Account[]> {
@@ -2338,6 +2353,7 @@ export const api = {
   getAccountOptions,
   getAccountById,
   getAccountByCode,
+  getAccountByIce,
   searchAccounts,
   getAccountsByClasse,
   createAccount,

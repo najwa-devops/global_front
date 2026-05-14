@@ -132,7 +132,7 @@ export function AccountingConfigurationPage({ embedded = false }: AccountingConf
         <div className={embedded ? "space-y-6" : "space-y-6 p-6"}>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xl font-semibold">Configuration comptable</CardTitle>
+                    <CardTitle className="text-xl font-semibold">Journal de trésorerie</CardTitle>
                     <Button onClick={openAdd}>
                         <Plus className="h-4 w-4 mr-2" />
                         Ajouter
@@ -171,7 +171,7 @@ export function AccountingConfigurationPage({ embedded = false }: AccountingConf
                             {accountingConfigs.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={6} className="text-center text-muted-foreground">
-                                        Aucune configuration comptable
+                                        Aucun journal de trésorerie configuré
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -184,7 +184,7 @@ export function AccountingConfigurationPage({ embedded = false }: AccountingConf
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>
-                            {editingConfig ? "Modifier la configuration comptable" : "Ajouter une configuration comptable"}
+                            {editingConfig ? "Modifier le journal de trésorerie" : "Ajouter un journal de trésorerie"}
                         </DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-2">

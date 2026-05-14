@@ -174,7 +174,7 @@ export function AccountingConfigurationPage({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-xl font-semibold">
-            Configuration comptable
+            Journal de trésorerie
           </CardTitle>
           <Button onClick={openAdd}>
             <Plus className="h-4 w-4 mr-2" />
@@ -229,7 +229,7 @@ export function AccountingConfigurationPage({
                     colSpan={7}
                     className="text-center text-muted-foreground"
                   >
-                    Aucune configuration comptable
+                    Aucun journal de trésorerie configuré
                   </TableCell>
                 </TableRow>
               )}
@@ -243,8 +243,8 @@ export function AccountingConfigurationPage({
           <DialogHeader>
             <DialogTitle>
               {editingConfig
-                ? "Modifier la configuration comptable"
-                : "Ajouter une configuration comptable"}
+                ? "Modifier le journal de trésorerie"
+                : "Ajouter un journal de trésorerie"}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">

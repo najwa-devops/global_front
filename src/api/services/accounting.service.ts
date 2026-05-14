@@ -122,12 +122,17 @@ export class AccountingService {
             libelle: normalizeText(data.libelle),
             activity: normalizeText(data.activity),
             tierNumber: normalizeCode(data.tierNumber),
+            codeTier: normalizeText((data as any).codeTier),
             collectifAccount: normalizeCode(data.collectifAccount),
             ifNumber: normalizeIdentifier(data.ifNumber),
             ice: normalizeIdentifier(data.ice),
             rcNumber: normalizeIdentifier(data.rcNumber),
             defaultChargeAccount: normalizeCode(data.defaultChargeAccount),
+            defaultChargeAccount2: normalizeCode((data as any).defaultChargeAccount2),
             tvaAccount: normalizeCode(data.tvaAccount),
+            tvaAccount2: normalizeCode((data as any).tvaAccount2),
+            defaultTvaRate: (data as any).defaultTvaRate ?? undefined,
+            defaultTvaRate2: (data as any).defaultTvaRate2 ?? undefined,
         } as T;
     }
 }

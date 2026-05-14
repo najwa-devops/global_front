@@ -362,6 +362,7 @@ export interface Tier {
   // Mode Auxiliaire
   auxiliaireMode: boolean;
   tierNumber: string;
+  codeTier?: string | undefined;
   collectifAccount?: string | undefined;
   displayAccount?: string | undefined;
 
@@ -372,8 +373,11 @@ export interface Tier {
 
   // Config Comptable
   defaultChargeAccount?: string | undefined;
+  defaultChargeAccount2?: string | undefined;
   tvaAccount?: string | undefined;
+  tvaAccount2?: string | undefined;
   defaultTvaRate?: number | undefined;
+  defaultTvaRate2?: number | undefined;
   taxCode?: string | undefined;
 
   active: boolean;
@@ -390,13 +394,17 @@ export interface CreateTierRequest {
   activity?: string | undefined;
   auxiliaireMode: boolean;
   tierNumber: string;
+  codeTier?: string | undefined;
   collectifAccount?: string | undefined;
   ifNumber?: string | undefined;
   ice?: string | undefined;
   rcNumber?: string | undefined;
   defaultChargeAccount?: string | undefined;
+  defaultChargeAccount2?: string | undefined;
   tvaAccount?: string | undefined;
+  tvaAccount2?: string | undefined;
   defaultTvaRate?: number | undefined;
+  defaultTvaRate2?: number | undefined;
   active?: boolean | undefined;
 }
 
@@ -404,13 +412,17 @@ export interface UpdateTierRequest {
   libelle?: string | undefined;
   activity?: string | undefined;
   tierNumber?: string | undefined;
+  codeTier?: string | undefined;
   collectifAccount?: string | undefined;
   ifNumber?: string | undefined;
   ice?: string | undefined;
   rcNumber?: string | undefined;
   defaultChargeAccount?: string | undefined;
+  defaultChargeAccount2?: string | undefined;
   tvaAccount?: string | undefined;
+  tvaAccount2?: string | undefined;
   defaultTvaRate?: number | undefined;
+  defaultTvaRate2?: number | undefined;
   taxCode?: string | undefined;
   active?: boolean | undefined;
 }
@@ -788,6 +800,11 @@ export interface FixedSupplierData {
   ifNumber?: string;
   rcNumber?: string;
   supplier?: string;
+  activity?: string;
+  chargeAccount?: string;
+  tvaAccount?: string;
+  tvaRate?: number;
+  taxCode?: string;
   address?: string;
   phone?: string;
   email?: string;
