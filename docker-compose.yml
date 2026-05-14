@@ -27,7 +27,7 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       DATABASE_URL: jdbc:mariadb://mariadb:3306/${DB_NAME:-invoice_db}?createDatabaseIfNotExist=true
       DATABASE_USERNAME: ${DATABASE_USERNAME:-root}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-${DB_ROOT_PASSWORD:-root}}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-root}
       BACKEND_PORT: ${BACKEND_PORT:-8089}
       UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
       UPLOAD_BANK_DIR: ${UPLOAD_BANK_DIR:-/app/uploads_banking}
